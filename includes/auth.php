@@ -7,7 +7,7 @@ function isLoggedIn() {
 
 function requireLogin() {
     if (!isLoggedIn()) {
-        header('Location: /hr-finance-dashboard/login.php');
+        header('Location: /HRandMDDash/login.php');
         exit();
     }
 }
@@ -15,7 +15,7 @@ function requireLogin() {
 function requireRole($role) {
     requireLogin();
     if ($_SESSION['user_role'] !== $role) {
-        header('Location: /hr-finance-dashboard/index.php');
+        header('Location: /HRandMDDash/index.php');
         exit();
     }
 }
