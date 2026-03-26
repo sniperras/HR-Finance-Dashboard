@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             // Redirect based on role
             if ($user['role'] === 'director') {
-                header('Location: director/director_dashboard.php');
+                header('Location: director/md_dashboard.php');
             } else {
                 header('Location: admin/master_data.php');
             }

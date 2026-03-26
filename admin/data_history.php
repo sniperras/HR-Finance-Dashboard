@@ -383,6 +383,7 @@ unset($_SESSION['error']);
             <a href="master_data.php" class="navbar-brand">HR & Finance Dashboard</a>
             <div class="navbar-menu">
                 <a href="master_data.php">Master Data Entry</a>
+                <a href="report_mro_cpr.php">Director Data Entry</a>
                 <a href="verify_data.php">Verify Data</a>
                 <a href="data_history.php" style="color: var(--accent);">History</a>
                 <div class="user-info">

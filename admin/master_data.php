@@ -404,6 +404,7 @@ unset($_SESSION['error']);
             <a href="master_data.php" class="navbar-brand" style="font-size: 1rem;">HR & Finance Dashboard</a>
             <div class="navbar-menu">
                 <a href="master_data.php" style="font-size: 0.8rem;">Master Data</a>
+                <a href="report_mro_cpr.php">Director Data Entry</a>
                 <a href="verify_data.php" style="font-size: 0.8rem;">Verify</a>
                 <a href="data_history.php" style="font-size: 0.8rem;">History</a>
                 <div class="user-info">
@@ -434,7 +435,7 @@ unset($_SESSION['error']);
         <?php endif; ?>
         
         <div class="info-banner">
-            💡 <strong>Data Entry:</strong> Enter Actual values → % auto-calculates | ✏️ <strong>Targets are editable</strong> for each department | 🧮 <strong>Remainder:</strong> Auto-calculated from MD/DIV.
+            <strong>✏️ <strong>Targets are editable</strong> for each department | 🧮 <strong>Remainder:</strong> Auto-calculated from MD/DIV.
         </div>
         
         <div class="form-container" style="padding: 0;">
