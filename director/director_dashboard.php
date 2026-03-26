@@ -15,12 +15,20 @@ if (preg_match('/director_([A-Z\/\s]+)/', $username, $matches)) {
     $userDept = trim($matches[1]);
 }
 
-// If no department found or user is admin director, show all departments
+// Check if this is a department director (not admin)
 $isAdminDirector = ($userDept === '' || $userDept === 'admin');
-$departmentFilter = $isAdminDirector ? null : $userDept;
 
-// Define all departments
-$allDepartments = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'MRO HR', 'MD/DIV.', 'Remainder'];
+// If admin director, redirect to admin dashboard
+if ($isAdminDirector) {
+    header('Location: md_dashboard.php?month=' . $currentMonth);
+    exit();
+}
+
+// If no department found, redirect to login
+if (empty($userDept)) {
+    header('Location: ../login.php');
+    exit();
+}
 
 // Define all indicators with their display names
 $indicators = [
@@ -86,55 +94,21 @@ $indicators = [
     ]
 ];
 
-// Color mapping for departments - modern, comfortable UI colors
-$departmentColors = [
-    'BMT' => '#00ADB5',
-    'LMT' => '#4ECDC4',
-    'CMT' => '#45B7D1',
-    'EMT' => '#96CEB4',
-    'AEP' => '#FFEAA7',
-    'MSM' => '#DDA0DD',
-    'QA' => '#98D8C8',
-    'MRO HR' => '#F7B05E',
-    'MD/DIV.' => '#E67E22',
-    'Remainder' => '#95A5A6'
-];
-
-// Pie chart colors - vibrant but comfortable
-$pieColors = [
-    '#38BDF8', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
-    '#EC4899', '#14B8A6', '#F97316', '#6366F1', '#A855F7',
-    '#06B6D4', '#84CC16', '#D946EF', '#F43F5E', '#0EA5E9'
-];
-
-// Fetch actual data from database for the selected month
+// Fetch actual data from database for the selected month and department
 $dbData = [];
-$query = "SELECT indicator_name, department, percentage_achievement, actual_value, target_value, id
+$query = "SELECT indicator_name, percentage_achievement, actual_value, target_value, id
           FROM master_performance_data 
-          WHERE data_month = ? AND verification_status = 'verified'";
+          WHERE data_month = ? AND department = ? AND verification_status = 'verified'";
 
-if (!$isAdminDirector) {
-    $query .= " AND department = ?";
-    $stmt = $conn->prepare($query);
-    $stmt->bind_param("ss", $dataMonth, $userDept);
-} else {
-    $stmt = $conn->prepare($query);
-    $stmt->bind_param("s", $dataMonth);
-}
-
+$stmt = $conn->prepare($query);
+$stmt->bind_param("ss", $dataMonth, $userDept);
 $stmt->execute();
 $result = $stmt->get_result();
 
 while ($row = $result->fetch_assoc()) {
     $indicator = $row['indicator_name'];
-    $dept = $row['department'];
-    $percentage = round($row['percentage_achievement'], 1);
-    
-    if (!isset($dbData[$indicator])) {
-        $dbData[$indicator] = [];
-    }
-    $dbData[$indicator][$dept] = [
-        'percentage' => $percentage,
+    $dbData[$indicator] = [
+        'percentage' => round($row['percentage_achievement'], 1),
         'actual' => $row['actual_value'],
         'target' => $row['target_value'],
         'record_id' => $row['id']
@@ -142,49 +116,31 @@ while ($row = $result->fetch_assoc()) {
 }
 $stmt->close();
 
-// Calculate overall percentages and prepare data for display
+// Prepare metrics data for display
 $metricsData = [];
 foreach ($indicators as $indicatorKey => $indicatorInfo) {
-    $departmentData = [];
-    $departmentRecordIds = [];
-    
-    if (isset($dbData[$indicatorKey]) && !empty($dbData[$indicatorKey])) {
-        foreach ($dbData[$indicatorKey] as $dept => $values) {
-            if ($isAdminDirector || $dept === $userDept) {
-                $departmentData[$dept] = $values['percentage'];
-                $departmentRecordIds[$dept] = $values['record_id'];
-            }
-        }
-        
-        if (!empty($departmentData)) {
-            $overall = round(array_sum($departmentData) / count($departmentData), 1);
-        } else {
-            $overall = 0;
-        }
+    if (isset($dbData[$indicatorKey])) {
+        $data = $dbData[$indicatorKey];
+        $metricsData[$indicatorKey] = [
+            'display_name' => $indicatorInfo['display_name'],
+            'short_name' => $indicatorInfo['short_name'],
+            'id' => $indicatorInfo['id'],
+            'percentage' => $data['percentage'],
+            'actual' => $data['actual'],
+            'target' => $data['target'],
+            'record_id' => $data['record_id']
+        ];
     } else {
-        $overall = 0;
-        $departmentData = [];
-        $departmentRecordIds = [];
-        
-        if ($isAdminDirector) {
-            foreach ($allDepartments as $dept) {
-                $departmentData[$dept] = 0;
-                $departmentRecordIds[$dept] = null;
-            }
-        } else {
-            $departmentData[$userDept] = 0;
-            $departmentRecordIds[$userDept] = null;
-        }
+        $metricsData[$indicatorKey] = [
+            'display_name' => $indicatorInfo['display_name'],
+            'short_name' => $indicatorInfo['short_name'],
+            'id' => $indicatorInfo['id'],
+            'percentage' => 0,
+            'actual' => 0,
+            'target' => 100,
+            'record_id' => null
+        ];
     }
-    
-    $metricsData[$indicatorKey] = [
-        'display_name' => $indicatorInfo['display_name'],
-        'short_name' => $indicatorInfo['short_name'],
-        'id' => $indicatorInfo['id'],
-        'overall' => $overall,
-        'departments' => $departmentData,
-        'record_ids' => $departmentRecordIds
-    ];
 }
 
 $conn->close();
@@ -195,9 +151,8 @@ $conn->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title><?php echo $isAdminDirector ? 'Organizational' : $userDept; ?> Performance Dashboard</title>
+    <title><?php echo htmlspecialchars($userDept); ?> Department Performance Dashboard</title>
     <link rel="stylesheet" href="../css/style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --dark-bg: #0F172A;
@@ -304,8 +259,8 @@ $conn->close();
         /* Main Container */
         .container {
             width: 100%;
-            max-width: 100%;
-            margin: 0;
+            max-width: 1200px;
+            margin: 0 auto;
             padding: 0.75rem 1rem;
         }
         
@@ -348,168 +303,97 @@ $conn->close();
             font-size: 0.85rem;
         }
         
-        /* Responsive Grid Layout */
-        .metrics-grid {
-            display: grid;
-            gap: 1rem;
+        /* Department Header Card */
+        .department-header-card {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+            color: var(--dark-bg);
+            padding: 1rem;
+            border-radius: 12px;
             margin-bottom: 1rem;
+            text-align: center;
         }
         
-        /* Responsive grid columns based on screen size */
-        @media (min-width: 1600px) {
-            .metrics-grid {
-                grid-template-columns: repeat(4, 1fr);
-                gap: 1.2rem;
-            }
+        .department-header-card h2 {
+            font-size: 1.2rem;
+            margin-bottom: 0.3rem;
         }
         
-        @media (min-width: 1200px) and (max-width: 1599px) {
-            .metrics-grid {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 1rem;
-            }
+        .department-header-card p {
+            font-size: 0.7rem;
+            opacity: 0.9;
         }
         
-        @media (min-width: 768px) and (max-width: 1199px) {
-            .metrics-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 0.9rem;
-            }
-        }
-        
-        @media (max-width: 767px) {
-            .metrics-grid {
-                grid-template-columns: 1fr;
-                gap: 0.8rem;
-            }
-        }
-        
-        /* Metric Card */
-        .metric-card {
+        /* Table Layout */
+        .dashboard-table {
+            width: 100%;
+            border-collapse: collapse;
             background: var(--card-bg);
             border-radius: 12px;
-            padding: 0.8rem;
-            transition: all 0.3s;
-            border: 1px solid var(--border-light);
-            display: flex;
-            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            font-size: 0.8rem;
         }
         
-        .metric-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-            border-color: var(--accent);
+        .dashboard-table th,
+        .dashboard-table td {
+            padding: 0.8rem 0.6rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-light);
+            vertical-align: middle;
         }
         
-        .metric-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.6rem;
-            padding-bottom: 0.4rem;
-            border-bottom: 2px solid var(--accent);
-        }
-        
-        .metric-title {
+        .dashboard-table th {
+            background: var(--dark-bg);
+            color: var(--accent);
+            font-weight: bold;
             font-size: 0.75rem;
+        }
+        
+        .dashboard-table tr:hover {
+            background: rgba(56,189,248,0.05);
+        }
+        
+        .indicator-cell {
             font-weight: bold;
             color: var(--accent);
             cursor: pointer;
             transition: color 0.2s;
         }
         
-        .metric-title:hover {
+        .indicator-cell:hover {
             color: var(--accent-hover);
             text-decoration: underline;
         }
         
-        .overall-score {
-            font-size: 1rem;
+        .percentage-cell {
             font-weight: bold;
-            cursor: pointer;
-            padding: 0.2rem 0.5rem;
-            border-radius: 20px;
-            transition: all 0.2s;
+            text-align: center;
         }
         
-        .overall-score:hover {
-            transform: scale(1.05);
-            background: rgba(56,189,248,0.1);
+        .progress-cell {
+            min-width: 150px;
         }
         
-        /* Chart Container */
-        .chart-container {
-            position: relative;
-            width: 100%;
-            max-width: 180px;
-            margin: 0 auto 0.6rem;
-            cursor: pointer;
-        }
-        
-        .chart-container canvas {
-            width: 100% !important;
-            height: auto !important;
-            max-height: 140px;
-        }
-        
-        /* Department Bars */
-        .dept-bars {
-            margin-top: 0.5rem;
-            flex: 1;
-        }
-        
-        .dept-bar-item {
-            margin-bottom: 0.4rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            padding: 0.2rem 0.3rem;
-            border-radius: 6px;
-        }
-        
-        .dept-bar-item:hover {
-            background: rgba(56,189,248,0.1);
-            transform: translateX(3px);
-        }
-        
-        .dept-bar-label {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 0.15rem;
-            font-size: 0.6rem;
-        }
-        
-        .dept-name {
-            font-weight: bold;
-        }
-        
-        .dept-percentage {
-            font-weight: bold;
-        }
-        
-        .dept-bar-container {
+        .progress-bar-container {
             background: var(--dark-bg);
-            border-radius: 4px;
+            border-radius: 10px;
             overflow: hidden;
-            height: 6px;
+            height: 8px;
+            width: 100%;
         }
         
-        .dept-bar-fill {
+        .progress-bar-fill {
             height: 100%;
-            border-radius: 4px;
+            border-radius: 10px;
             transition: width 0.3s;
         }
         
-        /* Welcome Banner */
-        .welcome-banner {
-            background: rgba(56,189,248,0.1);
-            border-left: 3px solid var(--accent);
-            padding: 0.4rem 0.75rem;
-            border-radius: 6px;
-            margin-bottom: 0.75rem;
-            font-size: 0.7rem;
+        .actual-cell, .target-cell {
+            text-align: center;
+            font-family: monospace;
+            font-size: 0.75rem;
         }
         
-        /* No Data */
         .no-data {
             text-align: center;
             padding: 2rem;
@@ -519,7 +403,6 @@ $conn->close();
             border-radius: 12px;
         }
         
-        /* Spinner */
         .spinner {
             border: 2px solid var(--light-bg);
             border-top: 2px solid var(--accent);
@@ -535,7 +418,22 @@ $conn->close();
             100% { transform: rotate(360deg); }
         }
         
-        /* Scrollbar */
+        .clickable {
+            cursor: pointer;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 0.5rem;
+            }
+            
+            .dashboard-table th,
+            .dashboard-table td {
+                padding: 0.5rem 0.3rem;
+                font-size: 0.7rem;
+            }
+        }
+        
         ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
@@ -549,84 +447,6 @@ $conn->close();
             background: var(--accent);
             border-radius: 3px;
         }
-        
-        /* Tooltip */
-        [data-tooltip] {
-            position: relative;
-            cursor: help;
-        }
-        
-        [data-tooltip]:before {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--dark-bg);
-            color: var(--light-bg);
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.6rem;
-            white-space: nowrap;
-            z-index: 1000;
-            display: none;
-            pointer-events: none;
-        }
-        
-        [data-tooltip]:hover:before {
-            display: block;
-        }
-        
-        /* Loading overlay */
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-        }
-        
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-            .container {
-                padding: 0.5rem;
-            }
-            
-            .metric-card {
-                padding: 0.6rem;
-            }
-            
-            .metric-title {
-                font-size: 0.7rem;
-            }
-            
-            .overall-score {
-                font-size: 0.85rem;
-            }
-            
-            .chart-container {
-                max-width: 140px;
-            }
-            
-            .dept-bar-label {
-                font-size: 0.55rem;
-            }
-        }
-        
-        @media (max-width: 480px) {
-            .chart-container {
-                max-width: 120px;
-            }
-            
-            .dept-bar-item {
-                margin-bottom: 0.3rem;
-            }
-        }
     </style>
 </head>
 <body>
@@ -637,9 +457,7 @@ $conn->close();
                 <a href="director_dashboard.php" class="btn" style="background: transparent; color: var(--accent);">Dashboard</a>
                 <div class="user-info">
                     <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
-                    <?php if (!$isAdminDirector): ?>
-                        <span class="department-badge"><?php echo htmlspecialchars($userDept); ?></span>
-                    <?php endif; ?>
+                    <span class="department-badge"><?php echo htmlspecialchars($userDept); ?></span>
                     <a href="../logout.php" class="btn">Logout</a>
                 </div>
             </div>
@@ -648,15 +466,7 @@ $conn->close();
     
     <div class="container">
         <div class="dashboard-header">
-            <h1>
-                <?php 
-                if ($isAdminDirector) {
-                    echo "📊 Organizational Performance Dashboard";
-                } else {
-                    echo "📈 " . htmlspecialchars($userDept) . " Department Performance";
-                }
-                ?>
-            </h1>
+            <h1>📈 <?php echo htmlspecialchars($userDept); ?> Department Performance Dashboard</h1>
             <div class="month-selector">
                 <button onclick="changeMonth('prev')">← Prev</button>
                 <h3 id="current-month"><?php echo date('F Y', strtotime($dataMonth)); ?></h3>
@@ -664,11 +474,10 @@ $conn->close();
             </div>
         </div>
         
-        <?php if (!$isAdminDirector): ?>
-            <div class="welcome-banner">
-                <strong>👋 <?php echo htmlspecialchars($userDept); ?> Department</strong> - Click on any metric or department for detailed view | Hover over charts for values
-            </div>
-        <?php endif; ?>
+        <div class="department-header-card">
+            <h2><?php echo htmlspecialchars($userDept); ?> Department</h2>
+            <p>Performance Metrics for <?php echo date('F Y', strtotime($dataMonth)); ?> | Click on any metric for detailed report</p>
+        </div>
         
         <div id="dashboard-content">
             <div class="spinner"></div>
@@ -678,214 +487,90 @@ $conn->close();
     <script>
         // Data passed from PHP
         const metricsData = <?php echo json_encode($metricsData); ?>;
-        const departmentColors = <?php echo json_encode($departmentColors); ?>;
-        const pieColors = <?php echo json_encode($pieColors); ?>;
         const currentMonth = '<?php echo $currentMonth; ?>';
-        const isAdminDirector = <?php echo $isAdminDirector ? 'true' : 'false'; ?>;
         const userDepartment = '<?php echo $userDept; ?>';
-        const allDepartments = <?php echo json_encode($allDepartments); ?>;
-        
-        // Store chart instances for cleanup
-        const chartInstances = {};
         
         // Function to get color based on percentage
         function getScoreColor(percentage) {
-            if (percentage >= 90) return 'var(--success)';
-            if (percentage >= 70) return 'var(--warning)';
-            return 'var(--danger)';
+            if (percentage >= 90) return '#10B981';
+            if (percentage >= 70) return '#F59E0B';
+            return '#EF4444';
         }
         
         // Function to handle click on indicator
-        function onIndicatorClick(indicatorKey, indicatorName) {
-            console.log(`Clicked on indicator: ${indicatorName} (${indicatorKey})`);
+        function onIndicatorClick(indicatorKey, indicatorName, recordId, actualValue, targetValue, percentage) {
             sessionStorage.setItem('selectedIndicator', indicatorKey);
             sessionStorage.setItem('selectedIndicatorName', indicatorName);
-            sessionStorage.setItem('selectedMonth', currentMonth);
-            window.location.href = `indicator_detail.php?indicator=${encodeURIComponent(indicatorKey)}&month=${currentMonth}`;
-        }
-        
-        // Function to handle click on department
-        function onDepartmentClick(department, indicatorKey, recordId, actualValue, targetValue, percentage) {
-            console.log(`Clicked on ${department} - ${indicatorKey} (Record ID: ${recordId})`);
-            sessionStorage.setItem('selectedDepartment', department);
-            sessionStorage.setItem('selectedIndicator', indicatorKey);
             sessionStorage.setItem('selectedRecordId', recordId);
             sessionStorage.setItem('selectedMonth', currentMonth);
+            sessionStorage.setItem('selectedDepartment', userDepartment);
             sessionStorage.setItem('actualValue', actualValue);
             sessionStorage.setItem('targetValue', targetValue);
             sessionStorage.setItem('percentageValue', percentage);
-            window.location.href = `department_detail.php?dept=${encodeURIComponent(department)}&indicator=${encodeURIComponent(indicatorKey)}&record=${recordId}&month=${currentMonth}`;
+            window.location.href = `indicator_detail.php?indicator=${encodeURIComponent(indicatorKey)}&month=${currentMonth}&dept=${encodeURIComponent(userDepartment)}`;
         }
         
-        // Create pie chart
-        function createPieChart(canvasId, percentage, metricName) {
-            const ctx = document.getElementById(canvasId);
-            if (!ctx) return null;
-            
-            const achieved = percentage;
-            const remaining = Math.max(0, 100 - percentage);
-            
-            return new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Achieved', 'Remaining'],
-                    datasets: [{
-                        data: [achieved, remaining],
-                        backgroundColor: [getScoreColor(percentage), 'rgba(51, 65, 85, 0.6)'],
-                        borderWidth: 0,
-                        hoverOffset: 10
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    cutout: '65%',
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return `${context.label}: ${context.raw}%`;
-                                }
-                            },
-                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                            titleColor: '#38BDF8',
-                            bodyColor: '#F1F5F9'
-                        }
-                    },
-                    onClick: function(event, elements) {
-                        if (elements.length > 0) {
-                            onIndicatorClick(metricName.replace(/\s+/g, '-').toLowerCase(), metricName);
-                        }
-                    }
-                }
-            });
-        }
-        
-        // Render department bars
-        function renderDepartmentBars(containerId, departments, indicatorKey) {
-            const container = document.getElementById(containerId);
-            if (!container) return;
-            
-            if (Object.keys(departments).length === 0) {
-                container.innerHTML = '<div style="text-align: center; padding: 0.5rem; font-size: 0.6rem; color: #888;">No data</div>';
-                return;
-            }
-            
-            let html = '';
-            for (const [dept, value] of Object.entries(departments)) {
-                const percentageValue = parseFloat(value);
-                const barWidth = Math.min(percentageValue, 100);
-                const color = departmentColors[dept] || '#38BDF8';
-                const scoreColor = getScoreColor(percentageValue);
-                
-                html += `
-                    <div class="dept-bar-item" onclick="onDepartmentClick('${dept}', '${indicatorKey}', null, ${percentageValue}, 100, ${percentageValue})" data-tooltip="Click for details">
-                        <div class="dept-bar-label">
-                            <span class="dept-name" style="color: ${color};">${dept}</span>
-                            <span class="dept-percentage" style="color: ${scoreColor};">${percentageValue}%</span>
-                        </div>
-                        <div class="dept-bar-container">
-                            <div class="dept-bar-fill" style="width: ${barWidth}%; background: ${color};"></div>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            container.innerHTML = html;
-        }
-        
-        // Render the dashboard
         function renderDashboard() {
             const container = document.getElementById('dashboard-content');
             container.innerHTML = '';
             
-            // Check if there's data
             let hasData = false;
             for (const [metricKey, metric] of Object.entries(metricsData)) {
-                if (metric.overall > 0 || Object.keys(metric.departments).length > 0) {
+                if (metric.percentage > 0) {
                     hasData = true;
                     break;
                 }
             }
             
             if (!hasData) {
-                container.innerHTML = `
-                    <div class="no-data">
-                        <h4>📭 No Performance Data Available</h4>
-                        <p>No verified data for ${document.getElementById('current-month').innerText}</p>
-                        <p style="margin-top: 0.5rem; font-size: 0.7rem;">Please check back later or select a different month.</p>
-                    </div>
-                `;
+                container.innerHTML = `<div class="no-data"><h4>📭 No Performance Data Available</h4><p>No verified data for ${document.getElementById('current-month').innerText}</p></div>`;
                 return;
             }
             
-            const metricsGrid = document.createElement('div');
-            metricsGrid.className = 'metrics-grid';
+            const table = document.createElement('table');
+            table.className = 'dashboard-table';
+            
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Performance Metric</th>
+                        <th>Actual</th>
+                        <th>Target</th>
+                        <th>Percentage</th>
+                        <th>Progress</th>
+                    </tr>
+                </thead>
+                <tbody id="dashboard-table-body"></tbody>
+            `;
+            
+            const tbody = table.querySelector('#dashboard-table-body');
             
             for (const [metricKey, metric] of Object.entries(metricsData)) {
-                // Filter departments for display
-                let departmentsToShow = {};
-                if (!isAdminDirector) {
-                    if (metric.departments[userDepartment] !== undefined) {
-                        departmentsToShow[userDepartment] = metric.departments[userDepartment];
-                    }
-                } else {
-                    departmentsToShow = metric.departments;
-                }
+                const percentage = metric.percentage;
+                const actual = metric.actual;
+                const target = metric.target;
+                const percentageColor = getScoreColor(percentage);
                 
-                if (Object.keys(departmentsToShow).length === 0 && metric.overall === 0) continue;
-                
-                const cardId = `card-${metricKey.replace(/\s+/g, '-').replace(/[\/]/g, '-')}`;
-                const chartId = `chart-${metricKey.replace(/\s+/g, '-').replace(/[\/]/g, '-')}`;
-                const barsId = `bars-${metricKey.replace(/\s+/g, '-').replace(/[\/]/g, '-')}`;
-                const overallColor = getScoreColor(metric.overall);
-                
-                const card = document.createElement('div');
-                card.className = 'metric-card';
-                card.id = cardId;
-                card.innerHTML = `
-                    <div class="metric-header">
-                        <div class="metric-title" onclick="onIndicatorClick('${metricKey}', '${metric.display_name}')" data-tooltip="Click for full report">
-                            ${metric.display_name}
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="indicator-cell" onclick="onIndicatorClick('${metricKey}', '${metric.display_name}', ${metric.record_id}, ${actual}, ${target}, ${percentage})">${metric.display_name}</td>
+                    <td class="actual-cell">${actual}${actual > 0 ? '%' : ''}</td>
+                    <td class="target-cell">${target}${target > 0 ? '%' : ''}</td>
+                    <td class="percentage-cell" style="color: ${percentageColor}; font-weight: bold;">${percentage}%</td>
+                    <td class="progress-cell">
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" style="width: ${Math.min(percentage, 100)}%; background: ${percentageColor};"></div>
                         </div>
-                        <div class="overall-score" style="color: ${overallColor};" onclick="onIndicatorClick('${metricKey}', '${metric.display_name}')" data-tooltip="Overall: ${metric.overall}%">
-                            ${metric.overall}%
-                        </div>
-                    </div>
-                    <div class="chart-container" onclick="onIndicatorClick('${metricKey}', '${metric.display_name}')">
-                        <canvas id="${chartId}" width="180" height="140"></canvas>
-                    </div>
-                    <div id="${barsId}" class="dept-bars"></div>
+                    </td>
                 `;
-                
-                metricsGrid.appendChild(card);
-                
-                // Render chart and bars after DOM update
-                setTimeout(() => {
-                    const chart = createPieChart(chartId, metric.overall, metric.display_name);
-                    if (chart) chartInstances[chartId] = chart;
-                    renderDepartmentBars(barsId, departmentsToShow, metricKey);
-                }, 10);
+                tbody.appendChild(row);
             }
             
-            container.appendChild(metricsGrid);
-        }
-        
-        // Cleanup charts on page unload
-        function cleanupCharts() {
-            for (const [id, chart] of Object.entries(chartInstances)) {
-                if (chart && typeof chart.destroy === 'function') {
-                    chart.destroy();
-                }
-            }
+            container.appendChild(table);
         }
         
         // Change month function
         function changeMonth(direction) {
-            cleanupCharts();
             let currentUrl = new URL(window.location.href);
             let currentMonthParam = currentUrl.searchParams.get('month') || currentMonth;
             let date = new Date(currentMonthParam + '-01');
@@ -903,18 +588,6 @@ $conn->close();
         // Initialize dashboard when page loads
         document.addEventListener('DOMContentLoaded', function() {
             renderDashboard();
-        });
-        
-        // Cleanup on page unload
-        window.addEventListener('beforeunload', cleanupCharts);
-        
-        // Handle window resize for responsive adjustments
-        let resizeTimeout;
-        window.addEventListener('resize', function() {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(() => {
-                renderDashboard();
-            }, 250);
         });
     </script>
 </body>
