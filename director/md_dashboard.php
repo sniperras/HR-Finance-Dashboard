@@ -193,6 +193,8 @@ $conn->close();
             --danger: #EF4444;
             --card-bg: #1E293B;
             --border-light: #334155;
+            --text-primary: #F1F5F9;
+            --text-secondary: #94A3B8;
         }
         
         * {
@@ -204,7 +206,8 @@ $conn->close();
         body {
             font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
             background: var(--dark-bg);
-            color: var(--light-bg);
+            color: var(--text-primary);
+            transition: background-color 0.3s, color 0.3s;
         }
         
         /* Navigation */
@@ -216,6 +219,7 @@ $conn->close();
             top: 0;
             z-index: 1000;
             border-bottom: 1px solid var(--border-light);
+            transition: background 0.3s;
         }
         
         .navbar-container {
@@ -243,6 +247,17 @@ $conn->close();
             flex-wrap: wrap;
         }
         
+        .navbar-menu a {
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 0.8rem;
+            transition: color 0.2s;
+        }
+        
+        .navbar-menu a:hover {
+            color: var(--accent);
+        }
+        
         .user-info {
             display: flex;
             align-items: center;
@@ -253,6 +268,15 @@ $conn->close();
             color: var(--accent);
             font-weight: bold;
             font-size: 0.8rem;
+        }
+        
+        .department-badge {
+            background: var(--accent);
+            color: var(--dark-bg);
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: bold;
         }
         
         .btn {
@@ -275,6 +299,23 @@ $conn->close();
             background: var(--accent-hover);
         }
         
+        /* Theme Toggle Button */
+        .theme-toggle {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 0.35rem 0.9rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.3s;
+        }
+        
+        .theme-toggle:hover {
+            background: var(--accent);
+            color: var(--dark-bg);
+        }
+        
         /* Main Container */
         .container {
             width: 100%;
@@ -290,6 +331,7 @@ $conn->close();
             border-radius: 12px;
             margin-bottom: 1rem;
             border: 1px solid var(--border-light);
+            transition: background 0.3s;
         }
         
         .dashboard-header h1 {
@@ -317,7 +359,7 @@ $conn->close();
         }
         
         .month-selector h3 {
-            color: var(--light-bg);
+            color: var(--text-primary);
             margin: 0;
             font-size: 0.85rem;
         }
@@ -484,7 +526,7 @@ $conn->close();
         .no-data {
             text-align: center;
             padding: 2rem;
-            color: var(--light-bg);
+            color: var(--text-primary);
             opacity: 0.7;
             background: var(--card-bg);
             border-radius: 12px;
@@ -517,7 +559,7 @@ $conn->close();
             left: 50%;
             transform: translateX(-50%);
             background: var(--dark-bg);
-            color: var(--light-bg);
+            color: var(--text-primary);
             padding: 0.2rem 0.5rem;
             border-radius: 4px;
             font-size: 0.6rem;
@@ -544,6 +586,56 @@ $conn->close();
             background: var(--accent);
             border-radius: 3px;
         }
+        
+        /* Light Theme */
+        body.light-theme {
+            --dark-bg: #F8FAFC;
+            --medium-bg: #FFFFFF;
+            --accent: #0284C7;
+            --accent-hover: #0EA5E9;
+            --light-bg: #0F172A;
+            --card-bg: #FFFFFF;
+            --border-light: #E2E8F0;
+            --text-primary: #0F172A;
+            --text-secondary: #475569;
+        }
+        
+        body.light-theme .navbar {
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        body.light-theme .dashboard-header {
+            background: linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 100%);
+        }
+        
+        body.light-theme .metric-card {
+            background: white;
+        }
+        
+        body.light-theme .dept-bar-container {
+            background: #E2E8F0;
+        }
+        
+        body.light-theme .theme-toggle {
+            border-color: #0284C7;
+            color: #0284C7;
+        }
+        
+        body.light-theme .theme-toggle:hover {
+            background: #0284C7;
+            color: white;
+        }
+        
+        body.light-theme .btn {
+            background: #0284C7;
+            color: white;
+        }
+        
+        body.light-theme .department-badge {
+            background: #0284C7;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -551,10 +643,11 @@ $conn->close();
         <div class="navbar-container">
             <a href="md_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
             <div class="navbar-menu">
-                <a href="md_dashboard.php" class="btn" style="background: transparent; color: var(--accent);">Dashboard</a>
+                <a href="md_dashboard.php" style="color: var(--accent);">Dashboard</a>
                 <div class="user-info">
+                    <button id="themeToggle" class="theme-toggle">☀️ Light</button>
                     <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
-                    <span class="department-badge">Admin</span>
+                    
                     <a href="../logout.php" class="btn">Logout</a>
                 </div>
             </div>
@@ -581,6 +674,52 @@ $conn->close();
     </div>
     
     <script>
+        // Theme Manager
+        class ThemeManager {
+            constructor() {
+                this.themeKey = 'dashboard_theme';
+                this.loadTheme();
+                this.initToggle();
+            }
+            
+            loadTheme() {
+                const savedTheme = localStorage.getItem(this.themeKey);
+                if (savedTheme === 'light') {
+                    document.body.classList.add('light-theme');
+                    this.updateToggleButton(true);
+                } else {
+                    document.body.classList.remove('light-theme');
+                    this.updateToggleButton(false);
+                }
+            }
+            
+            toggleTheme() {
+                if (document.body.classList.contains('light-theme')) {
+                    document.body.classList.remove('light-theme');
+                    localStorage.setItem(this.themeKey, 'dark');
+                    this.updateToggleButton(false);
+                } else {
+                    document.body.classList.add('light-theme');
+                    localStorage.setItem(this.themeKey, 'light');
+                    this.updateToggleButton(true);
+                }
+            }
+            
+            updateToggleButton(isLight) {
+                const toggleBtn = document.getElementById('themeToggle');
+                if (toggleBtn) {
+                    toggleBtn.innerHTML = isLight ? '🌙 Dark' : '☀️ Light';
+                }
+            }
+            
+            initToggle() {
+                const toggleBtn = document.getElementById('themeToggle');
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', () => this.toggleTheme());
+                }
+            }
+        }
+        
         // Data passed from PHP
         const metricsData = <?php echo json_encode($metricsData); ?>;
         const departmentColors = <?php echo json_encode($departmentColors); ?>;
@@ -750,8 +889,9 @@ $conn->close();
             window.location.href = `md_dashboard.php?month=${newMonth}`;
         }
         
-        // Initialize dashboard when page loads
+        // Initialize theme manager and dashboard when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            new ThemeManager();
             renderDashboard();
         });
     </script>

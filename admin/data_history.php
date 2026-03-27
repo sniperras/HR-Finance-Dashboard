@@ -4,58 +4,115 @@ requireRole('hr');
 
 $conn = getConnection();
 
-// Get filter parameters
-$filterRecord = isset($_GET['record_id']) ? intval($_GET['record_id']) : null;
-$filterUser = isset($_GET['user_id']) ? intval($_GET['user_id']) : null;
-$filterAction = isset($_GET['action']) ? $_GET['action'] : null;
-$filterDateFrom = isset($_GET['date_from']) ? $_GET['date_from'] : null;
-$filterDateTo = isset($_GET['date_to']) ? $_GET['date_to'] : null;
+// Get filter parameters - treat empty values as null, and 0 as empty
+$filterRecord = isset($_GET['record_id']) && $_GET['record_id'] !== '' && intval($_GET['record_id']) > 0 ? intval($_GET['record_id']) : null;
+$filterUser = isset($_GET['user_id']) && $_GET['user_id'] !== '' && intval($_GET['user_id']) > 0 ? intval($_GET['user_id']) : null;
+$filterAction = isset($_GET['action']) && $_GET['action'] !== '' ? $_GET['action'] : null;
+$filterDateFrom = isset($_GET['date_from']) && $_GET['date_from'] !== '' ? $_GET['date_from'] : null;
+$filterDateTo = isset($_GET['date_to']) && $_GET['date_to'] !== '' ? $_GET['date_to'] : null;
+$filterDataType = isset($_GET['data_type']) ? $_GET['data_type'] : 'all';
 
-// Build query with filters
-$query = "SELECT al.*, 
-          u.full_name as user_name,
-          m.department,
-          m.indicator_name
-          FROM data_audit_log al
-          LEFT JOIN users u ON al.performed_by = u.id
-          LEFT JOIN master_performance_data m ON al.record_id = m.id
-          WHERE 1=1";
-
+// Build WHERE clause parts
+$whereParts = [];
 $params = [];
 $types = "";
 
-if ($filterRecord) {
-    $query .= " AND al.record_id = ?";
+if ($filterRecord !== null) {
+    $whereParts[] = "al.record_id = ?";
     $params[] = $filterRecord;
     $types .= "i";
 }
 
-if ($filterUser) {
-    $query .= " AND al.performed_by = ?";
+if ($filterUser !== null) {
+    $whereParts[] = "al.performed_by = ?";
     $params[] = $filterUser;
     $types .= "i";
 }
 
-if ($filterAction) {
-    $query .= " AND al.action = ?";
+if ($filterAction !== null) {
+    $whereParts[] = "al.action = ?";
     $params[] = $filterAction;
     $types .= "s";
 }
 
-if ($filterDateFrom) {
-    $query .= " AND DATE(al.performed_at) >= ?";
+if ($filterDateFrom !== null) {
+    $whereParts[] = "DATE(al.performed_at) >= ?";
     $params[] = $filterDateFrom;
     $types .= "s";
 }
 
-if ($filterDateTo) {
-    $query .= " AND DATE(al.performed_at) <= ?";
+if ($filterDateTo !== null) {
+    $whereParts[] = "DATE(al.performed_at) <= ?";
     $params[] = $filterDateTo;
     $types .= "s";
 }
 
-$query .= " ORDER BY al.performed_at DESC LIMIT 500";
+$whereClause = !empty($whereParts) ? "WHERE " . implode(" AND ", $whereParts) : "";
 
+// Build query based on data type filter
+$query = "";
+
+if ($filterDataType == 'master') {
+    // Only Master Data - single query
+    $query = "SELECT al.id, al.record_id, al.action, al.old_data, al.new_data, al.performed_at, al.performed_by,
+              u.full_name as user_name,
+              'master' as data_type,
+              m.department,
+              m.indicator_name as record_name,
+              CONCAT(m.department, ' - ', m.indicator_name) as record_info
+              FROM data_audit_log al
+              LEFT JOIN users u ON al.performed_by = u.id
+              LEFT JOIN master_performance_data m ON al.record_id = m.id
+              $whereClause";
+} elseif ($filterDataType == 'mro') {
+    // Only MRO Data - single query
+    $query = "SELECT al.id, al.record_id, al.action, al.old_data, al.new_data, al.performed_at, al.performed_by,
+              u.full_name as user_name,
+              'mro' as data_type,
+              m.department,
+              m.report_type as record_name,
+              CONCAT(m.department, ' - ', m.cost_center_text, ' - ', m.report_type) as record_info
+              FROM mro_audit_log al
+              LEFT JOIN users u ON al.performed_by = u.id
+              LEFT JOIN mro_cpr_report m ON al.record_id = m.id
+              $whereClause";
+} else {
+    // All Data Types (UNION) - Need to duplicate parameters for both parts
+    $query = "(SELECT al.id, al.record_id, al.action, al.old_data, al.new_data, al.performed_at, al.performed_by,
+              u.full_name as user_name,
+              'master' as data_type,
+              m.department,
+              m.indicator_name as record_name,
+              CONCAT(m.department, ' - ', m.indicator_name) as record_info
+              FROM data_audit_log al
+              LEFT JOIN users u ON al.performed_by = u.id
+              LEFT JOIN master_performance_data m ON al.record_id = m.id
+              $whereClause)
+              UNION ALL
+              (SELECT al.id, al.record_id, al.action, al.old_data, al.new_data, al.performed_at, al.performed_by,
+              u.full_name as user_name,
+              'mro' as data_type,
+              m.department,
+              m.report_type as record_name,
+              CONCAT(m.department, ' - ', m.cost_center_text, ' - ', m.report_type) as record_info
+              FROM mro_audit_log al
+              LEFT JOIN users u ON al.performed_by = u.id
+              LEFT JOIN mro_cpr_report m ON al.record_id = m.id
+              $whereClause)";
+    
+    // CRITICAL FIX: Duplicate parameters for UNION query
+    // Since the WHERE clause appears twice, we need twice the parameters
+    if (!empty($params)) {
+        $originalParams = $params;
+        $params = array_merge($originalParams, $originalParams);
+        $types = str_repeat($types, 2);
+    }
+}
+
+// Changed from 500 to 100 records
+$query .= " ORDER BY performed_at DESC LIMIT 100";
+
+// Prepare and execute the query
 $stmt = $conn->prepare($query);
 if (!empty($params)) {
     $stmt->bind_param($types, ...$params);
@@ -67,15 +124,35 @@ $logs = $stmt->get_result();
 $usersQuery = "SELECT id, full_name FROM users WHERE role = 'hr' ORDER BY full_name";
 $users = $conn->query($usersQuery);
 
-// Get statistics
-$statsQuery = "SELECT 
+// Get statistics for master data
+$statsMasterResult = $conn->query("SELECT 
                 COUNT(*) as total_actions,
                 COUNT(DISTINCT record_id) as records_affected,
                 COUNT(DISTINCT performed_by) as users_involved,
                 MIN(performed_at) as first_action,
                 MAX(performed_at) as last_action
-               FROM data_audit_log";
-$stats = $conn->query($statsQuery)->fetch_assoc();
+               FROM data_audit_log");
+
+if ($statsMasterResult && $statsMasterResult->num_rows > 0) {
+    $statsMaster = $statsMasterResult->fetch_assoc();
+} else {
+    $statsMaster = ['total_actions' => 0, 'records_affected' => 0, 'users_involved' => 0, 'first_action' => date('Y-m-d'), 'last_action' => date('Y-m-d')];
+}
+
+// Get statistics for MRO data
+$statsMroResult = $conn->query("SELECT 
+                COUNT(*) as total_actions,
+                COUNT(DISTINCT record_id) as records_affected,
+                COUNT(DISTINCT performed_by) as users_involved,
+                MIN(performed_at) as first_action,
+                MAX(performed_at) as last_action
+               FROM mro_audit_log");
+
+if ($statsMroResult && $statsMroResult->num_rows > 0) {
+    $statsMro = $statsMroResult->fetch_assoc();
+} else {
+    $statsMro = ['total_actions' => 0, 'records_affected' => 0, 'users_involved' => 0, 'first_action' => date('Y-m-d'), 'last_action' => date('Y-m-d')];
+}
 
 $conn->close();
 
@@ -89,17 +166,19 @@ function formatChangeData($oldData, $newData) {
     $html = '<table style="width:100%; font-size:0.7rem; border-collapse:collapse;">';
     
     if ($old) {
-        $html .= '<tr><td style="padding:2px; color:#dc3545;"><strong>OLD:</strong></td><td style="padding:2px;">';
+        $html .= ' tr><td style="padding:2px; color:#dc3545;"><strong>OLD:</strong></td><td style="padding:2px;">';
         foreach ($old as $key => $value) {
-            $html .= "<span style='color:#dc3545;'>$key:</span> $value<br>";
+            $displayValue = is_array($value) ? json_encode($value) : $value;
+            $html .= "<span style='color:#dc3545;'>$key:</span> " . htmlspecialchars($displayValue) . "<br>";
         }
         $html .= '</td></tr>';
     }
     
     if ($new) {
-        $html .= '<tr><td style="padding:2px; color:#28a745;"><strong>NEW:</strong></td><td style="padding:2px;">';
+        $html .= ' tr><td style="padding:2px; color:#28a745;"><strong>NEW:</strong></td><td style="padding:2px;">';
         foreach ($new as $key => $value) {
-            $html .= "<span style='color:#28a745;'>$key:</span> $value<br>";
+            $displayValue = is_array($value) ? json_encode($value) : $value;
+            $html .= "<span style='color:#28a745;'>$key:</span> " . htmlspecialchars($displayValue) . "<br>";
         }
         $html .= '</td></tr>';
     }
@@ -124,6 +203,15 @@ function getActionBadge($action) {
     }
 }
 
+// Helper function for data type badge
+function getDataTypeBadge($dataType) {
+    if ($dataType == 'master') {
+        return '<span class="badge badge-master">📊 Master Data</span>';
+    } else {
+        return '<span class="badge badge-mro">🔧 MRO Report</span>';
+    }
+}
+
 $message = isset($_SESSION['message']) ? $_SESSION['message'] : '';
 $error = isset($_SESSION['error']) ? $_SESSION['error'] : '';
 unset($_SESSION['message']);
@@ -138,6 +226,32 @@ unset($_SESSION['error']);
     <title>Data History - Audit Trail</title>
     <link rel="stylesheet" href="../css/style.css">
     <style>
+        :root {
+            --dark-bg: #0F172A;
+            --medium-bg: #1E293B;
+            --accent: #38BDF8;
+            --accent-hover: #60A5FA;
+            --light-bg: #F1F5F9;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --border-light: #334155;
+            --card-bg: #1E293B;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+            background: var(--dark-bg);
+            color: var(--light-bg);
+            transition: background-color 0.3s, color 0.3s;
+        }
+        
         .container {
             max-width: 1400px;
             margin: 2rem auto;
@@ -149,6 +263,7 @@ unset($_SESSION['error']);
             padding: 1.5rem;
             border-radius: 15px;
             margin-bottom: 2rem;
+            transition: background 0.3s;
         }
         
         .stats-grid {
@@ -163,6 +278,7 @@ unset($_SESSION['error']);
             padding: 1rem;
             border-radius: 10px;
             text-align: center;
+            transition: background 0.3s;
         }
         
         .stat-number {
@@ -183,6 +299,7 @@ unset($_SESSION['error']);
             padding: 1rem;
             border-radius: 10px;
             margin-bottom: 1.5rem;
+            transition: background 0.3s;
         }
         
         .filter-form {
@@ -208,10 +325,11 @@ unset($_SESSION['error']);
         .filter-group input {
             padding: 0.5rem;
             border-radius: 5px;
-            border: 1px solid var(--dark-bg);
+            border: 1px solid var(--border-light);
             background: var(--dark-bg);
             color: var(--light-bg);
             font-size: 0.8rem;
+            transition: all 0.3s;
         }
         
         .filter-group select:focus,
@@ -225,6 +343,7 @@ unset($_SESSION['error']);
             background: var(--medium-bg);
             border-radius: 15px;
             padding: 1rem;
+            transition: background 0.3s;
         }
         
         .history-table {
@@ -237,7 +356,7 @@ unset($_SESSION['error']);
         .history-table td {
             padding: 0.75rem;
             text-align: left;
-            border-bottom: 1px solid var(--dark-bg);
+            border-bottom: 1px solid var(--border-light);
             vertical-align: top;
         }
         
@@ -251,7 +370,7 @@ unset($_SESSION['error']);
         }
         
         .history-table tr:hover {
-            background: rgba(0,173,181,0.05);
+            background: rgba(56,189,248,0.05);
         }
         
         .badge {
@@ -279,6 +398,16 @@ unset($_SESSION['error']);
         
         .badge-reject {
             background: #dc3545;
+            color: white;
+        }
+        
+        .badge-master {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .badge-mro {
+            background: #f59e0b;
             color: white;
         }
         
@@ -310,27 +439,6 @@ unset($_SESSION['error']);
             transform: translateY(-1px);
         }
         
-        .pagination {
-            margin-top: 1.5rem;
-            display: flex;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-        
-        .pagination button {
-            background: var(--dark-bg);
-            color: var(--light-bg);
-            border: 1px solid var(--accent);
-            padding: 0.3rem 0.8rem;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        
-        .pagination button:hover {
-            background: var(--accent);
-            color: var(--dark-bg);
-        }
-        
         @media (max-width: 768px) {
             .container {
                 padding: 0 1rem;
@@ -359,21 +467,169 @@ unset($_SESSION['error']);
             max-width: 300px;
         }
         
-        .export-btn {
+        /* Theme Toggle Button */
+        .theme-toggle {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 0.35rem 0.9rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.3s;
+        }
+        
+        .theme-toggle:hover {
             background: var(--accent);
             color: var(--dark-bg);
-            padding: 0.5rem 1rem;
-            border-radius: 5px;
-            text-decoration: none;
-            font-size: 0.75rem;
-            font-weight: bold;
-            display: inline-flex;
+        }
+        
+        /* Navbar styles */
+        .navbar {
+            background: var(--medium-bg);
+            padding: 0.6rem 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 1px solid var(--border-light);
+            transition: background 0.3s;
+        }
+        
+        .navbar-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+            display: flex;
+            justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
             gap: 0.5rem;
         }
         
-        .export-btn:hover {
+        .navbar-brand {
+            font-size: 1rem;
+            font-weight: bold;
+            color: var(--accent);
+            text-decoration: none;
+        }
+        
+        .navbar-menu {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .navbar-menu a {
+            color: var(--light-bg);
+            text-decoration: none;
+            font-size: 0.8rem;
+            transition: color 0.2s;
+        }
+        
+        .navbar-menu a:hover {
+            color: var(--accent);
+        }
+        
+        .user-name {
+            color: var(--accent);
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+        
+        .btn {
+            background: var(--accent);
+            color: var(--dark-bg);
+            border: none;
+            padding: 0.4rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.8rem;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn:hover {
             transform: translateY(-1px);
+            box-shadow: 0 2px 5px rgba(56,189,248,0.3);
+            background: var(--accent-hover);
+        }
+        
+        /* Light Theme */
+        body.light-theme {
+            background: #F8FAFC;
+            color: #0F172A;
+        }
+        
+        body.light-theme .navbar,
+        body.light-theme .history-header,
+        body.light-theme .filter-section,
+        body.light-theme .table-wrapper {
+            background: white !important;
+            border-color: #E2E8F0 !important;
+        }
+        
+        body.light-theme .navbar {
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        body.light-theme .history-header {
+            background: linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 100%) !important;
+        }
+        
+        body.light-theme .stat-card {
+            background: #F1F5F9;
+        }
+        
+        body.light-theme .history-table th {
+            background: #F1F5F9;
+            color: #0284C7;
+        }
+        
+        body.light-theme .history-table td {
+            border-bottom-color: #E2E8F0;
+        }
+        
+        body.light-theme .filter-group select,
+        body.light-theme .filter-group input {
+            background: white;
+            color: #0F172A;
+            border-color: #CBD5E1;
+        }
+        
+        body.light-theme .btn {
+            background: #0284C7;
+            color: white;
+        }
+        
+        body.light-theme .theme-toggle {
+            border-color: #0284C7;
+            color: #0284C7;
+        }
+        
+        body.light-theme .theme-toggle:hover {
+            background: #0284C7;
+            color: white;
+        }
+        
+        body.light-theme .record-link {
+            color: #0284C7;
+        }
+        
+        body.light-theme .badge-master {
+            background: #3b82f6;
+        }
+        
+        body.light-theme .badge-mro {
+            background: #f59e0b;
+        }
+        
+        body.light-theme .clear-filter {
+            background: #0284C7;
+            color: white;
         }
     </style>
 </head>
@@ -382,13 +638,14 @@ unset($_SESSION['error']);
         <div class="navbar-container">
             <a href="master_data.php" class="navbar-brand">HR & Finance Dashboard</a>
             <div class="navbar-menu">
-                <a href="master_data.php">Master Data Entry</a>
-                <a href="report_mro_cpr.php">Director Data Entry</a>
-                <a href="verify_data.php">Verify Data</a>
-                <a href="data_history.php" style="color: var(--accent);">History</a>
+                <a href="master_data.php" style="color: var(--accent);">Master Data Entry</a>
+                <a href="../admin/report_mro_cpr.php" style="color: var(--light-bg);">Director Data Entry</a>
+                <a href="verify_data.php" style="color: var(--light-bg);">Verify Data</a>
+                <a href="data_history.php" style="color: var(--light-bg);">History</a>
                 <div class="user-info">
+                    <button id="themeToggle" class="theme-toggle">☀️ Light</button>
                     <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
-                    <a href="../logout.php" class="btn" style="padding: 0.5rem 1rem;">Logout</a>
+                    <a href="../logout.php" class="btn">Logout</a>
                 </div>
             </div>
         </div>
@@ -397,23 +654,23 @@ unset($_SESSION['error']);
     <div class="container">
         <div class="history-header">
             <h2>📜 Data History & Audit Trail</h2>
-            <p>Complete history of all changes made to master data</p>
+            <p>Complete history of all changes made to Master Data and MRO CPR Reports</p>
             
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-number"><?php echo number_format($stats['total_actions']); ?></div>
-                    <div class="stat-label">Total Actions</div>
+                    <div class="stat-number"><?php echo number_format($statsMaster['total_actions']); ?></div>
+                    <div class="stat-label">Master Data Actions</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number"><?php echo number_format($stats['records_affected']); ?></div>
-                    <div class="stat-label">Records Affected</div>
+                    <div class="stat-number"><?php echo number_format($statsMro['total_actions']); ?></div>
+                    <div class="stat-label">MRO Report Actions</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number"><?php echo number_format($stats['users_involved']); ?></div>
-                    <div class="stat-label">Users Involved</div>
+                    <div class="stat-number"><?php echo number_format($statsMaster['records_affected'] + $statsMro['records_affected']); ?></div>
+                    <div class="stat-label">Total Records Affected</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number"><?php echo date('M d, Y', strtotime($stats['first_action'])); ?></div>
+                    <div class="stat-number"><?php echo date('M d, Y', strtotime(min($statsMaster['first_action'], $statsMro['first_action']))); ?></div>
                     <div class="stat-label">First Action</div>
                 </div>
             </div>
@@ -421,6 +678,15 @@ unset($_SESSION['error']);
         
         <div class="filter-section">
             <form method="GET" action="" class="filter-form">
+                <div class="filter-group">
+                    <label>Data Type</label>
+                    <select name="data_type" onchange="this.form.submit()">
+                        <option value="all" <?php echo $filterDataType == 'all' ? 'selected' : ''; ?>>All Data Types</option>
+                        <option value="master" <?php echo $filterDataType == 'master' ? 'selected' : ''; ?>>📊 Master Data</option>
+                        <option value="mro" <?php echo $filterDataType == 'mro' ? 'selected' : ''; ?>>🔧 MRO Reports</option>
+                    </select>
+                </div>
+                
                 <div class="filter-group">
                     <label>Record ID</label>
                     <input type="number" name="record_id" placeholder="Filter by Record ID" value="<?php echo htmlspecialchars($filterRecord); ?>">
@@ -474,57 +740,107 @@ unset($_SESSION['error']);
                         <th>Date & Time</th>
                         <th>User</th>
                         <th>Action</th>
+                        <th>Data Type</th>
                         <th>Record</th>
                         <th>Changes</th>
-                    </tr>
-                </thead>
+                    </thead>
                 <tbody>
-                    <?php if ($logs->num_rows > 0): ?>
+                    <?php if ($logs && $logs->num_rows > 0): ?>
                         <?php while ($log = $logs->fetch_assoc()): ?>
                             <tr>
                                 <td><?php echo $log['id']; ?></td>
                                 <td class="timestamp"><?php echo date('Y-m-d H:i:s', strtotime($log['performed_at'])); ?></td>
-                                <td>
-                                    <strong><?php echo htmlspecialchars($log['user_name']); ?></strong>
-                                </td>
+                                <td><strong><?php echo htmlspecialchars($log['user_name']); ?></strong></td>
                                 <td><?php echo getActionBadge($log['action']); ?></td>
+                                <td><?php echo getDataTypeBadge($log['data_type']); ?></td>
                                 <td>
                                     <?php if ($log['record_id']): ?>
-                                        <a href="master_data.php?record_id=<?php echo $log['record_id']; ?>" class="record-link">
-                                            #<?php echo $log['record_id']; ?>
-                                        </a>
-                                        <?php if ($log['department']): ?>
-                                            <div style="font-size: 0.65rem; color: #888;">
-                                                <?php echo htmlspecialchars($log['department']); ?> - 
-                                                <?php echo htmlspecialchars(substr($log['indicator_name'], 0, 30)); ?>
+                                        <?php if ($log['data_type'] == 'master'): ?>
+                                            <a href="master_data.php?record_id=<?php echo $log['record_id']; ?>" class="record-link">
+                                                #<?php echo $log['record_id']; ?>
+                                            </a>
+                                        <?php else: ?>
+                                            <a href="../admin/report_mro_cpr.php?record_id=<?php echo $log['record_id']; ?>" class="record-link">
+                                                #<?php echo $log['record_id']; ?>
+                                            </a>
+                                        <?php endif; ?>
+                                        <?php if ($log['record_info']): ?>
+                                            <div style="font-size: 0.65rem; color: #888; margin-top: 3px;">
+                                                <?php echo htmlspecialchars(substr($log['record_info'], 0, 50)); ?>
                                             </div>
                                         <?php endif; ?>
                                     <?php else: ?>
                                         <span style="color: #888;">Record Deleted</span>
                                     <?php endif; ?>
-                                </td>
+                                 </td>
                                 <td class="change-details">
                                     <?php echo formatChangeData($log['old_data'], $log['new_data']); ?>
-                                </td>
-                            </tr>
+                                 </td>
+                             </tr>
                         <?php endwhile; ?>
                     <?php else: ?>
-                        <tr>
-                            <td colspan="6" style="text-align: center; padding: 2rem;">
+                         <tr>
+                            <td colspan="7" style="text-align: center; padding: 2rem;">
                                 <div style="color: #888;">No history records found</div>
-                            </td>
-                        </tr>
+                             </td>
+                         </tr>
                     <?php endif; ?>
                 </tbody>
-            </table>
+             </table>
         </div>
         
         <div style="margin-top: 1rem; text-align: right;">
-            <small style="color: #888;">Showing last 500 records. Use filters to narrow down results.</small>
+            <small style="color: #888;">Showing last 100 records. Use filters to narrow down results.</small>
         </div>
     </div>
     
     <script>
+        // Theme Manager
+        class ThemeManager {
+            constructor() {
+                this.themeKey = 'dashboard_theme';
+                this.loadTheme();
+                this.initToggle();
+            }
+            
+            loadTheme() {
+                const savedTheme = localStorage.getItem(this.themeKey);
+                if (savedTheme === 'light') {
+                    document.body.classList.add('light-theme');
+                    this.updateToggleButton(true);
+                } else {
+                    document.body.classList.remove('light-theme');
+                    this.updateToggleButton(false);
+                }
+            }
+            
+            toggleTheme() {
+                if (document.body.classList.contains('light-theme')) {
+                    document.body.classList.remove('light-theme');
+                    localStorage.setItem(this.themeKey, 'dark');
+                    this.updateToggleButton(false);
+                } else {
+                    document.body.classList.add('light-theme');
+                    localStorage.setItem(this.themeKey, 'light');
+                    this.updateToggleButton(true);
+                }
+            }
+            
+            updateToggleButton(isLight) {
+                const toggleBtn = document.getElementById('themeToggle');
+                if (toggleBtn) {
+                    toggleBtn.innerHTML = isLight ? '🌙 Dark' : '☀️ Light';
+                }
+            }
+            
+            initToggle() {
+                const toggleBtn = document.getElementById('themeToggle');
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', () => this.toggleTheme());
+                }
+            }
+        }
+        
         // Auto-submit form when filters change (except for text inputs)
         document.querySelectorAll('select, input[type="date"]').forEach(element => {
             element.addEventListener('change', function() {
@@ -541,6 +857,11 @@ unset($_SESSION['error']);
                     submitBtn.disabled = true;
                 }
             });
+        });
+        
+        // Initialize theme manager
+        document.addEventListener('DOMContentLoaded', function() {
+            new ThemeManager();
         });
     </script>
 </body>

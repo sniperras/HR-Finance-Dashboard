@@ -165,6 +165,8 @@ $conn->close();
             --danger: #EF4444;
             --card-bg: #1E293B;
             --border-light: #334155;
+            --text-primary: #F1F5F9;
+            --text-secondary: #94A3B8;
         }
         
         * {
@@ -176,7 +178,8 @@ $conn->close();
         body {
             font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
             background: var(--dark-bg);
-            color: var(--light-bg);
+            color: var(--text-primary);
+            transition: background-color 0.3s, color 0.3s;
         }
         
         /* Navigation */
@@ -188,17 +191,30 @@ $conn->close();
             top: 0;
             z-index: 1000;
             border-bottom: 1px solid var(--border-light);
+            transition: background 0.3s;
         }
         
         .navbar-container {
-            max-width: 100%;
+            max-width: 1400px;
             margin: 0 auto;
-            padding: 0 1.5rem;
+            padding: 0 2rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 0.5rem;
+            gap: 1rem;
+        }
+        
+        @media (max-width: 1024px) {
+            .navbar-container {
+                padding: 0 1.5rem;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .navbar-container {
+                padding: 0 1rem;
+            }
         }
         
         .navbar-brand {
@@ -215,10 +231,24 @@ $conn->close();
             flex-wrap: wrap;
         }
         
+        .navbar-menu a {
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 0.8rem;
+            transition: color 0.2s;
+            padding: 0.3rem 0.5rem;
+            border-radius: 5px;
+        }
+        
+        .navbar-menu a:hover {
+            color: var(--accent);
+            background: rgba(56,189,248,0.1);
+        }
+        
         .user-info {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.6rem;
         }
         
         .user-name {
@@ -256,21 +286,52 @@ $conn->close();
             background: var(--accent-hover);
         }
         
+        /* Theme Toggle Button */
+        .theme-toggle {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 0.3rem 0.8rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: all 0.3s;
+        }
+        
+        .theme-toggle:hover {
+            background: var(--accent);
+            color: var(--dark-bg);
+        }
+        
         /* Main Container */
         .container {
             width: 100%;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0.75rem 1rem;
+            max-width: 1400px;
+            margin: 1rem auto;
+            padding: 0 2rem;
+        }
+        
+        @media (max-width: 1024px) {
+            .container {
+                padding: 0 1.5rem;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 1rem;
+                margin: 0.75rem auto;
+            }
         }
         
         /* Dashboard Header */
         .dashboard-header {
             background: linear-gradient(135deg, var(--medium-bg) 0%, var(--dark-bg) 100%);
-            padding: 0.6rem 1rem;
+            padding: 0.75rem 1.25rem;
             border-radius: 12px;
             margin-bottom: 1rem;
             border: 1px solid var(--border-light);
+            transition: background 0.3s;
         }
         
         .dashboard-header h1 {
@@ -297,8 +358,12 @@ $conn->close();
             font-size: 0.7rem;
         }
         
+        .month-selector button:hover {
+            transform: scale(1.02);
+        }
+        
         .month-selector h3 {
-            color: var(--light-bg);
+            color: var(--text-primary);
             margin: 0;
             font-size: 0.85rem;
         }
@@ -307,36 +372,36 @@ $conn->close();
         .department-header-card {
             background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
             color: var(--dark-bg);
-            padding: 1rem;
+            padding: 0.75rem;
             border-radius: 12px;
             margin-bottom: 1rem;
             text-align: center;
         }
         
         .department-header-card h2 {
-            font-size: 1.2rem;
-            margin-bottom: 0.3rem;
+            font-size: 1.1rem;
+            margin-bottom: 0.2rem;
         }
         
         .department-header-card p {
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             opacity: 0.9;
         }
         
-        /* Table Layout */
+        /* Compact Table Layout - All in one view */
         .dashboard-table {
             width: 100%;
             border-collapse: collapse;
             background: var(--card-bg);
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            font-size: 0.8rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            font-size: 0.7rem;
         }
         
         .dashboard-table th,
         .dashboard-table td {
-            padding: 0.8rem 0.6rem;
+            padding: 0.6rem 0.4rem;
             text-align: left;
             border-bottom: 1px solid var(--border-light);
             vertical-align: middle;
@@ -346,7 +411,9 @@ $conn->close();
             background: var(--dark-bg);
             color: var(--accent);
             font-weight: bold;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
         }
         
         .dashboard-table tr:hover {
@@ -354,10 +421,11 @@ $conn->close();
         }
         
         .indicator-cell {
-            font-weight: bold;
+            font-weight: 600;
             color: var(--accent);
             cursor: pointer;
-            transition: color 0.2s;
+            transition: all 0.2s;
+            font-size: 0.7rem;
         }
         
         .indicator-cell:hover {
@@ -368,49 +436,51 @@ $conn->close();
         .percentage-cell {
             font-weight: bold;
             text-align: center;
+            font-size: 0.75rem;
         }
         
         .progress-cell {
-            min-width: 150px;
+            min-width: 100px;
         }
         
         .progress-bar-container {
             background: var(--dark-bg);
             border-radius: 10px;
             overflow: hidden;
-            height: 8px;
+            height: 6px;
             width: 100%;
         }
         
         .progress-bar-fill {
             height: 100%;
             border-radius: 10px;
-            transition: width 0.3s;
+            transition: width 0.3s ease;
         }
         
         .actual-cell, .target-cell {
             text-align: center;
             font-family: monospace;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
+            font-weight: 500;
         }
         
         .no-data {
             text-align: center;
             padding: 2rem;
-            color: var(--light-bg);
+            color: var(--text-primary);
             opacity: 0.7;
             background: var(--card-bg);
             border-radius: 12px;
         }
         
         .spinner {
-            border: 2px solid var(--light-bg);
+            border: 2px solid var(--border-light);
             border-top: 2px solid var(--accent);
             border-radius: 50%;
             width: 30px;
             height: 30px;
             animation: spin 1s linear infinite;
-            margin: 2rem auto;
+            margin: 1.5rem auto;
         }
         
         @keyframes spin {
@@ -418,47 +488,99 @@ $conn->close();
             100% { transform: rotate(360deg); }
         }
         
-        .clickable {
-            cursor: pointer;
-        }
-        
-        @media (max-width: 768px) {
-            .container {
-                padding: 0.5rem;
-            }
-            
-            .dashboard-table th,
-            .dashboard-table td {
-                padding: 0.5rem 0.3rem;
-                font-size: 0.7rem;
-            }
-        }
-        
+        /* Scrollbar - Minimal */
         ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
+            width: 5px;
+            height: 5px;
         }
         
         ::-webkit-scrollbar-track {
             background: var(--dark-bg);
+            border-radius: 3px;
         }
         
         ::-webkit-scrollbar-thumb {
             background: var(--accent);
             border-radius: 3px;
         }
+        
+        /* Light Theme */
+        body.light-theme {
+            --dark-bg: #F8FAFC;
+            --medium-bg: #FFFFFF;
+            --accent: #0284C7;
+            --accent-hover: #0EA5E9;
+            --light-bg: #0F172A;
+            --card-bg: #FFFFFF;
+            --border-light: #E2E8F0;
+            --text-primary: #0F172A;
+            --text-secondary: #475569;
+        }
+        
+        body.light-theme .navbar {
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        body.light-theme .dashboard-header {
+            background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
+        }
+        
+        body.light-theme .department-header-card {
+            background: linear-gradient(135deg, #0284C7 0%, #0EA5E9 100%);
+        }
+        
+        body.light-theme .dashboard-table {
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+        }
+        
+        body.light-theme .dashboard-table th {
+            background: #F1F5F9;
+        }
+        
+        body.light-theme .theme-toggle {
+            border-color: #0284C7;
+            color: #0284C7;
+        }
+        
+        body.light-theme .theme-toggle:hover {
+            background: #0284C7;
+            color: white;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .dashboard-table th,
+            .dashboard-table td {
+                padding: 0.4rem 0.25rem;
+                font-size: 0.6rem;
+            }
+            
+            .actual-cell, .target-cell {
+                font-size: 0.6rem;
+            }
+            
+            .percentage-cell {
+                font-size: 0.65rem;
+            }
+            
+            .progress-cell {
+                min-width: 80px;
+            }
+        }
     </style>
 </head>
 <body>
     <nav class="navbar">
         <div class="navbar-container">
-            <a href="director_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
+            <a href="director_dashboard.php" class="navbar-brand">🏢 HR & Finance Dashboard</a>
             <div class="navbar-menu">
-                <a href="director_dashboard.php" class="btn" style="background: transparent; color: var(--accent);">Dashboard</a>
+                <a href="director_dashboard.php" style="color: var(--accent);">📊 Dashboard</a>
                 <div class="user-info">
-                    <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
-                    <span class="department-badge"><?php echo htmlspecialchars($userDept); ?></span>
-                    <a href="../logout.php" class="btn">Logout</a>
+                    <button id="themeToggle" class="theme-toggle">☀️ Light</button>
+                    <span class="user-name">👤 <?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
+                    <span class="department-badge">🏭 <?php echo htmlspecialchars($userDept); ?></span>
+                    <a href="../logout.php" class="btn">🚪 Logout</a>
                 </div>
             </div>
         </div>
@@ -469,13 +591,13 @@ $conn->close();
             <h1>📈 <?php echo htmlspecialchars($userDept); ?> Department Performance Dashboard</h1>
             <div class="month-selector">
                 <button onclick="changeMonth('prev')">← Prev</button>
-                <h3 id="current-month"><?php echo date('F Y', strtotime($dataMonth)); ?></h3>
+                <h3 id="current-month">📅 <?php echo date('F Y', strtotime($dataMonth)); ?></h3>
                 <button onclick="changeMonth('next')">Next →</button>
             </div>
         </div>
         
         <div class="department-header-card">
-            <h2><?php echo htmlspecialchars($userDept); ?> Department</h2>
+            <h2>🎯 <?php echo htmlspecialchars($userDept); ?> Department</h2>
             <p>Performance Metrics for <?php echo date('F Y', strtotime($dataMonth)); ?> | Click on any metric for detailed report</p>
         </div>
         
@@ -485,6 +607,52 @@ $conn->close();
     </div>
     
     <script>
+        // Theme Manager
+        class ThemeManager {
+            constructor() {
+                this.themeKey = 'dashboard_theme';
+                this.loadTheme();
+                this.initToggle();
+            }
+            
+            loadTheme() {
+                const savedTheme = localStorage.getItem(this.themeKey);
+                if (savedTheme === 'light') {
+                    document.body.classList.add('light-theme');
+                    this.updateToggleButton(true);
+                } else {
+                    document.body.classList.remove('light-theme');
+                    this.updateToggleButton(false);
+                }
+            }
+            
+            toggleTheme() {
+                if (document.body.classList.contains('light-theme')) {
+                    document.body.classList.remove('light-theme');
+                    localStorage.setItem(this.themeKey, 'dark');
+                    this.updateToggleButton(false);
+                } else {
+                    document.body.classList.add('light-theme');
+                    localStorage.setItem(this.themeKey, 'light');
+                    this.updateToggleButton(true);
+                }
+            }
+            
+            updateToggleButton(isLight) {
+                const toggleBtn = document.getElementById('themeToggle');
+                if (toggleBtn) {
+                    toggleBtn.innerHTML = isLight ? '🌙 Dark' : '☀️ Light';
+                }
+            }
+            
+            initToggle() {
+                const toggleBtn = document.getElementById('themeToggle');
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', () => this.toggleTheme());
+                }
+            }
+        }
+        
         // Data passed from PHP
         const metricsData = <?php echo json_encode($metricsData); ?>;
         const currentMonth = '<?php echo $currentMonth; ?>';
@@ -536,10 +704,9 @@ $conn->close();
                         <th>Performance Metric</th>
                         <th>Actual</th>
                         <th>Target</th>
-                        <th>Percentage</th>
+                        <th>%</th>
                         <th>Progress</th>
-                    </tr>
-                </thead>
+                    </thead>
                 <tbody id="dashboard-table-body"></tbody>
             `;
             
@@ -556,7 +723,7 @@ $conn->close();
                     <td class="indicator-cell" onclick="onIndicatorClick('${metricKey}', '${metric.display_name}', ${metric.record_id}, ${actual}, ${target}, ${percentage})">${metric.display_name}</td>
                     <td class="actual-cell">${actual}${actual > 0 ? '%' : ''}</td>
                     <td class="target-cell">${target}${target > 0 ? '%' : ''}</td>
-                    <td class="percentage-cell" style="color: ${percentageColor}; font-weight: bold;">${percentage}%</td>
+                    <td class="percentage-cell" style="color: ${percentageColor};">${percentage}%</td>
                     <td class="progress-cell">
                         <div class="progress-bar-container">
                             <div class="progress-bar-fill" style="width: ${Math.min(percentage, 100)}%; background: ${percentageColor};"></div>
@@ -585,8 +752,9 @@ $conn->close();
             window.location.href = `director_dashboard.php?month=${newMonth}`;
         }
         
-        // Initialize dashboard when page loads
+        // Initialize theme manager and dashboard when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            new ThemeManager();
             renderDashboard();
         });
     </script>

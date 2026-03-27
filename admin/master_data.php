@@ -149,6 +149,7 @@ unset($_SESSION['error']);
         body {
             background: var(--dark-bg);
             overflow-x: hidden;
+            transition: background-color 0.3s, color 0.3s;
         }
         
         .container {
@@ -178,7 +179,7 @@ unset($_SESSION['error']);
         
         .compact-table th,
         .compact-table td {
-            border: 1px solid var(--dark-bg);
+            border: 1px solid var(--border-light);
             padding: 0.5rem 0.35rem;
             vertical-align: middle;
         }
@@ -208,21 +209,23 @@ unset($_SESSION['error']);
         }
         
         .indicator-cell {
-            background: var(--dark-bg);
+            background: var(--medium-bg);
             font-weight: bold;
-            color: var(--text-light);
+            color: var(--text-primary);
             position: sticky;
             left: 0;
             z-index: 10;
             font-size: 0.7rem;
             word-wrap: break-word;
             line-height: 1.3;
+            transition: background-color 0.3s, color 0.3s;
         }
         
         .department-header {
             font-weight: bold;
             font-size: 0.75rem;
             white-space: nowrap;
+            color: var(--text-primary);
         }
         
         .input-cell {
@@ -232,46 +235,48 @@ unset($_SESSION['error']);
         .compact-table input {
             width: 100%;
             padding: 0.4rem 0.2rem;
-            border: 1px solid #555;
+            border: 1px solid var(--border-light);
             border-radius: 3px;
-            background: var(--dark-bg);
-            color: var(--text-light);
+            background: var(--input-bg);
+            color: var(--text-primary);
             text-align: center;
             font-size: 0.7rem;
+            transition: background-color 0.2s, border-color 0.2s;
         }
         
         .compact-table input:focus {
             outline: none;
             border-color: var(--accent);
-            background: #2a2f38;
+            background: var(--input-bg);
         }
         
         .compact-table input.editable {
-            background: rgba(0,173,181,0.1);
+            background: rgba(2,177,170,0.1);
             border-color: var(--accent);
         }
         
         .compact-table input.editable:hover {
-            background: rgba(0,173,181,0.2);
+            background: rgba(2,177,170,0.2);
         }
         
         .compact-table input.non-editable {
-            background: #2a2f38;
-            color: #888;
+            background: var(--input-bg);
+            color: var(--text-secondary);
             cursor: not-allowed;
+            opacity: 0.7;
         }
         
         .target-input {
-            background: rgba(57,62,70,0.5);
+            background: rgba(43,53,62,0.1);
         }
         
         .percentage-input {
-            background: rgba(0,173,181,0.2);
+            background: rgba(2,177,170,0.15);
             font-weight: bold;
         }
         
         .remainder-input {
-            background: rgba(255,193,7,0.15);
+            background: rgba(239,242,77,0.15);
             color: var(--warning);
             font-weight: bold;
         }
@@ -292,6 +297,7 @@ unset($_SESSION['error']);
             background: var(--dark-bg);
             z-index: 30;
             border-radius: 10px;
+            transition: background-color 0.3s;
         }
         
         .month-navigation {
@@ -304,6 +310,7 @@ unset($_SESSION['error']);
             background: var(--medium-bg);
             padding: 0.75rem 1.5rem;
             border-radius: 10px;
+            transition: background-color 0.3s;
         }
         
         .month-navigation h3 {
@@ -314,7 +321,7 @@ unset($_SESSION['error']);
         
         .btn {
             background: var(--accent);
-            color: var(--dark-bg);
+            color: var(--text-primary);
             border: none;
             padding: 0.4rem 1rem;
             border-radius: 5px;
@@ -326,11 +333,12 @@ unset($_SESSION['error']);
         
         .btn:hover {
             transform: translateY(-1px);
-            box-shadow: 0 2px 5px rgba(0,173,181,0.3);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            opacity: 0.9;
         }
         
         .info-banner {
-            background: rgba(0,173,181,0.2);
+            background: rgba(2,177,170,0.1);
             padding: 0.6rem 1rem;
             border-radius: 6px;
             margin-bottom: 1rem;
@@ -353,7 +361,7 @@ unset($_SESSION['error']);
         }
         
         .table-wrapper::-webkit-scrollbar-track {
-            background: var(--dark-bg);
+            background: var(--border-light);
             border-radius: 5px;
         }
         
@@ -374,7 +382,7 @@ unset($_SESSION['error']);
             font-size: 0.6rem;
             font-weight: normal;
             display: block;
-            color: var(--text-light);
+            color: var(--text-secondary);
             margin-top: 2px;
         }
         
@@ -393,23 +401,168 @@ unset($_SESSION['error']);
             font-weight: bold;
         }
         
-        .warning-banner { background: var(--warning); color: var(--dark-bg); }
+        .warning-banner { background: var(--warning); color: var(--text-primary); }
         .success-banner { background: var(--success); color: white; }
         .error-banner { background: var(--danger); color: white; }
+        
+        /* Theme Toggle Button Styles */
+        .theme-toggle {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 0.3rem 0.8rem;
+            cursor: pointer;
+        }
+        
+        .theme-toggle:hover {
+            background: var(--accent);
+            color: var(--dark-bg);
+            transform: translateY(-1px);
+        }
+        
+        /* Navbar styles */
+        .navbar {
+            background: var(--medium-bg);
+            padding: 0.5rem 0;
+            transition: background-color 0.3s;
+        }
+        
+        .navbar-container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        
+        .navbar-brand {
+            font-size: 1rem;
+            font-weight: bold;
+            color: var(--accent);
+            text-decoration: none;
+        }
+        
+        .navbar-menu {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .navbar-menu a {
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 0.8rem;
+            transition: color 0.2s;
+        }
+        
+        .navbar-menu a:hover {
+            color: var(--accent);
+        }
+        
+        .user-info {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        
+        .user-name {
+            color: var(--accent);
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+        
+        /* Light theme specific styles using new color palette */
+        body.light-theme {
+            --dark-bg: #F2F2F2;
+            --medium-bg: #FFFFFF;
+            --accent: #02B1AA;
+            --accent-hover: #26AE62;
+            --text-primary: #2B353E;
+            --text-secondary: #5A6B7C;
+            --border-light: #EFF24D;
+            --input-bg: #F2F2F2;
+            --success: #26AE62;
+            --warning: #EFF24D;
+            --danger: #C51713;
+        }
+        
+        body.light-theme .indicator-cell {
+            background: var(--medium-bg);
+            color: var(--text-primary);
+        }
+        
+        body.light-theme .compact-table th {
+            background: var(--dark-bg);
+            color: var(--accent);
+        }
+        
+        body.light-theme .compact-table td {
+            background: var(--medium-bg);
+            border-color: var(--border-light);
+        }
+        
+        body.light-theme .compact-table tr:hover td {
+            background: rgba(2,177,170,0.05);
+        }
+        
+        body.light-theme .btn {
+            background: var(--accent);
+            color: white;
+        }
+        
+        body.light-theme .btn:hover {
+            background: var(--accent-hover);
+        }
+        
+        body.light-theme .theme-toggle {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        
+        body.light-theme .theme-toggle:hover {
+            background: var(--accent);
+            color: white;
+        }
+        
+        body.light-theme .percentage-input {
+            background: rgba(2,177,170,0.1);
+        }
+        
+        body.light-theme .remainder-input {
+            background: rgba(239,242,77,0.2);
+        }
+        
+        body.light-theme .month-navigation {
+            background: var(--medium-bg);
+            border: 1px solid var(--border-light);
+        }
+        
+        body.light-theme .save-section {
+            background: var(--dark-bg);
+        }
+        
+        body.light-theme .table-wrapper::-webkit-scrollbar-track {
+            background: var(--border-light);
+        }
     </style>
 </head>
 <body>
     <nav class="navbar">
         <div class="navbar-container">
-            <a href="master_data.php" class="navbar-brand" style="font-size: 1rem;">HR & Finance Dashboard</a>
+            <a href="master_data.php" class="navbar-brand">HR & Finance Dashboard</a>
             <div class="navbar-menu">
-                <a href="master_data.php" style="font-size: 0.8rem;">Master Data</a>
-                <a href="report_mro_cpr.php">Director Data Entry</a>
-                <a href="verify_data.php" style="font-size: 0.8rem;">Verify</a>
-                <a href="data_history.php" style="font-size: 0.8rem;">History</a>
+                <a href="master_data.php" style="color: var(--accent);">Master Data</a>
+                <a href="../admin/report_mro_cpr.php">Director Data Entry</a>
+                <a href="verify_data.php">Verify</a>
+                <a href="data_history.php">History</a>
                 <div class="user-info">
-                    <span class="user-name" style="font-size: 0.8rem;"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
-                    <a href="../logout.php" class="btn" style="padding: 0.3rem 0.8rem; font-size: 0.7rem;">Logout</a>
+                    <button id="themeToggle" class="btn theme-toggle">☀️ Light</button>
+                    <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
+                    <a href="../logout.php" class="btn">Logout</a>
                 </div>
             </div>
         </div>
@@ -435,7 +588,7 @@ unset($_SESSION['error']);
         <?php endif; ?>
         
         <div class="info-banner">
-            <strong>✏️ <strong>Targets are editable</strong> for each department | 🧮 <strong>Remainder:</strong> Auto-calculated from MD/DIV.
+            <strong>✏️ Targets are editable</strong> for each department | 🧮 <strong>Remainder:</strong> Auto-calculated from MD/DIV.
         </div>
         
         <div class="form-container" style="padding: 0;">
@@ -461,7 +614,7 @@ unset($_SESSION['error']);
                                 $lastUpdate = getLastUpdateInfo($dataMap, $indicatorKey);
                             ?>
                                 <tr>
-                                    <td class="indicator-cell" style="position: sticky; left: 0; background: var(--medium-bg);">
+                                    <td class="indicator-cell">
                                         <?php echo htmlspecialchars($indicatorInfo['name']); ?>
                                     </td>
                                     
@@ -530,7 +683,7 @@ unset($_SESSION['error']);
                                                        data-dept="<?php echo $dept; ?>"
                                                        data-indicator="<?php echo $indicatorKey; ?>"
                                                        readonly
-                                                       style="margin-top: 2px; background: rgba(0,173,181,0.15);"
+                                                       style="margin-top: 2px;"
                                                        placeholder="%">
                                             <?php endif; ?>
                                         </td>
@@ -544,8 +697,8 @@ unset($_SESSION['error']);
                             <?php endforeach; ?>
                             
                             <!-- Remarks Row -->
-                            <tr style="background: rgba(57,62,70,0.3);">
-                                <td class="indicator-cell" style="position: sticky; left: 0; background: var(--dark-bg);">
+                            <tr style="background: var(--dark-bg);">
+                                <td class="indicator-cell">
                                     <strong>📝 Remarks</strong>
                                 </td>
                                 <?php foreach ($departments as $dept): 
@@ -580,6 +733,52 @@ unset($_SESSION['error']);
     </div>
     
     <script>
+        // Theme Management
+        class ThemeManager {
+            constructor() {
+                this.themeKey = 'dashboard_theme';
+                this.loadTheme();
+                this.initToggle();
+            }
+            
+            loadTheme() {
+                const savedTheme = localStorage.getItem(this.themeKey);
+                if (savedTheme === 'light') {
+                    document.body.classList.add('light-theme');
+                    this.updateToggleButton(true);
+                } else {
+                    document.body.classList.remove('light-theme');
+                    this.updateToggleButton(false);
+                }
+            }
+            
+            toggleTheme() {
+                if (document.body.classList.contains('light-theme')) {
+                    document.body.classList.remove('light-theme');
+                    localStorage.setItem(this.themeKey, 'dark');
+                    this.updateToggleButton(false);
+                } else {
+                    document.body.classList.add('light-theme');
+                    localStorage.setItem(this.themeKey, 'light');
+                    this.updateToggleButton(true);
+                }
+            }
+            
+            updateToggleButton(isLight) {
+                const toggleBtn = document.getElementById('themeToggle');
+                if (toggleBtn) {
+                    toggleBtn.innerHTML = isLight ? '🌙 Dark' : '☀️ Light';
+                }
+            }
+            
+            initToggle() {
+                const toggleBtn = document.getElementById('themeToggle');
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', () => this.toggleTheme());
+                }
+            }
+        }
+        
         // Calculate percentage based on actual and target values
         function calculatePercentage(actualInput, targetInput, percentageInput) {
             let actual = parseFloat(actualInput.value);
@@ -619,8 +818,6 @@ unset($_SESSION['error']);
         
         // Update Remainder based on MD/DIV. percentage using formula: MAX(100%, MD/DIV%) - MD/DIV%
         function updateRemainderForIndicator(indicator) {
-            const mdDivActualInput = document.querySelector(`input.actual-input[data-dept="MD/DIV."][data-indicator="${indicator}"]`);
-            const mdDivTargetInput = document.querySelector(`input.target-input[data-dept="MD/DIV."][data-indicator="${indicator}"]`);
             const mdDivPercentageInput = document.querySelector(`input.percentage-field[data-dept="MD/DIV."][data-indicator="${indicator}"]`);
             
             if (mdDivPercentageInput) {
@@ -710,8 +907,9 @@ unset($_SESSION['error']);
             window.location.href = `master_data.php?month=${newMonth}`;
         }
         
-        // Run initialization when page loads
+        // Initialize theme and remainder calculations when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            new ThemeManager();
             initializeRemainders();
         });
     </script>

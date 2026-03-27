@@ -117,9 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <button type="submit" class="btn" style="width: 100%;">Login</button>
             </form>
             
-            <div class="login-footer">
-                <small>Default users: hr_user / password123 | director_user / password123</small>
-            </div>
+           
         </div>
     </div>
 </body>

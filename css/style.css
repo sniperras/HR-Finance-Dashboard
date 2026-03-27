@@ -1,5 +1,5 @@
 :root {
-    --dark-bg: #222831;
+       --dark-bg: #222831;
     --medium-bg: #393E46;
     --accent: #00ADB5;
     --light-bg: #EEEEEE;
@@ -427,4 +427,67 @@ body {
     color: #888;
     margin-top: 0.5rem;
     text-align: right;
+}
+/* Light Theme Variables */
+:root {
+    --dark-bg: #0F172A;
+    --medium-bg: #1E293B;
+    --accent: #38BDF8;
+    --accent-hover: #60A5FA;
+    --light-bg: #F1F5F9;
+    --card-bg: #1E293B;
+    --border-light: #334155;
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    --input-bg: #0F172A;
+}
+
+/* Light Theme using new color palette */
+body.light-theme {
+    --dark-bg: #F2F2F2;      /* White Smoke */
+    --medium-bg: #FFFFFF;     /* White */
+    --card-bg: #FFFFFF;       /* White */
+    --accent: #02B1AA;        /* Light Sea Green */
+    --accent-hover: #26AE62;  /* Medium Jungle */
+    --text-primary: #2B353E;  /* Jet Black */
+    --text-secondary: #5A6B7C;
+    --text-light: #2B353E;    /* Jet Black */
+    --border-light: #EFF24D;  /* Canary Yellow */
+    --input-bg: #F2F2F2;      /* White Smoke */
+    --success: #26AE62;       /* Medium Jungle */
+    --warning: #EFF24D;       /* Canary Yellow */
+    --danger: #C51713;        /* Brick Ember */
+    --info: #02B1AA;          /* Light Sea Green */
+}
+
+/* Apply theme variables */
+body {
+    background: var(--dark-bg);
+    color: var(--text-primary);
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.navbar {
+    background: var(--medium-bg);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.metric-card, .card, .form-container, .verification-table-wrapper {
+    background: var(--card-bg);
+    border: 1px solid var(--border-light);
+}
+
+input, select, textarea {
+    background: var(--input-bg);
+    color: var(--text-primary);
+    border-color: var(--border-light);
+}
+
+.dashboard-header, .verification-header {
+    background: linear-gradient(135deg, var(--medium-bg) 0%, var(--dark-bg) 100%);
+}
+
+/* Smooth transition for all elements */
+* {
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
 }
