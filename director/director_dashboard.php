@@ -153,6 +153,7 @@ $conn->close();
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title><?php echo htmlspecialchars($userDept); ?> Department Performance Dashboard</title>
     <link rel="stylesheet" href="../css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --dark-bg: #0F172A;
@@ -180,13 +181,14 @@ $conn->close();
             background: var(--dark-bg);
             color: var(--text-primary);
             transition: background-color 0.3s, color 0.3s;
+            overflow-x: hidden;
         }
         
         /* Navigation */
         .navbar {
             background: var(--medium-bg);
-            padding: 0.6rem 0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            padding: 0.5rem 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
             position: sticky;
             top: 0;
             z-index: 1000;
@@ -195,20 +197,14 @@ $conn->close();
         }
         
         .navbar-container {
-            max-width: 1400px;
+            max-width: 100%;
             margin: 0 auto;
-            padding: 0 2rem;
+            padding: 0 1.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 1rem;
-        }
-        
-        @media (max-width: 1024px) {
-            .navbar-container {
-                padding: 0 1.5rem;
-            }
+            gap: 0.5rem;
         }
         
         @media (max-width: 768px) {
@@ -218,7 +214,7 @@ $conn->close();
         }
         
         .navbar-brand {
-            font-size: 1rem;
+            font-size: 0.95rem;
             font-weight: bold;
             color: var(--accent);
             text-decoration: none;
@@ -226,7 +222,7 @@ $conn->close();
         
         .navbar-menu {
             display: flex;
-            gap: 1rem;
+            gap: 0.8rem;
             align-items: center;
             flex-wrap: wrap;
         }
@@ -234,9 +230,9 @@ $conn->close();
         .navbar-menu a {
             color: var(--text-primary);
             text-decoration: none;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             transition: color 0.2s;
-            padding: 0.3rem 0.5rem;
+            padding: 0.25rem 0.4rem;
             border-radius: 5px;
         }
         
@@ -248,21 +244,21 @@ $conn->close();
         .user-info {
             display: flex;
             align-items: center;
-            gap: 0.6rem;
+            gap: 0.5rem;
         }
         
         .user-name {
             color: var(--accent);
             font-weight: bold;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
         }
         
         .department-badge {
             background: var(--accent);
             color: var(--dark-bg);
-            padding: 0.2rem 0.6rem;
+            padding: 0.15rem 0.5rem;
             border-radius: 20px;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             font-weight: bold;
         }
         
@@ -270,11 +266,11 @@ $conn->close();
             background: var(--accent);
             color: var(--dark-bg);
             border: none;
-            padding: 0.3rem 0.8rem;
+            padding: 0.25rem 0.7rem;
             border-radius: 5px;
             cursor: pointer;
             font-weight: bold;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             transition: all 0.3s;
             text-decoration: none;
             display: inline-block;
@@ -291,10 +287,10 @@ $conn->close();
             background: transparent;
             border: 1px solid var(--accent);
             color: var(--accent);
-            padding: 0.3rem 0.8rem;
+            padding: 0.25rem 0.7rem;
             border-radius: 5px;
             cursor: pointer;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             transition: all 0.3s;
         }
         
@@ -306,28 +302,33 @@ $conn->close();
         /* Main Container */
         .container {
             width: 100%;
-            max-width: 1400px;
-            margin: 1rem auto;
-            padding: 0 2rem;
+            max-width: 100%;
+            margin: 0;
+            padding: 0.75rem 1rem;
         }
         
-        @media (max-width: 1024px) {
+        @media (min-width: 1400px) {
             .container {
-                padding: 0 1.5rem;
+                padding: 0.75rem 2rem;
+            }
+        }
+        
+        @media (min-width: 1920px) {
+            .container {
+                padding: 0.75rem 4rem;
             }
         }
         
         @media (max-width: 768px) {
             .container {
-                padding: 0 1rem;
-                margin: 0.75rem auto;
+                padding: 0.5rem;
             }
         }
         
-        /* Dashboard Header */
+        /* Dashboard Header - Compact */
         .dashboard-header {
             background: linear-gradient(135deg, var(--medium-bg) 0%, var(--dark-bg) 100%);
-            padding: 0.75rem 1.25rem;
+            padding: 0.6rem 1rem;
             border-radius: 12px;
             margin-bottom: 1rem;
             border: 1px solid var(--border-light);
@@ -358,28 +359,24 @@ $conn->close();
             font-size: 0.7rem;
         }
         
-        .month-selector button:hover {
-            transform: scale(1.02);
-        }
-        
         .month-selector h3 {
             color: var(--text-primary);
             margin: 0;
             font-size: 0.85rem;
         }
         
-        /* Department Header Card */
+        /* Department Header Card - Compact */
         .department-header-card {
             background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
             color: var(--dark-bg);
-            padding: 0.75rem;
+            padding: 0.6rem 1rem;
             border-radius: 12px;
             margin-bottom: 1rem;
             text-align: center;
         }
         
         .department-header-card h2 {
-            font-size: 1.1rem;
+            font-size: 1rem;
             margin-bottom: 0.2rem;
         }
         
@@ -388,80 +385,117 @@ $conn->close();
             opacity: 0.9;
         }
         
-        /* Compact Table Layout - All in one view */
-        .dashboard-table {
-            width: 100%;
-            border-collapse: collapse;
+        /* Metrics Grid - 4 columns on large screens for all 12 metrics in one view */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.8rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        @media (max-width: 1200px) {
+            .metrics-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 0.7rem;
+            }
+        }
+        
+        @media (max-width: 900px) {
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.6rem;
+            }
+        }
+        
+        @media (max-width: 600px) {
+            .metrics-grid {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+        }
+        
+        /* Metric Card - Compact */
+        .metric-card {
             background: var(--card-bg);
             border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-            font-size: 0.7rem;
-        }
-        
-        .dashboard-table th,
-        .dashboard-table td {
-            padding: 0.6rem 0.4rem;
-            text-align: left;
-            border-bottom: 1px solid var(--border-light);
-            vertical-align: middle;
-        }
-        
-        .dashboard-table th {
-            background: var(--dark-bg);
-            color: var(--accent);
-            font-weight: bold;
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-        }
-        
-        .dashboard-table tr:hover {
-            background: rgba(56,189,248,0.05);
-        }
-        
-        .indicator-cell {
-            font-weight: 600;
-            color: var(--accent);
-            cursor: pointer;
+            padding: 0.6rem;
             transition: all 0.2s;
+            border: 1px solid var(--border-light);
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-color: var(--accent);
+        }
+        
+        .metric-title {
             font-size: 0.7rem;
-        }
-        
-        .indicator-cell:hover {
-            color: var(--accent-hover);
-            text-decoration: underline;
-        }
-        
-        .percentage-cell {
             font-weight: bold;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.3rem;
+            border-bottom: 1px solid var(--accent);
             text-align: center;
-            font-size: 0.75rem;
-        }
-        
-        .progress-cell {
-            min-width: 100px;
-        }
-        
-        .progress-bar-container {
-            background: var(--dark-bg);
-            border-radius: 10px;
+            white-space: nowrap;
             overflow: hidden;
-            height: 6px;
+            text-overflow: ellipsis;
+        }
+        
+        /* Chart Container - Smaller */
+        .chart-container {
+            position: relative;
             width: 100%;
+            max-width: 130px;
+            margin: 0 auto;
+            cursor: pointer;
         }
         
-        .progress-bar-fill {
-            height: 100%;
-            border-radius: 10px;
-            transition: width 0.3s ease;
+        .chart-container canvas {
+            width: 100% !important;
+            height: auto !important;
+            max-height: 110px;
         }
         
-        .actual-cell, .target-cell {
+        /* Metric Values - Compact */
+        .metric-values {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid var(--border-light);
+            font-size: 0.6rem;
+        }
+        
+        .metric-values div {
             text-align: center;
-            font-family: monospace;
+            flex: 1;
+        }
+        
+        .metric-values .value-label {
+            color: var(--text-secondary);
+            font-size: 0.55rem;
+            margin-bottom: 0.15rem;
+        }
+        
+        .metric-values .value-number {
+            font-weight: bold;
             font-size: 0.7rem;
-            font-weight: 500;
+        }
+        
+        .actual-value {
+            color: var(--accent);
+        }
+        
+        .target-value {
+            color: var(--warning);
+        }
+        
+        .percentage-value {
+            font-weight: bold;
         }
         
         .no-data {
@@ -488,7 +522,7 @@ $conn->close();
             100% { transform: rotate(360deg); }
         }
         
-        /* Scrollbar - Minimal */
+        /* Scrollbar */
         ::-webkit-scrollbar {
             width: 5px;
             height: 5px;
@@ -519,7 +553,7 @@ $conn->close();
         
         body.light-theme .navbar {
             background: white;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
         }
         
         body.light-theme .dashboard-header {
@@ -528,14 +562,6 @@ $conn->close();
         
         body.light-theme .department-header-card {
             background: linear-gradient(135deg, #0284C7 0%, #0EA5E9 100%);
-        }
-        
-        body.light-theme .dashboard-table {
-            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-        }
-        
-        body.light-theme .dashboard-table th {
-            background: #F1F5F9;
         }
         
         body.light-theme .theme-toggle {
@@ -548,25 +574,26 @@ $conn->close();
             color: white;
         }
         
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-            .dashboard-table th,
-            .dashboard-table td {
-                padding: 0.4rem 0.25rem;
-                font-size: 0.6rem;
-            }
-            
-            .actual-cell, .target-cell {
-                font-size: 0.6rem;
-            }
-            
-            .percentage-cell {
-                font-size: 0.65rem;
-            }
-            
-            .progress-cell {
-                min-width: 80px;
-            }
+        /* Tooltip on hover */
+        .metric-card {
+            position: relative;
+        }
+        
+        .metric-card:hover::after {
+            content: "Click for detailed report";
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--dark-bg);
+            color: var(--accent);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.6rem;
+            white-space: nowrap;
+            z-index: 100;
+            pointer-events: none;
+            border: 1px solid var(--accent);
         }
     </style>
 </head>
@@ -598,7 +625,7 @@ $conn->close();
         
         <div class="department-header-card">
             <h2>🎯 <?php echo htmlspecialchars($userDept); ?> Department</h2>
-            <p>Performance Metrics for <?php echo date('F Y', strtotime($dataMonth)); ?> | Click on any metric for detailed report</p>
+            <p>Performance Metrics for <?php echo date('F Y', strtotime($dataMonth)); ?> | Click any card for details</p>
         </div>
         
         <div id="dashboard-content">
@@ -658,6 +685,9 @@ $conn->close();
         const currentMonth = '<?php echo $currentMonth; ?>';
         const userDepartment = '<?php echo $userDept; ?>';
         
+        // Store chart instances
+        let chartInstances = {};
+        
         // Function to get color based on percentage
         function getScoreColor(percentage) {
             if (percentage >= 90) return '#10B981';
@@ -665,8 +695,8 @@ $conn->close();
             return '#EF4444';
         }
         
-        // Function to handle click on indicator
-        function onIndicatorClick(indicatorKey, indicatorName, recordId, actualValue, targetValue, percentage) {
+        // Function to handle click on metric card
+        function onMetricClick(indicatorKey, indicatorName, recordId, actualValue, targetValue, percentage) {
             sessionStorage.setItem('selectedIndicator', indicatorKey);
             sessionStorage.setItem('selectedIndicatorName', indicatorName);
             sessionStorage.setItem('selectedRecordId', recordId);
@@ -676,6 +706,50 @@ $conn->close();
             sessionStorage.setItem('targetValue', targetValue);
             sessionStorage.setItem('percentageValue', percentage);
             window.location.href = `indicator_detail.php?indicator=${encodeURIComponent(indicatorKey)}&month=${currentMonth}&dept=${encodeURIComponent(userDepartment)}`;
+        }
+        
+        // Create pie chart
+        function createPieChart(canvasId, percentage, indicatorKey, indicatorName, recordId, actualValue, targetValue) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return null;
+            
+            const achieved = percentage;
+            const remaining = Math.max(0, 100 - percentage);
+            const color = getScoreColor(percentage);
+            
+            return new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Achieved', 'Remaining'],
+                    datasets: [{
+                        data: [achieved, remaining],
+                        backgroundColor: [color, 'rgba(51, 65, 85, 0.5)'],
+                        borderWidth: 0,
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    cutout: '65%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.label}: ${context.raw}%`;
+                                }
+                            },
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleColor: '#38BDF8',
+                            bodyColor: '#F1F5F9'
+                        }
+                    },
+                    onClick: function() {
+                        onMetricClick(indicatorKey, indicatorName, recordId, actualValue, targetValue, percentage);
+                    }
+                }
+            });
         }
         
         function renderDashboard() {
@@ -695,45 +769,51 @@ $conn->close();
                 return;
             }
             
-            const table = document.createElement('table');
-            table.className = 'dashboard-table';
-            
-            table.innerHTML = `
-                <thead>
-                    <tr>
-                        <th>Performance Metric</th>
-                        <th>Actual</th>
-                        <th>Target</th>
-                        <th>%</th>
-                        <th>Progress</th>
-                    </thead>
-                <tbody id="dashboard-table-body"></tbody>
-            `;
-            
-            const tbody = table.querySelector('#dashboard-table-body');
+            const metricsGrid = document.createElement('div');
+            metricsGrid.className = 'metrics-grid';
             
             for (const [metricKey, metric] of Object.entries(metricsData)) {
                 const percentage = metric.percentage;
                 const actual = metric.actual;
                 const target = metric.target;
                 const percentageColor = getScoreColor(percentage);
+                const chartId = `chart-${metricKey.replace(/\s+/g, '-').replace(/[\/]/g, '-')}`;
                 
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="indicator-cell" onclick="onIndicatorClick('${metricKey}', '${metric.display_name}', ${metric.record_id}, ${actual}, ${target}, ${percentage})">${metric.display_name}</td>
-                    <td class="actual-cell">${actual}${actual > 0 ? '%' : ''}</td>
-                    <td class="target-cell">${target}${target > 0 ? '%' : ''}</td>
-                    <td class="percentage-cell" style="color: ${percentageColor};">${percentage}%</td>
-                    <td class="progress-cell">
-                        <div class="progress-bar-container">
-                            <div class="progress-bar-fill" style="width: ${Math.min(percentage, 100)}%; background: ${percentageColor};"></div>
+                const card = document.createElement('div');
+                card.className = 'metric-card';
+                card.onclick = () => onMetricClick(metricKey, metric.display_name, metric.record_id, actual, target, percentage);
+                
+                card.innerHTML = `
+                    <div class="metric-title" title="${metric.display_name}">${metric.display_name}</div>
+                    <div class="chart-container">
+                        <canvas id="${chartId}" width="120" height="120"></canvas>
+                    </div>
+                    <div class="metric-values">
+                        <div>
+                            <div class="value-label">Actual</div>
+                            <div class="value-number actual-value">${actual}${actual > 0 ? '%' : ''}</div>
                         </div>
-                    </td>
+                        <div>
+                            <div class="value-label">Target</div>
+                            <div class="value-number target-value">${target}${target > 0 ? '%' : ''}</div>
+                        </div>
+                        <div>
+                            <div class="value-label">%</div>
+                            <div class="value-number percentage-value" style="color: ${percentageColor};">${percentage}%</div>
+                        </div>
+                    </div>
                 `;
-                tbody.appendChild(row);
+                
+                metricsGrid.appendChild(card);
+                
+                // Create chart after card is added to DOM
+                setTimeout(() => {
+                    const chart = createPieChart(chartId, percentage, metricKey, metric.display_name, metric.record_id, actual, target);
+                    if (chart) chartInstances[chartId] = chart;
+                }, 10);
             }
             
-            container.appendChild(table);
+            container.appendChild(metricsGrid);
         }
         
         // Change month function
@@ -752,10 +832,30 @@ $conn->close();
             window.location.href = `director_dashboard.php?month=${newMonth}`;
         }
         
-        // Initialize theme manager and dashboard when page loads
+        // Cleanup charts on page unload
+        function cleanupCharts() {
+            for (const [id, chart] of Object.entries(chartInstances)) {
+                if (chart && typeof chart.destroy === 'function') {
+                    chart.destroy();
+                }
+            }
+        }
+        
+        // Initialize dashboard
         document.addEventListener('DOMContentLoaded', function() {
             new ThemeManager();
             renderDashboard();
+        });
+        
+        window.addEventListener('beforeunload', cleanupCharts);
+        
+        // Handle window resize
+        let resizeTimeout;
+        window.addEventListener('resize', function() {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                renderDashboard();
+            }, 250);
         });
     </script>
 </body>
