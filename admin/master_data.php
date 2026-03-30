@@ -54,10 +54,10 @@ $departments = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'MRO HR', 'MD/DI
 
 // Define indicators with their full names and target defaults
 $indicators = [
-    'Team Leaders Clock-in Data' => [
-        'name' => 'Team Leaders Clock in Data (December)',
-        'targets' => ['BMT' => 100, 'LMT' => 100, 'CMT' => 100, 'EMT' => 100, 'AEP' => 100, 'MSM' => 100, 'QA' => 100, 'MRO HR' => 100, 'MD/DIV.' => 100, 'Remainder' => 100]
-    ],
+    // 'Team Leaders Clock-in Data' => [
+    //     'name' => 'Team Leaders Clock in Data',
+    //     'targets' => ['BMT' => 100, 'LMT' => 100, 'CMT' => 100, 'EMT' => 100, 'AEP' => 100, 'MSM' => 100, 'QA' => 100, 'MRO HR' => 100, 'MD/DIV.' => 100, 'Remainder' => 100]
+    // ],
     'Crew Meeting Minutes Submission' => [
         'name' => 'Crew Meeting Minutes Submission',
         'targets' => ['BMT' => 14, 'LMT' => 5, 'CMT' => 18, 'EMT' => 10, 'AEP' => 5, 'MSM' => 1, 'QA' => 1, 'MRO HR' => 1, 'MD/DIV.' => 55, 'Remainder' => 100]
@@ -83,7 +83,7 @@ $indicators = [
         'targets' => ['BMT' => 1, 'LMT' => 1, 'CMT' => 1, 'EMT' => 1, 'AEP' => 1, 'MSM' => 1, 'QA' => 1, 'MRO HR' => 1, 'MD/DIV.' => 8, 'Remainder' => 100]
     ],
     'Lost Time Justification' => [
-        'name' => 'Lost time Justification (Dec 1-25, 2025)',
+        'name' => 'Lost time Justification',
         'targets' => ['BMT' => 100, 'LMT' => 100, 'CMT' => 1001, 'EMT' => 100, 'AEP' => 100, 'MSM' => 100, 'QA' => 100, 'MRO HR' => 100, 'MD/DIV.' => 100, 'Remainder' => 100]
     ],
     'Attendance Approval Status' => [
