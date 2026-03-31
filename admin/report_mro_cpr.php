@@ -14,6 +14,7 @@ $reports = [
     'Crew Meeting Minutes Submission' => 'Crew Meeting Minutes Submission',
     'Exceptional Customer Experience Training' => 'Exceptional Customer Experience Training',
     '2025/26 1st Semiannual BSC/ISC Target Status' => '2025/26 1st Semiannual BSC/ISC Target Status',
+    '2025/26 1st Semiannual BSC/ISC Evaluation Status' => '2025/26 1st Semiannual BSC/ISC Evaluation Status',
     'Activity Report Submission' => 'Activity Report Submission',
     'Cost Saving Report Submission' => 'Cost Saving Report Submission',
     'Lost time Justification' => 'Lost time Justification',
@@ -24,7 +25,7 @@ $reports = [
 ];
 
 // Define departments
-$departments = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'NSM', 'QA', 'PSCM'];
+$departments = ['ALL','BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'NSM', 'QA', 'PSCM'];
 
 // Define cost centers for each department
 $costCenters = [
@@ -465,7 +466,11 @@ $conn->close();
 
     <div class="container">
         <div class="report-header">
-            <h1 style="color: var(--accent); font-size: 1.2rem;">📊 MRO Performance Report</h1>
+            <h1 style="color: var(--accent); font-size: 1.2rem;">
+  <img src="..\assets\images\online-data.png" alt="MRO Icon" style="width:20px; height:20px; vertical-align:middle; margin-right:8px;">
+  MRO Performance Report
+</h1>
+
             <p style="font-size: 0.7rem; opacity: 0.8;">Enter expected and completed tasks to calculate completion percentage</p>
         </div>
 

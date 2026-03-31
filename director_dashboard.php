@@ -24,11 +24,11 @@ $allDepartments = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'MRO HR', 'MD
 
 // Define all indicators with their display names
 $indicators = [
-    'Team Leaders Clock-in Data' => [
-        'display_name' => 'Team Leaders Clock-in',
-        'short_name' => 'Clock-in',
-        'id' => 'ind_clockin'
-    ],
+    // 'Team Leaders Clock-in Data' => [
+    //     'display_name' => 'Team Leaders Clock-in',
+    //     'short_name' => 'Clock-in',
+    //     'id' => 'ind_clockin'
+    // ],
     'Crew Meeting Minutes Submission' => [
         'display_name' => 'Crew Meeting Minutes',
         'short_name' => 'Meeting Minutes',

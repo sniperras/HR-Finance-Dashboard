@@ -639,9 +639,9 @@ unset($_SESSION['error']);
             <a href="master_data.php" class="navbar-brand">HR & Finance Dashboard</a>
             <div class="navbar-menu">
                 <a href="master_data.php" style="color: var(--accent);">Master Data Entry</a>
-                <a href="../admin/report_mro_cpr.php" style="color: var(--light-bg);">Director Data Entry</a>
-                <a href="verify_data.php" style="color: var(--light-bg);">Verify Data</a>
-                <a href="data_history.php" style="color: var(--light-bg);">History</a>
+                <a href="../admin/report_mro_cpr.php" style="color: var(--accent);">Director Data Entry</a>
+                <a href="verify_data.php" style="color: var(--accent);">Verify Data</a>
+                <a href="data_history.php" style="color: var(--accent);">History</a>
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
                     <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>

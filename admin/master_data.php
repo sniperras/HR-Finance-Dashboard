@@ -523,7 +523,7 @@ unset($_SESSION['error']);
             color: var(--accent);
         }
         
-        body.light-theme .theme-toggle:hover {
+        body.light-theme .theme-toggle {
             background: var(--accent);
             color: white;
         }
@@ -571,7 +571,9 @@ unset($_SESSION['error']);
     <div class="container">
         <div class="month-navigation">
             <button onclick="changeMonth('prev')" class="btn">&larr; Previous Month</button>
-            <h3>📊 Master Data Entry - <?php echo date('F Y', strtotime($dataMonth)); ?></h3>
+            
+            <h3><img src="..\assets\images\online-data.png" alt="MRO Icon" style="width:20px; height:20px; vertical-align:middle; margin-right:8px;">
+            Master Data Entry - <?php echo date('F Y', strtotime($dataMonth)); ?></h3>
             <button onclick="changeMonth('next')" class="btn">Next Month &rarr;</button>
         </div>
         
