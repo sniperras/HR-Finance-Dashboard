@@ -283,9 +283,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             .form-group input {
-                background-color: #3a3a3a;
+                background-color: #ffffff;
                 border-color: #4a4a4a;
-                color: #e5e5e5;
+                color: #000000;
             }
 
             .form-group input:focus {
@@ -346,7 +346,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <!-- Title -->
-                <h2 class="title">HR & Finance Dashboard</h2>
+                <h2 class="title">Welcome to HR & Finance Dashboard</h2>
 
                 <!-- Error Message -->
                 <?php if ($error): ?>

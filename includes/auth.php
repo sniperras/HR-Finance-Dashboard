@@ -7,7 +7,7 @@ function isLoggedIn() {
 
 function requireLogin() {
     if (!isLoggedIn()) {
-        header('Location: /HRandMDDash/login.php');
+        header('Location: /HRandMDDash/index.php');
         exit();
     }
 }
