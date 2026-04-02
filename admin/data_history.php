@@ -522,7 +522,7 @@ unset($_SESSION['error']);
         }
         
         .navbar-menu a {
-            color: var(--light-bg);
+            color: var(--text-primary);
             text-decoration: none;
             font-size: 0.8rem;
             transition: color 0.2s;
@@ -638,9 +638,10 @@ unset($_SESSION['error']);
         <div class="navbar-container">
             <a href="master_data.php" class="navbar-brand">HR & Finance Dashboard</a>
             <div class="navbar-menu">
-                <a href="master_data.php" style="color: var(--accent);">Master Data Entry</a>
-                <a href="../admin/report_mro_cpr.php" style="color: var(--accent);">Director Data Entry</a>
-                <a href="verify_data.php" style="color: var(--accent);">Verify Data</a>
+                <a href="../director/md_dashboard.php" >Dashboard</a>
+                <a href="master_data.php" >Master Data Entry</a>
+                <a href="../admin/report_mro_cpr.php">Director Data Entry</a>
+                <a href="verify_data.php" >Verify Data</a>
                 <a href="data_history.php" style="color: var(--accent);">History</a>
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>

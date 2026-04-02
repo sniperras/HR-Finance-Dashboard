@@ -7,17 +7,46 @@ function isLoggedIn() {
 
 function requireLogin() {
     if (!isLoggedIn()) {
-        header('Location: /HRandMDDash/index.php');
+        header('Location: /HRandMDDash/login.php');
         exit();
     }
 }
 
 function requireRole($role) {
     requireLogin();
+    
+    // HR role can access everything
+    if ($_SESSION['user_role'] === 'hr') {
+        return true;
+    }
+    
+    // For other roles, check specific role
     if ($_SESSION['user_role'] !== $role) {
-        header('Location: /HRandMDDash/index.php');
+        header('Location: /HRandMDDash/login.php');
         exit();
     }
+}
+
+function checkAccess($allowedRoles = []) {
+    requireLogin();
+    
+    // HR role can access everything
+    if ($_SESSION['user_role'] === 'hr') {
+        return true;
+    }
+    
+    // Check if current role is allowed
+    if (in_array($_SESSION['user_role'], $allowedRoles)) {
+        return true;
+    }
+    
+    // No access - redirect based on role
+    if ($_SESSION['user_role'] === 'director') {
+        header('Location: /HRandMDDash/director/md_dashboard.php');
+    } else {
+        header('Location: /HRandMDDash/login.php');
+    }
+    exit();
 }
 
 function getCurrentUser() {
@@ -42,4 +71,23 @@ function logAction($recordId, $action, $oldData, $newData) {
     $stmt->close();
     $conn->close();
 }
-?>
+
+// Helper function to check if user has access to a specific page
+function hasPageAccess($pageType) {
+    if (!isLoggedIn()) {
+        return false;
+    }
+    
+    // HR has access to everything
+    if ($_SESSION['user_role'] === 'hr') {
+        return true;
+    }
+    
+    // Director access
+    if ($_SESSION['user_role'] === 'director') {
+        $allowedPages = ['md_dashboard', 'director_dashboard', 'report_mro_cpr'];
+        return in_array($pageType, $allowedPages);
+    }
+    
+    return false;
+}

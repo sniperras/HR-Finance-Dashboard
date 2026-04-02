@@ -24,6 +24,7 @@ if (!$isAdminDirector) {
     exit();
 }
 
+
 // Define all departments
 $allDepartments = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'MRO HR', 'MD/DIV.', 'Remainder'];
 
@@ -647,19 +648,32 @@ $conn->close();
 
 <body>
     <nav class="navbar">
-        <div class="navbar-container">
-            <a href="md_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
-            <div class="navbar-menu">
-                <a href="md_dashboard.php" style="color: var(--accent);">Dashboard</a>
-                <div class="user-info">
-                    <button id="themeToggle" class="theme-toggle">☀️ Light</button>
-                    <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
-
-                    <a href="../logout.php" class="btn">Logout</a>
-                </div>
+    <div class="navbar-container">
+        <a href="md_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
+        <div class="navbar-menu">
+            <?php 
+            $isAdminDirector = ($_SESSION['username'] === 'director_admin' && $_SESSION['user_role'] === 'director');
+            ?>
+            
+            <!-- Always show Dashboard -->
+            <a href="md_dashboard.php" style="color: var(--accent);">Dashboard</a>
+            
+            <!-- Show these only for non-admin directors -->
+            <?php if (!$isAdminDirector): ?>
+                <a href="../admin/master_data.php">Master Data</a>
+                <a href="../admin/report_mro_cpr.php">Director Data Entry</a>
+                <a href="../admin/verify_data.php">Verify</a>
+                <a href="../admin/data_history.php">History</a>
+            <?php endif; ?>
+            
+            <div class="user-info">
+                <button id="themeToggle" class="theme-toggle">☀️ Light</button>
+                <span class="user-name">👤 <?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
+                <a href="../logout.php" class="btn">Logout</a>
             </div>
         </div>
-    </nav>
+    </div>
+</nav>
 
     <div class="container">
         <div class="dashboard-header">
@@ -672,7 +686,7 @@ $conn->close();
         </div>
 
         <div class="welcome-banner">
-            <strong>👋 Admin Director</strong> - Viewing all departments performance metrics | Click on any metric or department for detailed report
+            <strong>Managing Director</strong> - Viewing all departments performance metrics | Click on any metric or department for detailed report
         </div>
 
         <div id="dashboard-content">

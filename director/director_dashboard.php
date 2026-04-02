@@ -26,7 +26,7 @@ if ($isAdminDirector) {
 
 // If no department found, redirect to login
 if (empty($userDept)) {
-    header('Location: ../login.php');
+    header('Location: ../index.php');
     exit();
 }
 
@@ -600,14 +600,14 @@ $conn->close();
 <body>
     <nav class="navbar">
         <div class="navbar-container">
-            <a href="director_dashboard.php" class="navbar-brand">🏢 HR & Finance Dashboard</a>
+            <a href="director_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
             <div class="navbar-menu">
-                <a href="director_dashboard.php" style="color: var(--accent);">📊 Dashboard</a>
+                <a href="director_dashboard.php" style="color: var(--accent);">Dashboard</a>
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
                     <span class="user-name">👤 <?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
-                    <span class="department-badge">🏭 <?php echo htmlspecialchars($userDept); ?></span>
-                    <a href="../logout.php" class="btn">🚪 Logout</a>
+                    <span class="department-badge"> <?php echo htmlspecialchars($userDept); ?></span>
+                    <a href="../logout.php" class="btn">Logout</a>
                 </div>
             </div>
         </div>
