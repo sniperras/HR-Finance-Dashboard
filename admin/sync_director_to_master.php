@@ -1,5 +1,6 @@
 <?php
 // sync_director_to_master.php - Run this once to backfill existing data
+require_once '../session_config.php';
 require_once '../includes/auth.php';
 requireRole('hr');
 

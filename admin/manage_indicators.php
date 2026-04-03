@@ -2,6 +2,7 @@
 error_reporting(0); // Suppress all warnings/errors from breaking JSON
 ini_set('display_errors', 0);
 
+require_once '../session_config.php';
 require_once '../includes/auth.php';
 requireRole('hr');
 

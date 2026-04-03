@@ -1,15 +1,6 @@
 <?php
-// Session configuration - MUST be called before session_start()
-ini_set('session.cookie_httponly', 1);
-ini_set('session.use_only_cookies', 1);
-ini_set('session.cookie_secure', 0); // Set to 1 if using HTTPS
-ini_set('session.cookie_samesite', 'Lax');
-ini_set('session.gc_maxlifetime', 7200); // 2 hours session lifetime (optional)
-
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// IMPORTANT: Include session config FIRST
+require_once '../session_config.php';
 
 require_once __DIR__ . '/../config/database.php';
 
@@ -19,6 +10,8 @@ function isLoggedIn() {
 
 function requireLogin() {
     if (!isLoggedIn()) {
+        // Clear any existing session data
+        session_write_close();
         header('Location: /HRandMDDash/login.php');
         exit();
     }
@@ -216,22 +209,4 @@ function hasPageAccess($pageType) {
     
     return false;
 }
-
-// Function to refresh session (keep it alive)
-function refreshSession() {
-    if (isLoggedIn()) {
-        $_SESSION['LAST_ACTIVITY'] = time();
-    }
-}
-
-// Function to check session timeout (optional, for auto-logout after inactivity)
-function checkSessionTimeout($timeoutSeconds = 7200) {
-    if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY'] > $timeoutSeconds)) {
-        // Session expired
-        session_unset();
-        session_destroy();
-        header('Location: /HRandMDDash/login.php?timeout=1');
-        exit();
-    }
-    $_SESSION['LAST_ACTIVITY'] = time();
-}
+?>

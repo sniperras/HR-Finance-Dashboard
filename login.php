@@ -1,16 +1,7 @@
 <?php
-session_start();
+// Include session config FIRST
+require_once 'session_config.php';
 require_once 'config/database.php';
-// Session configuration for cross-tab support
-ini_set('session.cookie_httponly', 1);
-ini_set('session.use_only_cookies', 1);
-ini_set('session.cookie_lifetime', 0); // 0 = session cookie (expires when browser closes)
-ini_set('session.gc_maxlifetime', 7200);
-
-// Start session
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
 
 $error = '';
 
@@ -26,10 +17,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($user = $result->fetch_assoc()) {
         if (password_verify($password, $user['password'])) {
+            // Regenerate session ID to prevent fixation
+            session_regenerate_id(true);
+            
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $user['username'];
             $_SESSION['full_name'] = $user['full_name'];
             $_SESSION['user_role'] = $user['role'];
+            $_SESSION['LAST_ACTIVITY'] = time();
 
             // Update last login
             $updateStmt = $conn->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
@@ -37,22 +32,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $updateStmt->execute();
             $updateStmt->close();
 
-            // Redirect based on role and username pattern
+            // Redirect based on role
             if ($user['role'] === 'hr') {
                 header('Location: admin/master_data.php');
+            } elseif ($user['role'] === 'manager') {
+                header('Location: director/manager_dashboard.php');
             } elseif ($user['role'] === 'director') {
-                // Check if it's a Managing Director (admin director)
                 if ($username === 'director_admin') {
                     header('Location: director/md_dashboard.php');
-                } 
-                // Check if it's a department director (director_BMT, director_LMT, etc.)
-                elseif (preg_match('/director_([A-Z\/\s]+)/', $username, $matches)) {
+                } else {
                     header('Location: director/director_dashboard.php');
                 }
-                // Default director fallback
-                else {
-                    header('Location: director/director_dashboard.php');
-                }
+            } elseif ($user['role'] === 'md') {
+                header('Location: director/md_dashboard.php');
             } else {
                 header('Location: index.php');
             }
@@ -68,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $conn->close();
 }
 ?>
+<!-- Rest of your HTML... -->
 
 <!DOCTYPE html>
 <html lang="en">

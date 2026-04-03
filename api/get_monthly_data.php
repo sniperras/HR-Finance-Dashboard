@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once '../config/database.php';
+require_once '../session_config.php';
 require_once '../includes/auth.php';
 
 if (!isLoggedIn()) {

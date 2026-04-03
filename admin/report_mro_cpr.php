@@ -1,4 +1,5 @@
 <?php
+require_once '../session_config.php';
 require_once '../includes/auth.php';
 requireRole('hr');
 $conn = getConnection();
