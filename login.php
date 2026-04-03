@@ -1,6 +1,16 @@
 <?php
 session_start();
 require_once 'config/database.php';
+// Session configuration for cross-tab support
+ini_set('session.cookie_httponly', 1);
+ini_set('session.use_only_cookies', 1);
+ini_set('session.cookie_lifetime', 0); // 0 = session cookie (expires when browser closes)
+ini_set('session.gc_maxlifetime', 7200);
+
+// Start session
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 $error = '';
 

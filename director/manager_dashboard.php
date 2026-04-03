@@ -350,6 +350,17 @@ $conn->close();
         document.addEventListener('DOMContentLoaded', function() {
             new ThemeManager();
         });
+
+        // Keep session alive by sending heartbeat every 5 minutes
+function keepSessionAlive() {
+    fetch('/HRandMDDash/keep_alive.php', {
+        method: 'GET',
+        cache: 'no-cache'
+    }).catch(error => console.log('Session keep-alive failed:', error));
+}
+
+// Send heartbeat every 5 minutes
+setInterval(keepSessionAlive, 5 * 60 * 1000);
     </script>
 </body>
 </html>
