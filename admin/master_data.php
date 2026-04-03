@@ -36,7 +36,22 @@ if ($_SESSION['username'] === 'RamsisE' || $_SESSION['username'] === 'mgrhr_mro'
     $conn->query($cleanQuery);
 }
 
-// Function to sync data from mro_cpr_report to master_performance_data
+// Function to get user name by ID
+function getUserNameById($conn, $userId) {
+    if (!$userId) return null;
+    $query = "SELECT full_name FROM users WHERE id = ?";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("i", $userId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($row = $result->fetch_assoc()) {
+        $stmt->close();
+        return $row['full_name'];
+    }
+    $stmt->close();
+    return null;
+}
+
 // Function to sync data from mro_cpr_report to master_performance_data
 function syncFromMroCprReport($conn, $indicatorName, $month, $year) {
     $dataMonth = $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT) . '-01';
@@ -44,8 +59,8 @@ function syncFromMroCprReport($conn, $indicatorName, $month, $year) {
     
     // Only sync for current and future months
     if ($dataMonth >= $currentDateForComparison) {
-        // Get the DIRECTOR row data for each department (cost_center_code = 'DIR')
-        $query = "SELECT department, expected, completed, percentage 
+        // Get the DIRECTOR row data for each department with updated_by info
+        $query = "SELECT department, expected, completed, percentage, updated_by, updated_at 
                   FROM mro_cpr_report 
                   WHERE report_type = ? AND report_month = ? AND report_year = ? 
                   AND cost_center_code = 'DIR'
@@ -60,6 +75,14 @@ function syncFromMroCprReport($conn, $indicatorName, $month, $year) {
             $totalExpected = (float)$row['expected'];
             $totalCompleted = (float)$row['completed'];
             $percentage = (float)$row['percentage'];
+            $updatedBy = $row['updated_by'];
+            $updatedAt = $row['updated_at'];
+            
+            // Get the updater's name if available
+            $updatedByName = null;
+            if ($updatedBy) {
+                $updatedByName = getUserNameById($conn, $updatedBy);
+            }
             
             // Check if record exists in master_performance_data
             $checkStmt = $conn->prepare("SELECT id FROM master_performance_data 
@@ -69,13 +92,13 @@ function syncFromMroCprReport($conn, $indicatorName, $month, $year) {
             $checkResult = $checkStmt->get_result();
             
             if ($checkResult->num_rows > 0) {
-                // Update existing record
+                // Update existing record - use the updated_by from mro_cpr_report
                 $updateStmt = $conn->prepare("UPDATE master_performance_data 
                                               SET target_value = ?, actual_value = ?, percentage_achievement = ?, 
-                                                  updated_at = NOW(), updated_by = ?
+                                                  updated_at = ?, updated_by = ?
                                               WHERE indicator_name = ? AND department = ? AND data_month = ?");
-                $updateStmt->bind_param("dddisss", $totalExpected, $totalCompleted, $percentage, 
-                                        $_SESSION['user_id'], $indicatorName, $department, $dataMonth);
+                $updateStmt->bind_param("dddsiss", $totalExpected, $totalCompleted, $percentage, 
+                                        $updatedAt, $updatedBy, $indicatorName, $department, $dataMonth);
                 $updateStmt->execute();
                 $updateStmt->close();
             } else {
@@ -83,9 +106,9 @@ function syncFromMroCprReport($conn, $indicatorName, $month, $year) {
                 $insertStmt = $conn->prepare("INSERT INTO master_performance_data 
                                               (indicator_name, department, target_value, actual_value, 
                                                percentage_achievement, data_month, created_by, created_at, updated_by, updated_at)
-                                              VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, NOW())");
-                $insertStmt->bind_param("ssdddssi", $indicatorName, $department, $totalExpected, $totalCompleted, 
-                                        $percentage, $dataMonth, $_SESSION['user_id'], $_SESSION['user_id']);
+                                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $insertStmt->bind_param("ssdddssiss", $indicatorName, $department, $totalExpected, $totalCompleted, 
+                                        $percentage, $dataMonth, $updatedBy, $updatedAt, $updatedBy, $updatedAt);
                 $insertStmt->execute();
                 $insertStmt->close();
             }
@@ -204,7 +227,7 @@ if ($mroIndicatorsResult) {
     }
 }
 
-$departments = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'MRO HR', 'MD/DIV.', 'Remainder'];
+$departments = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'PSCM', 'MRO HR', 'MD/DIV.', 'Remainder'];
 
 // Load default targets
 $targetsQuery = "SELECT indicator_name, department, default_target FROM indicator_target_defaults";
@@ -284,6 +307,7 @@ $message = $_SESSION['message'] ?? '';
 $error = $_SESSION['error'] ?? '';
 unset($_SESSION['message'], $_SESSION['error']);
 ?>
+<!-- HTML continues same as before... -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -952,7 +976,7 @@ unset($_SESSION['message'], $_SESSION['error']);
             <?php if ($_SESSION['username'] === 'RamsisE' || $_SESSION['username'] === 'mgrhr_mro'): ?>
                 <span class="sync-badge">🔄 Auto-sync enabled</span>
             <?php endif; ?>
-            <br><span style="font-size: 0.65rem;">Target = Sum of Expected across all cost centers | Actual = Sum of Completed across all cost centers</span>
+            <!-- <br><span style="font-size: 0.65rem;">Target = Sum of Expected across all cost centers | Actual = Sum of Completed across all cost centers</span> -->
         </div>
         
         <div class="form-container" style="padding: 0;">
