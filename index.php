@@ -6,12 +6,24 @@ require_once 'config/database.php';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = $_POST['username'] ?? '';
+    $loginInput = $_POST['username'] ?? ''; // Can be either username or OID
     $password = $_POST['password'] ?? '';
 
     $conn = getConnection();
-    $stmt = $conn->prepare("SELECT id, username, full_name, password, role FROM users WHERE username = ?");
-    $stmt->bind_param("s", $username);
+    
+    // Check if login input is numeric (OID) or text (username)
+    $isOID = is_numeric($loginInput);
+    
+    if ($isOID) {
+        // Login using OID
+        $stmt = $conn->prepare("SELECT id, username, oid, full_name, password, role, email, costcenter, section, last_login FROM users WHERE oid = ?");
+        $stmt->bind_param("s", $loginInput);
+    } else {
+        // Login using username
+        $stmt = $conn->prepare("SELECT id, username, oid, full_name, password, role, email, costcenter, section, last_login FROM users WHERE username = ?");
+        $stmt->bind_param("s", $loginInput);
+    }
+    
     $stmt->execute();
     $result = $stmt->get_result();
 
@@ -22,8 +34,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $user['username'];
+            $_SESSION['oid'] = $user['oid'];
             $_SESSION['full_name'] = $user['full_name'];
             $_SESSION['user_role'] = $user['role'];
+            $_SESSION['email'] = $user['email'];
+            $_SESSION['costcenter'] = $user['costcenter'];
+            $_SESSION['section'] = $user['section'];
             $_SESSION['LAST_ACTIVITY'] = time();
 
             // Update last login
@@ -38,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } elseif ($user['role'] === 'manager') {
                 header('Location: director/manager_dashboard.php');
             } elseif ($user['role'] === 'director') {
-                if ($username === 'director_admin') {
+                if ($user['username'] === 'director_admin') {
                     header('Location: director/md_dashboard.php');
                 } else {
                     header('Location: director/director_dashboard.php');
@@ -53,14 +69,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Invalid password';
         }
     } else {
-        $error = 'User not found';
+        $error = 'User not found. Please check your Username or OID.';
     }
 
     $stmt->close();
     $conn->close();
 }
 ?>
-<!-- Rest of your HTML... -->
 
 <!DOCTYPE html>
 <html lang="en">
@@ -138,8 +153,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-weight: 600;
             text-align: center;
             color: #111827;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
             letter-spacing: -0.01em;
+        }
+
+        .subtitle {
+            font-size: 0.8rem;
+            text-align: center;
+            color: #6b7280;
+            margin-bottom: 1.5rem;
         }
 
         .form-group {
@@ -287,6 +309,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-weight: 500;
         }
 
+        .info-message {
+            background-color: #e0f2fe;
+            border-left: 4px solid #0284c7;
+            color: #0369a1;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.25rem;
+            text-align: left;
+            font-size: 0.75rem;
+        }
+
         .reset-link {
             margin-top: 1rem;
             text-align: center;
@@ -352,6 +385,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <h2 class="title">Welcome to HR & Finance Dashboard</h2>
+                <div class="subtitle">Login using your Username or Organizational ID (OID)</div>
 
                 <?php if ($error): ?>
                     <div class="error-message">
@@ -359,10 +393,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 <?php endif; ?>
 
+                <!-- <div class="info-message">
+                    💡 Tip: You can login using either your <strong>Username</strong> or your <strong>Organizational ID (OID)</strong>
+                </div> -->
+
                 <form method="POST" action="">
                     <div class="form-group">
-                        <label for="username">Username</label>
-                        <input type="text" id="username" name="username" required autocomplete="off" placeholder="Enter your username">
+                        <label for="username">Username or OID</label>
+                        <input type="text" id="username" name="username" required autocomplete="off" placeholder="Enter your username or OID">
                     </div>
 
                     <div class="form-group">

@@ -486,19 +486,14 @@ unset($_SESSION['error']);
         }
         
         /* Navbar styles */
-        .navbar {
+         .navbar {
             background: var(--medium-bg);
-            padding: 0.6rem 0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            border-bottom: 1px solid var(--border-light);
-            transition: background 0.3s;
+            padding: 0.5rem 0;
+            transition: background-color 0.3s;
         }
         
         .navbar-container {
-            max-width: 1400px;
+            max-width: 100%;
             margin: 0 auto;
             padding: 0 1.5rem;
             display: flex;
@@ -532,7 +527,6 @@ unset($_SESSION['error']);
         .navbar-menu a:hover {
             color: var(--accent);
         }
-        
         .user-name {
             color: var(--accent);
             font-weight: bold;

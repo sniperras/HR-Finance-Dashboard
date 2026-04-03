@@ -846,7 +846,7 @@ unset($_SESSION['message'], $_SESSION['error']);
         <?php endif; ?>
         
         <div class="info-banner">
-            <strong>✏️ Targets are editable</strong> for each department | 🧮 <strong>Remainder:</strong> Auto-calculated from MD/DIV.
+            <strong>Targets are editable</strong> for each department | <strong>Remainder:</strong> Auto-calculated from MD/DIV.
             <?php if ($_SESSION['username'] === 'RamsisE'): ?>
             <br><span style="font-size: 0.65rem;">🔧 <strong>Admin Note:</strong> Click on any indicator name or use ✏️/🗑️ buttons to manage indicators</span>
             <?php endif; ?>

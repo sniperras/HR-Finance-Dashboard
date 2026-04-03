@@ -8,7 +8,7 @@ session_set_cookie_params([
     'lifetime' => 0,           // Session cookie (expires when browser closes)
     'path' => '/',             // Available for entire domain
     'domain' => '',            // Current domain only
-    'secure' => false,         // Set to true if using HTTPS
+    'secure' => true,         // Set to true if using HTTPS
     'httponly' => true,        // Prevents JavaScript access
     'samesite' => 'Lax'        // Allows same-site navigation
 ]);

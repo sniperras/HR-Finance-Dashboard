@@ -158,16 +158,12 @@ function hasDirector($costCentersList) {
             transition: background-color 0.3s, color 0.3s;
         }
 
-        .navbar {
+         .navbar {
             background: var(--medium-bg);
-            padding: 0.6rem 0;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            border-bottom: 1px solid var(--border-light);
+            padding: 0.5rem 0;
+            transition: background-color 0.3s;
         }
-
+        
         .navbar-container {
             max-width: 100%;
             margin: 0 auto;
@@ -178,18 +174,30 @@ function hasDirector($costCentersList) {
             flex-wrap: wrap;
             gap: 0.5rem;
         }
-
+        
         .navbar-brand {
             font-size: 1rem;
             font-weight: bold;
             color: var(--accent);
             text-decoration: none;
         }
-
+        
         .navbar-menu {
             display: flex;
             gap: 1rem;
             align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .navbar-menu a {
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 0.8rem;
+            transition: color 0.2s;
+        }
+        
+        .navbar-menu a:hover {
+            color: var(--accent);
         }
 
         .user-name {
