@@ -20,9 +20,33 @@ function requireRole($role) {
         return true;
     }
     
-    // For other roles, check specific role
+    // Manager role - check if role matches
+    if ($role === 'manager' && $_SESSION['user_role'] === 'manager') {
+        return true;
+    }
+    
+    // Director role - check if role matches or if user is director accessing director pages
+    if ($role === 'director' && $_SESSION['user_role'] === 'director') {
+        return true;
+    }
+    
+    // For MD/Managing Director role
+    if ($role === 'md' && $_SESSION['user_role'] === 'md') {
+        return true;
+    }
+    
+    // For specific role check
     if ($_SESSION['user_role'] !== $role) {
-        header('Location: /HRandMDDash/login.php');
+        // Redirect based on role
+        if ($_SESSION['user_role'] === 'manager') {
+            header('Location: /HRandMDDash/director/manager_dashboard.php');
+        } elseif ($_SESSION['user_role'] === 'director') {
+            header('Location: /HRandMDDash/director/director_dashboard.php');
+        } elseif ($_SESSION['user_role'] === 'md') {
+            header('Location: /HRandMDDash/director/md_dashboard.php');
+        } else {
+            header('Location: /HRandMDDash/login.php');
+        }
         exit();
     }
 }
@@ -41,7 +65,11 @@ function checkAccess($allowedRoles = []) {
     }
     
     // No access - redirect based on role
-    if ($_SESSION['user_role'] === 'director') {
+    if ($_SESSION['user_role'] === 'manager') {
+        header('Location: /HRandMDDash/director/manager_dashboard.php');
+    } elseif ($_SESSION['user_role'] === 'director') {
+        header('Location: /HRandMDDash/director/director_dashboard.php');
+    } elseif ($_SESSION['user_role'] === 'md') {
         header('Location: /HRandMDDash/director/md_dashboard.php');
     } else {
         header('Location: /HRandMDDash/login.php');
@@ -59,6 +87,79 @@ function getCurrentUser() {
         ];
     }
     return null;
+}
+
+// Get user's department from username (for director and manager users)
+function getUserDepartment() {
+    if (!isLoggedIn()) {
+        return null;
+    }
+    
+    $username = $_SESSION['username'];
+    $role = $_SESSION['user_role'];
+    
+    // For director users (format: director_BMT, director_LMT, etc.)
+    if ($role === 'director' && preg_match('/director_([A-Z\/\s]+)/', $username, $matches)) {
+        return trim($matches[1]);
+    }
+    
+    // For manager users - get section from users table
+    if ($role === 'manager') {
+        $conn = getConnection();
+        $stmt = $conn->prepare("SELECT section FROM users WHERE username = ?");
+        $stmt->bind_param("s", $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($row = $result->fetch_assoc()) {
+            $stmt->close();
+            $conn->close();
+            return $row['section'];
+        }
+        $stmt->close();
+        $conn->close();
+    }
+    
+    return null;
+}
+
+// Get user's cost center
+function getUserCostCenter() {
+    if (!isLoggedIn() || $_SESSION['user_role'] !== 'manager') {
+        return null;
+    }
+    
+    $username = $_SESSION['username'];
+    $conn = getConnection();
+    $stmt = $conn->prepare("SELECT costcenter, section FROM users WHERE username = ?");
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($row = $result->fetch_assoc()) {
+        $stmt->close();
+        $conn->close();
+        return [
+            'costcenter' => $row['costcenter'],
+            'section' => $row['section']
+        ];
+    }
+    $stmt->close();
+    $conn->close();
+    return null;
+}
+
+// Check if user is a manager
+function isManager() {
+    return (isLoggedIn() && $_SESSION['user_role'] === 'manager');
+}
+
+// Check if user is a department director
+function isDepartmentDirector() {
+    return (isLoggedIn() && $_SESSION['user_role'] === 'director' && getUserDepartment() !== null);
+}
+
+// Check if user is Managing Director
+function isManagingDirector() {
+    return (isLoggedIn() && $_SESSION['user_role'] === 'md');
 }
 
 function logAction($recordId, $action, $oldData, $newData) {
@@ -83,9 +184,21 @@ function hasPageAccess($pageType) {
         return true;
     }
     
+    // Manager access
+    if ($_SESSION['user_role'] === 'manager') {
+        $allowedPages = ['manager_dashboard', 'report_mro_cpr'];
+        return in_array($pageType, $allowedPages);
+    }
+    
     // Director access
     if ($_SESSION['user_role'] === 'director') {
         $allowedPages = ['md_dashboard', 'director_dashboard', 'report_mro_cpr'];
+        return in_array($pageType, $allowedPages);
+    }
+    
+    // Managing Director access
+    if ($_SESSION['user_role'] === 'md') {
+        $allowedPages = ['md_dashboard', 'director_dashboard'];
         return in_array($pageType, $allowedPages);
     }
     

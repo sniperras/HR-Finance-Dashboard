@@ -3,9 +3,39 @@ require_once '../includes/auth.php';
 requireRole('hr');
 
 $conn = getConnection();
+
+// Force clean duplicates on every page load for RamsisE
+if ($_SESSION['username'] === 'RamsisE') {
+    // First, update all master_performance_data to use the latest name for each indicator
+    $syncQuery = "
+        UPDATE master_performance_data mpd
+        SET mpd.indicator_name = (
+            SELECT indicator_name FROM performance_indicators pi 
+            WHERE LOWER(TRIM(pi.indicator_name)) = LOWER(TRIM(mpd.indicator_name))
+            ORDER BY pi.id DESC LIMIT 1
+        )
+        WHERE EXISTS (
+            SELECT 1 FROM performance_indicators pi 
+            WHERE LOWER(TRIM(pi.indicator_name)) = LOWER(TRIM(mpd.indicator_name))
+            AND pi.indicator_name != mpd.indicator_name
+        )
+    ";
+    $conn->query($syncQuery);
+    
+    // Then delete duplicate indicators
+    $cleanQuery = "
+        DELETE p1 FROM performance_indicators p1
+        INNER JOIN performance_indicators p2 
+        WHERE p1.id > p2.id 
+        AND LOWER(TRIM(p1.indicator_name)) = LOWER(TRIM(p2.indicator_name))
+    ";
+    $conn->query($cleanQuery);
+}
+
 $currentMonth = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
 $isEditable = ($currentMonth >= date('Y-m')) ? true : false;
 $dataMonth = $currentMonth . '-01';
+$currentDateForComparison = date('Y-m') . '-01';
 
 // Get existing data
 $query = "SELECT m.id, m.indicator_name, m.department, m.actual_value, m.target_value, 
@@ -15,23 +45,7 @@ $query = "SELECT m.id, m.indicator_name, m.department, m.actual_value, m.target_
           LEFT JOIN users u ON m.updated_by = u.id
           LEFT JOIN users c ON m.created_by = c.id
           WHERE m.data_month = ?
-          ORDER BY 
-            CASE m.indicator_name
-              WHEN 'Team Leaders Clock-in Data' THEN 1
-              WHEN 'Crew Meeting Minutes Submission' THEN 2
-              WHEN 'Exceptional Customer Experience Training' THEN 3
-              WHEN 'CPR' THEN 4
-              WHEN '2025/26 1st Semiannual BSCI/ISC Target Status' THEN 5
-              WHEN 'Activity Report Submission' THEN 6
-              WHEN 'Cost Saving Report Submission' THEN 7
-              WHEN 'Lost Time Justification' THEN 8
-              WHEN 'Attendance Approval Status' THEN 9
-              WHEN 'Productivity' THEN 10
-              WHEN 'Employees Training Gap Clearance' THEN 11
-              WHEN 'Employees Issue Resolution Rate' THEN 12
-              ELSE 13
-            END,
-            FIELD(m.department, 'BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'MRO HR', 'MD/DIV.', 'Remainder')";
+          ORDER BY m.indicator_name, FIELD(m.department, 'BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'MRO HR', 'MD/DIV.', 'Remainder')";
             
 $stmt = $conn->prepare($query);
 $stmt->bind_param("s", $dataMonth);
@@ -48,92 +62,134 @@ while ($row = $existingData->fetch_assoc()) {
     }
     $dataMap[$dept][$indicator] = $row;
 }
+$stmt->close();
 
-// Define departments
+// Get indicators from master list
+$indicatorsResult = $conn->query("SELECT DISTINCT TRIM(indicator_name) as indicator_name FROM performance_indicators ORDER BY created_at ASC");
+$indicators = [];
+$seenNames = [];
+
+while ($row = $indicatorsResult->fetch_assoc()) {
+    $indicatorName = trim($row['indicator_name']);
+    $lowercaseName = strtolower($indicatorName);
+    
+    // Only add if we haven't seen this indicator name before
+    if (!in_array($lowercaseName, $seenNames)) {
+        $seenNames[] = $lowercaseName;
+        $indicators[$indicatorName] = [
+            'name' => $indicatorName,
+            'targets' => []
+        ];
+    }
+}
+
+// FOR PAST MONTHS: Also include indicators that have data but are no longer in master list
+if ($dataMonth < $currentDateForComparison) {
+    $pastIndicatorsQuery = "SELECT DISTINCT indicator_name FROM master_performance_data WHERE data_month = ? ORDER BY indicator_name";
+    $pastStmt = $conn->prepare($pastIndicatorsQuery);
+    $pastStmt->bind_param("s", $dataMonth);
+    $pastStmt->execute();
+    $pastResult = $pastStmt->get_result();
+    
+    while ($row = $pastResult->fetch_assoc()) {
+        $indicatorName = $row['indicator_name'];
+        // If this indicator has data but is not in the main indicators list, add it
+        $exists = false;
+        foreach ($indicators as $key => $info) {
+            if (strtolower($key) === strtolower($indicatorName)) {
+                $exists = true;
+                break;
+            }
+        }
+        if (!$exists) {
+            $indicators[$indicatorName] = [
+                'name' => $indicatorName,
+                'targets' => []
+            ];
+            // Set default targets
+            foreach ($departments as $dept) {
+                $indicators[$indicatorName]['targets'][$dept] = 100;
+            }
+        }
+    }
+    $pastStmt->close();
+}
+
 $departments = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'MRO HR', 'MD/DIV.', 'Remainder'];
 
-// Define indicators with their full names and target defaults
-$indicators = [
-    // 'Team Leaders Clock-in Data' => [
-    //     'name' => 'Team Leaders Clock in Data',
-    //     'targets' => ['BMT' => 100, 'LMT' => 100, 'CMT' => 100, 'EMT' => 100, 'AEP' => 100, 'MSM' => 100, 'QA' => 100, 'MRO HR' => 100, 'MD/DIV.' => 100, 'Remainder' => 100]
-    // ],
-    'Crew Meeting Minutes Submission' => [
-        'name' => 'Crew Meeting Minutes Submission',
-        'targets' => ['BMT' => 14, 'LMT' => 5, 'CMT' => 18, 'EMT' => 10, 'AEP' => 5, 'MSM' => 1, 'QA' => 1, 'MRO HR' => 1, 'MD/DIV.' => 55, 'Remainder' => 100]
-    ],
-    'Exceptional Customer Experience Training' => [
-        'name' => 'Exceptional Customer Experience Training',
-        'targets' => ['BMT' => 100, 'LMT' => 100, 'CMT' => 100, 'EMT' => 100, 'AEP' => 100, 'MSM' => 100, 'QA' => 100, 'MRO HR' => 100, 'MD/DIV.' => 100, 'Remainder' => 100]
-    ],
-    'CPR' => [
-        'name' => 'CPR',
-        'targets' => ['BMT' => 1074, 'LMT' => 801, 'CMT' => 375, 'EMT' => 243, 'AEP' => 139, 'MSM' => 14, 'QA' => 35, 'MRO HR' => 14, 'MD/DIV.' => 2695, 'Remainder' => 100]
-    ],
-    '2025/26 1st Semiannual BSCI/ISC Target Status' => [
-        'name' => '2025/26 1st Semiannual BSC/ISC Target Status',
-        'targets' => ['BMT' => 100, 'LMT' => 100, 'CMT' => 100, 'EMT' => 100, 'AEP' => 100, 'MSM' => 100, 'QA' => 100, 'MRO HR' => 100, 'MD/DIV.' => 100, 'Remainder' => 100]
-    ],
-    'Activity Report Submission' => [
-        'name' => 'Activity Report Submission',
-        'targets' => ['BMT' => 1, 'LMT' => 1, 'CMT' => 1, 'EMT' => 1, 'AEP' => 1, 'MSM' => 1, 'QA' => 1, 'MRO HR' => 1, 'MD/DIV.' => 8, 'Remainder' => 100]
-    ],
-    'Cost Saving Report Submission' => [
-        'name' => 'Cost Saving Report Submission',
-        'targets' => ['BMT' => 1, 'LMT' => 1, 'CMT' => 1, 'EMT' => 1, 'AEP' => 1, 'MSM' => 1, 'QA' => 1, 'MRO HR' => 1, 'MD/DIV.' => 8, 'Remainder' => 100]
-    ],
-    'Lost Time Justification' => [
-        'name' => 'Lost time Justification',
-        'targets' => ['BMT' => 100, 'LMT' => 100, 'CMT' => 1001, 'EMT' => 100, 'AEP' => 100, 'MSM' => 100, 'QA' => 100, 'MRO HR' => 100, 'MD/DIV.' => 100, 'Remainder' => 100]
-    ],
-    'Attendance Approval Status' => [
-        'name' => 'Attendance Approval Status',
-        'targets' => ['BMT' => 100, 'LMT' => 100, 'CMT' => 100, 'EMT' => 100, 'AEP' => 100, 'MSM' => 100, 'QA' => 100, 'MRO HR' => 100, 'MD/DIV.' => 100, 'Remainder' => 100]
-    ],
-    'Productivity' => [
-        'name' => 'Productivity',
-        'targets' => ['BMT' => 100, 'LMT' => 100, 'CMT' => 100, 'EMT' => 100, 'AEP' => 100, 'MSM' => 100, 'QA' => 100, 'MRO HR' => 100, 'MD/DIV.' => 100, 'Remainder' => 100]
-    ],
-    'Employees Training Gap Clearance' => [
-        'name' => 'Employees Training Gap Clearance',
-        'targets' => ['BMT' => 100, 'LMT' => 100, 'CMT' => 100, 'EMT' => 100, 'AEP' => 100, 'MSM' => 100, 'QA' => 100, 'MRO HR' => 100, 'MD/DIV.' => 100, 'Remainder' => 100]
-    ],
-    'Employees Issue Resolution Rate' => [
-        'name' => 'Employees Issue Resolution Rate',
-        'targets' => ['BMT' => 100, 'LMT' => 100, 'CMT' => 100, 'EMT' => 100, 'AEP' => 100, 'MSM' => 100, 'QA' => 100, 'MRO HR' => 100, 'MD/DIV.' => 100, 'Remainder' => 100]
-    ]
-];
+// Load default targets
+$targetsQuery = "SELECT indicator_name, department, default_target FROM indicator_target_defaults";
+$targetsResult = $conn->query($targetsQuery);
+while ($row = $targetsResult->fetch_assoc()) {
+    $targetIndicatorName = trim($row['indicator_name']);
+    foreach ($indicators as $key => &$info) {
+        if (strtolower($key) === strtolower($targetIndicatorName)) {
+            $info['targets'][$row['department']] = (float)$row['default_target'];
+            break;
+        }
+    }
+}
 
-$stmt->close();
+// Set default targets for indicators that don't have them
+foreach ($indicators as $key => &$info) {
+    foreach ($departments as $dept) {
+        if (!isset($info['targets'][$dept])) {
+            $info['targets'][$dept] = 100;
+        }
+    }
+}
+
 $conn->close();
 
-// Helper function to safely get value
-function getValue($dataMap, $department, $indicator, $field, $default = '') {
-    if (isset($dataMap[$department]) && isset($dataMap[$department][$indicator]) && isset($dataMap[$department][$indicator][$field])) {
-        return $dataMap[$department][$indicator][$field];
+// Helper functions
+function getValue($dataMap, $dept, $indicator, $field, $default = null) {
+    if (isset($dataMap[$dept]) && isset($dataMap[$dept][$indicator]) && isset($dataMap[$dept][$indicator][$field])) {
+        return $dataMap[$dept][$indicator][$field];
+    }
+    // Try case-insensitive match
+    foreach ($dataMap[$dept] ?? [] as $key => $value) {
+        if (strtolower(trim($key)) === strtolower(trim($indicator))) {
+            return $value[$field] ?? $default;
+        }
     }
     return $default;
 }
 
-function getLastUpdateInfo($dataMap, $indicator) {
-    $updatedAt = getValue($dataMap, 'BMT', $indicator, 'updated_at');
-    $createdAt = getValue($dataMap, 'BMT', $indicator, 'created_at');
-    $updatedBy = getValue($dataMap, 'BMT', $indicator, 'updated_by_name');
-    $createdBy = getValue($dataMap, 'BMT', $indicator, 'created_by_name');
+function getCellLastUpdateInfo($dataMap, $dept, $indicator) {
+    if (isset($dataMap[$dept]) && isset($dataMap[$dept][$indicator])) {
+        $record = $dataMap[$dept][$indicator];
+    } else {
+        // Try case-insensitive match
+        foreach ($dataMap[$dept] ?? [] as $key => $value) {
+            if (strtolower(trim($key)) === strtolower(trim($indicator))) {
+                $record = $value;
+                break;
+            }
+        }
+    }
     
-    $time = $updatedAt ? date('Y-m-d H:i', strtotime($updatedAt)) : 
-            ($createdAt ? date('Y-m-d H:i', strtotime($createdAt)) : 'Not set');
-    $person = $updatedBy ? $updatedBy : ($createdBy ? $createdBy : 'N/A');
+    if (!isset($record)) return null;
     
-    return ['time' => $time, 'person' => $person];
+    $updatedAt = $record['updated_at'] ?? null;
+    $updatedBy = $record['updated_by_name'] ?? null;
+    
+    if (empty($updatedAt) || $updatedAt === '0000-00-00 00:00:00') {
+        $updatedAt = $record['created_at'] ?? null;
+        $updatedBy = $record['created_by_name'] ?? null;
+    }
+    
+    if (!$updatedAt || $updatedAt === '0000-00-00 00:00:00') return null;
+    
+    return [
+        'time' => date('Y-m-d H:i', strtotime($updatedAt)),
+        'person' => $updatedBy ?: 'N/A'
+    ];
 }
 
-$message = isset($_SESSION['message']) ? $_SESSION['message'] : '';
-$error = isset($_SESSION['error']) ? $_SESSION['error'] : '';
-unset($_SESSION['message']);
-unset($_SESSION['error']);
+$message = $_SESSION['message'] ?? '';
+$error = $_SESSION['error'] ?? '';
+unset($_SESSION['message'], $_SESSION['error']);
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -197,15 +253,9 @@ unset($_SESSION['error']);
         
         .compact-table th:first-child,
         .compact-table td:first-child {
-            width: 180px;
-            min-width: 180px;
-            max-width: 200px;
-        }
-        
-        .compact-table th:last-child,
-        .compact-table td:last-child {
-            width: 90px;
-            min-width: 90px;
+            width: 220px;
+            min-width: 220px;
+            max-width: 280px;
         }
         
         .indicator-cell {
@@ -219,6 +269,57 @@ unset($_SESSION['error']);
             word-wrap: break-word;
             line-height: 1.3;
             transition: background-color 0.3s, color 0.3s;
+        }
+        
+        .indicator-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        
+        .indicator-name {
+            flex: 1;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        
+        .indicator-name:hover {
+            background: rgba(2,177,170,0.1);
+        }
+        
+        .indicator-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .indicator-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 0.7rem;
+            padding: 2px 5px;
+            border-radius: 3px;
+            transition: all 0.2s;
+        }
+        
+        .indicator-btn.edit-btn {
+            color: var(--accent);
+        }
+        
+        .indicator-btn.edit-btn:hover {
+            background: rgba(2,177,170,0.2);
+            transform: scale(1.05);
+        }
+        
+        .indicator-btn.delete-btn {
+            color: var(--danger);
+        }
+        
+        .indicator-btn.delete-btn:hover {
+            background: rgba(197,23,19,0.2);
+            transform: scale(1.05);
         }
         
         .department-header {
@@ -281,11 +382,29 @@ unset($_SESSION['error']);
             font-weight: bold;
         }
         
-        .last-update-mini {
-            font-size: 0.6rem;
+        .audit-info {
+            font-size: 0.55rem;
             color: var(--accent);
             text-align: center;
+            margin-top: 4px;
+            padding-top: 2px;
+            border-top: 1px dashed var(--border-light);
             line-height: 1.2;
+        }
+        
+        .audit-info-missing {
+            font-size: 0.55rem;
+            color: #999;
+            text-align: center;
+            margin-top: 4px;
+            padding-top: 2px;
+            border-top: 1px dashed var(--border-light);
+            line-height: 1.2;
+            font-style: italic;
+        }
+        
+        .audit-info span {
+            display: inline-block;
         }
         
         .save-section {
@@ -373,8 +492,8 @@ unset($_SESSION['error']);
         @media (max-width: 1400px) {
             .compact-table th:first-child,
             .compact-table td:first-child {
-                width: 160px;
-                min-width: 160px;
+                width: 200px;
+                min-width: 200px;
             }
         }
         
@@ -405,7 +524,6 @@ unset($_SESSION['error']);
         .success-banner { background: var(--success); color: white; }
         .error-banner { background: var(--danger); color: white; }
         
-        /* Theme Toggle Button Styles */
         .theme-toggle {
             background: transparent;
             border: 1px solid var(--accent);
@@ -420,7 +538,6 @@ unset($_SESSION['error']);
             transform: translateY(-1px);
         }
         
-        /* Navbar styles */
         .navbar {
             background: var(--medium-bg);
             padding: 0.5rem 0;
@@ -475,7 +592,146 @@ unset($_SESSION['error']);
             font-size: 0.8rem;
         }
         
-        /* Light theme specific styles using new color palette */
+        .add-indicator-row {
+            background: var(--dark-bg);
+        }
+        
+        .add-indicator-cell {
+            padding: 0.5rem !important;
+        }
+        
+        .add-indicator-form {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .add-indicator-input {
+            flex: 1;
+            padding: 0.4rem 0.5rem;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-size: 0.7rem;
+        }
+        
+        .add-indicator-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        
+        .add-indicator-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        
+        .add-indicator-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: var(--medium-bg);
+            padding: 1.5rem;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        
+        .modal-content h3 {
+            margin-top: 0;
+            color: var(--accent);
+        }
+        
+        .modal-content input {
+            width: 100%;
+            padding: 0.5rem;
+            margin: 1rem 0;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        .modal-buttons button {
+            padding: 0.4rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .modal-buttons .confirm-btn {
+            background: var(--accent);
+            color: white;
+        }
+        
+        .modal-buttons .cancel-btn {
+            background: #666;
+            color: white;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+        
+        #temporaryMessage {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            padding: 15px 20px;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            font-weight: bold;
+            animation: slideIn 0.3s ease-out;
+        }
+        
         body.light-theme {
             --dark-bg: #F2F2F2;
             --medium-bg: #FFFFFF;
@@ -555,15 +811,14 @@ unset($_SESSION['error']);
         <div class="navbar-container">
             <a href="master_data.php" class="navbar-brand">HR & Finance Dashboard</a>
             <div class="navbar-menu">
-               
                 <a href="master_data.php" style="color: var(--accent);">Master Data</a>
-                 <a href="../director/md_dashboard.php" >Dashboard</a>
+                <a href="../director/md_dashboard.php">Dashboard</a>
                 <a href="../admin/report_mro_cpr.php">Director Data Entry</a>
-                <a href="verify_data.php">Verify</a>
                 <a href="data_history.php">History</a>
                 <div class="user-info">
                     <button id="themeToggle" class="btn theme-toggle">☀️ Light</button>
                     <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
+                    <a href="#" onclick="openPasswordModal(); return false;" style="cursor: pointer;">🔑 Change Password</a>
                     <a href="../logout.php" class="btn">Logout</a>
                 </div>
             </div>
@@ -573,9 +828,7 @@ unset($_SESSION['error']);
     <div class="container">
         <div class="month-navigation">
             <button onclick="changeMonth('prev')" class="btn">&larr; Previous Month</button>
-            
-            <h3><img src="..\assets\images\online-data.png" alt="MRO Icon" style="width:20px; height:20px; vertical-align:middle; margin-right:8px;">
-            Master Data Entry - <?php echo date('F Y', strtotime($dataMonth)); ?></h3>
+            <h3>Master Data Entry - <?php echo date('F Y', strtotime($dataMonth)); ?></h3>
             <button onclick="changeMonth('next')" class="btn">Next Month &rarr;</button>
         </div>
         
@@ -593,6 +846,9 @@ unset($_SESSION['error']);
         
         <div class="info-banner">
             <strong>✏️ Targets are editable</strong> for each department | 🧮 <strong>Remainder:</strong> Auto-calculated from MD/DIV.
+            <?php if ($_SESSION['username'] === 'RamsisE'): ?>
+            <br><span style="font-size: 0.65rem;">🔧 <strong>Admin Note:</strong> Click on any indicator name or use ✏️/🗑️ buttons to manage indicators</span>
+            <?php endif; ?>
         </div>
         
         <div class="form-container" style="padding: 0;">
@@ -610,104 +866,131 @@ unset($_SESSION['error']);
                                         <div class="dept-abbr">Actual | Target | %</div>
                                     </th>
                                 <?php endforeach; ?>
-                                <th>Last Updated</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($indicators as $indicatorKey => $indicatorInfo): 
-                                $lastUpdate = getLastUpdateInfo($dataMap, $indicatorKey);
-                            ?>
+                            <?php foreach ($indicators as $indicatorName => $indicatorInfo): ?>
                                 <tr>
                                     <td class="indicator-cell">
-                                        <?php echo htmlspecialchars($indicatorInfo['name']); ?>
+                                        <div class="indicator-header">
+                                            <span class="indicator-name" <?php if ($_SESSION['username'] === 'RamsisE' && $isEditable): ?>onclick="editIndicator('<?php echo htmlspecialchars($indicatorName); ?>')" style="cursor: pointer;"<?php endif; ?>>
+                                                <?php echo htmlspecialchars($indicatorInfo['name']); ?>
+                                            </span>
+                                            <?php if ($_SESSION['username'] === 'RamsisE' && $isEditable): ?>
+                                            <div class="indicator-actions">
+                                                <button type="button" class="indicator-btn edit-btn" onclick="editIndicator('<?php echo htmlspecialchars($indicatorName); ?>')" title="Edit Indicator">✏️</button>
+                                                <button type="button" class="indicator-btn delete-btn" onclick="deleteIndicator('<?php echo htmlspecialchars($indicatorName); ?>')" title="Delete Indicator">🗑️</button>
+                                            </div>
+                                            <?php endif; ?>
+                                        </div>
                                     </td>
                                     
                                     <?php foreach ($departments as $dept):
-                                        $actualValue = getValue($dataMap, $dept, $indicatorKey, 'actual_value');
-                                        $targetValue = getValue($dataMap, $dept, $indicatorKey, 'target_value');
-                                        $percentageValue = getValue($dataMap, $dept, $indicatorKey, 'percentage_achievement');
+                                        $actualValue = getValue($dataMap, $dept, $indicatorName, 'actual_value');
+                                        $targetValue = $indicatorInfo['targets'][$dept] ?? 100;
+                                        $percentageValue = getValue($dataMap, $dept, $indicatorName, 'percentage_achievement');
                                         
-                                        // Use saved target or default from array
-                                        if ($targetValue === null || $targetValue === '') {
-                                            $targetValue = $indicatorInfo['targets'][$dept] ?? 100;
-                                        }
-                                        
-                                        $actualFormatted = $actualValue !== null && $actualValue !== '' ? number_format((float)$actualValue, 2) : '';
-                                        $targetFormatted = $targetValue !== null && $targetValue !== '' ? number_format((float)$targetValue, 2) : '';
-                                        $percentageFormatted = $percentageValue !== null && $percentageValue !== '' ? number_format((float)$percentageValue, 2) : '';
+                                        $actualFormatted = $actualValue !== null ? number_format((float)$actualValue, 2) : '';
+                                        $targetFormatted = number_format((float)$targetValue, 2);
+                                        $percentageFormatted = $percentageValue !== null ? number_format((float)$percentageValue, 2) : '';
                                         
                                         $isRemainder = ($dept === 'Remainder');
+                                        $cellAudit = getCellLastUpdateInfo($dataMap, $dept, $indicatorName);
                                     ?>
                                         <td class="input-cell">
                                             <?php if ($isRemainder): ?>
-                                                <!-- Remainder - Auto-calculated -->
                                                 <input type="text" 
                                                        class="remainder-actual remainder-input non-editable"
-                                                       data-md-div-indicator="<?php echo $indicatorKey; ?>"
-                                                       value="<?php echo $percentageFormatted; ?>"
+                                                       data-md-div-indicator="<?php echo htmlspecialchars($indicatorName); ?>"
+                                                       value="<?php echo htmlspecialchars($percentageFormatted); ?>"
                                                        readonly
                                                        placeholder="Auto">
                                                 <input type="hidden" 
-                                                       name="data[Remainder][<?php echo $indicatorKey; ?>][target]" 
+                                                       name="data[Remainder][<?php echo htmlspecialchars($indicatorName); ?>][target]" 
                                                        value="100">
                                                 <input type="hidden" 
-                                                       name="data[Remainder][<?php echo $indicatorKey; ?>][percentage]" 
+                                                       name="data[Remainder][<?php echo htmlspecialchars($indicatorName); ?>][percentage]" 
                                                        class="remainder-hidden"
-                                                       value="<?php echo $percentageFormatted; ?>">
+                                                       value="<?php echo htmlspecialchars($percentageFormatted); ?>">
                                                 <input type="hidden" 
-                                                       name="data[Remainder][<?php echo $indicatorKey; ?>][actual]" 
-                                                       value="<?php echo $percentageFormatted; ?>">
+                                                       name="data[Remainder][<?php echo htmlspecialchars($indicatorName); ?>][actual]" 
+                                                       value="<?php echo htmlspecialchars($percentageFormatted); ?>">
+                                                
+                                                <?php if ($cellAudit): ?>
+                                                    <div class="audit-info">
+                                                        <span>🕒 <?php echo htmlspecialchars($cellAudit['time']); ?></span><br>
+                                                        <span>👤 <?php echo htmlspecialchars($cellAudit['person']); ?></span>
+                                                    </div>
+                                                <?php else: ?>
+                                                    <div class="audit-info-missing">
+                                                        <span>📝 Not yet saved</span>
+                                                    </div>
+                                                <?php endif; ?>
                                             <?php else: ?>
-                                                <!-- Actual Input -->
                                                 <input type="number" step="0.01" 
-                                                       name="data[<?php echo $dept; ?>][<?php echo $indicatorKey; ?>][actual]" 
+                                                       name="data[<?php echo $dept; ?>][<?php echo htmlspecialchars($indicatorName); ?>][actual]" 
                                                        value="<?php echo htmlspecialchars($actualFormatted); ?>" 
                                                        <?php echo !$isEditable ? 'disabled' : ''; ?>
                                                        class="actual-input <?php echo $isEditable ? 'editable' : 'non-editable'; ?>"
                                                        data-dept="<?php echo $dept; ?>"
-                                                       data-indicator="<?php echo $indicatorKey; ?>"
+                                                       data-indicator="<?php echo htmlspecialchars($indicatorName); ?>"
                                                        placeholder="Actual">
                                                 
-                                                <!-- Target Input (Editable) -->
                                                 <input type="number" step="0.01" 
-                                                       name="data[<?php echo $dept; ?>][<?php echo $indicatorKey; ?>][target]" 
+                                                       name="data[<?php echo $dept; ?>][<?php echo htmlspecialchars($indicatorName); ?>][target]" 
                                                        value="<?php echo htmlspecialchars($targetFormatted); ?>" 
                                                        <?php echo !$isEditable ? 'disabled' : ''; ?>
                                                        class="target-input <?php echo $isEditable ? 'editable' : 'non-editable'; ?>"
                                                        data-dept="<?php echo $dept; ?>"
-                                                       data-indicator="<?php echo $indicatorKey; ?>"
+                                                       data-indicator="<?php echo htmlspecialchars($indicatorName); ?>"
                                                        placeholder="Target"
                                                        style="margin-top: 2px;">
                                                 
-                                                <!-- Percentage (Auto-calculated, Read-only) -->
                                                 <input type="number" step="0.01" 
-                                                       name="data[<?php echo $dept; ?>][<?php echo $indicatorKey; ?>][percentage]" 
+                                                       name="data[<?php echo $dept; ?>][<?php echo htmlspecialchars($indicatorName); ?>][percentage]" 
                                                        value="<?php echo htmlspecialchars($percentageFormatted); ?>" 
                                                        class="percentage-input percentage-field"
                                                        data-dept="<?php echo $dept; ?>"
-                                                       data-indicator="<?php echo $indicatorKey; ?>"
+                                                       data-indicator="<?php echo htmlspecialchars($indicatorName); ?>"
                                                        readonly
                                                        style="margin-top: 2px;"
                                                        placeholder="%">
+                                                
+                                                <?php if ($cellAudit): ?>
+                                                    <div class="audit-info">
+                                                        <span>🕒 <?php echo htmlspecialchars($cellAudit['time']); ?></span><br>
+                                                        <span>👤 <?php echo htmlspecialchars($cellAudit['person']); ?></span>
+                                                    </div>
+                                                <?php else: ?>
+                                                    <div class="audit-info-missing">
+                                                        <span>📝 Not yet saved</span>
+                                                    </div>
+                                                <?php endif; ?>
                                             <?php endif; ?>
                                         </td>
                                     <?php endforeach; ?>
-                                    
-                                    <td class="last-update-mini">
-                                        <div><?php echo htmlspecialchars($lastUpdate['person']); ?></div>
-                                        <div style="font-size: 0.55rem;"><?php echo htmlspecialchars($lastUpdate['time']); ?></div>
-                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                             
-                            <!-- Remarks Row -->
-                            <tr style="background: var(--dark-bg);">
-                                <td class="indicator-cell">
-                                    <strong>📝 Remarks</strong>
+                            <?php if ($_SESSION['username'] === 'RamsisE' && $isEditable): ?>
+                            <tr class="add-indicator-row">
+                                <td class="add-indicator-cell indicator-cell">
+                                    <div class="add-indicator-form">
+                                        <input type="text" id="newIndicatorName" class="add-indicator-input" placeholder="Enter new indicator name...">
+                                        <button type="button" class="add-indicator-btn" onclick="addIndicator()">➕ Add Indicator</button>
+                                    </div>
                                 </td>
+                                <?php foreach ($departments as $dept): ?>
+                                    <td class="add-indicator-cell" style="text-align: center; color: #999; font-size: 0.6rem;">➕</td>
+                                <?php endforeach; ?>
+                            </tr>
+                            <?php endif; ?>
+                            
+                            <tr style="background: var(--dark-bg);">
+                                <td class="indicator-cell"><strong>📝 Remarks</strong></td>
                                 <?php foreach ($departments as $dept): 
                                     $firstIndicator = array_key_first($indicators);
-                                    $remarksValue = getValue($dataMap, $dept, $firstIndicator, 'remarks');
+                                    $remarksValue = getValue($dataMap, $dept, $firstIndicator, 'remarks', '');
                                 ?>
                                     <td class="input-cell">
                                         <input type="text" 
@@ -719,7 +1002,6 @@ unset($_SESSION['error']);
                                                style="width: 100%; text-align: left; font-size: 0.65rem;">
                                     </td>
                                 <?php endforeach; ?>
-                                <td class="last-update-mini">-</td>
                             </tr>
                         </tbody>
                     </table>
@@ -733,6 +1015,17 @@ unset($_SESSION['error']);
                     </div>
                 <?php endif; ?>
             </form>
+        </div>
+    </div>
+    
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <h3>Edit Indicator Name</h3>
+            <input type="text" id="editIndicatorInput" placeholder="Enter new indicator name...">
+            <div class="modal-buttons">
+                <button class="cancel-btn" onclick="closeModal()">Cancel</button>
+                <button class="confirm-btn" onclick="confirmEdit()">Save Changes</button>
+            </div>
         </div>
     </div>
     
@@ -792,7 +1085,6 @@ unset($_SESSION['error']);
                 let percentage = (actual / target) * 100;
                 percentageInput.value = percentage.toFixed(2);
                 
-                // If this is MD/DIV., update Remainder calculation
                 const dept = actualInput.getAttribute('data-dept');
                 const indicator = actualInput.getAttribute('data-indicator');
                 if (dept === 'MD/DIV.') {
@@ -820,7 +1112,7 @@ unset($_SESSION['error']);
             }
         }
         
-        // Update Remainder based on MD/DIV. percentage using formula: MAX(100%, MD/DIV%) - MD/DIV%
+        // Update Remainder based on MD/DIV. percentage
         function updateRemainderForIndicator(indicator) {
             const mdDivPercentageInput = document.querySelector(`input.percentage-field[data-dept="MD/DIV."][data-indicator="${indicator}"]`);
             
@@ -829,12 +1121,10 @@ unset($_SESSION['error']);
                 let remainderValue = '';
                 
                 if (!isNaN(mdDivPercentage)) {
-                    // Formula: MAX(100%, MD/DIV%) - MD/DIV%
                     let maxValue = Math.max(100, mdDivPercentage);
                     remainderValue = (maxValue - mdDivPercentage).toFixed(2);
                 }
                 
-                // Update remainder display field
                 const remainderDisplay = document.querySelector(`.remainder-actual[data-md-div-indicator="${indicator}"]`);
                 const remainderHidden = document.querySelector(`input.remainder-hidden[name*="${indicator}"]`);
                 
@@ -896,6 +1186,7 @@ unset($_SESSION['error']);
         });
         
         // Change month function
+                // Change month function
         function changeMonth(direction) {
             let currentUrl = new URL(window.location.href);
             let currentMonth = currentUrl.searchParams.get('month') || '<?php echo $currentMonth; ?>';
@@ -911,11 +1202,351 @@ unset($_SESSION['error']);
             window.location.href = `master_data.php?month=${newMonth}`;
         }
         
+        <?php if ($_SESSION['username'] === 'RamsisE'): ?>
+        // Global variables for indicator management
+        let currentEditIndicator = null;
+        let currentEditOriginalName = null;
+        
+        function editIndicator(indicatorName) {
+            currentEditIndicator = indicatorName;
+            currentEditOriginalName = indicatorName;
+            document.getElementById('editIndicatorInput').value = indicatorName;
+            document.getElementById('editModal').style.display = 'flex';
+        }
+        
+        // Indicator Management Functions
+        function showTemporaryMessage(message, type = 'success') {
+            const existingMsg = document.getElementById('temporaryMessage');
+            if (existingMsg) {
+                existingMsg.remove();
+            }
+            
+            const msgDiv = document.createElement('div');
+            msgDiv.id = 'temporaryMessage';
+            msgDiv.className = type === 'success' ? 'success-banner' : 'error-banner';
+            msgDiv.style.position = 'fixed';
+            msgDiv.style.top = '20px';
+            msgDiv.style.right = '20px';
+            msgDiv.style.zIndex = '9999';
+            msgDiv.style.maxWidth = '400px';
+            msgDiv.innerHTML = message;
+            
+            document.body.appendChild(msgDiv);
+            
+            setTimeout(() => {
+                if (msgDiv) {
+                    msgDiv.style.animation = 'slideOut 0.3s ease-out';
+                    setTimeout(() => {
+                        if (msgDiv && msgDiv.parentNode) {
+                            msgDiv.remove();
+                        }
+                    }, 300);
+                }
+            }, 3000);
+        }
+        
+        function addIndicator() {
+            const input = document.getElementById('newIndicatorName');
+            const indicatorName = input.value.trim();
+            
+            if (!indicatorName) {
+                alert('Please enter an indicator name');
+                return;
+            }
+            
+            const addBtn = document.querySelector('.add-indicator-btn');
+            const originalText = addBtn.textContent;
+            addBtn.disabled = true;
+            addBtn.textContent = 'Adding...';
+            
+            const formData = new URLSearchParams();
+            formData.append('action', 'add');
+            formData.append('indicator_name', indicatorName);
+            
+            fetch('manage_indicators.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: formData.toString()
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showTemporaryMessage('✓ Indicator "' + indicatorName + '" added successfully!', 'success');
+                    input.value = '';
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else if (data.error) {
+                    alert('Error: ' + data.error);
+                    addBtn.disabled = false;
+                    addBtn.textContent = originalText;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to add indicator: ' + error.message);
+                addBtn.disabled = false;
+                addBtn.textContent = originalText;
+            });
+        }
+        
+        function confirmEdit() {
+            const newName = document.getElementById('editIndicatorInput').value.trim();
+            
+            if (!newName) {
+                alert('Please enter an indicator name');
+                return;
+            }
+            
+            if (newName === currentEditIndicator) {
+                closeModal();
+                return;
+            }
+            
+            const existingIndicators = <?php echo json_encode(array_keys($indicators)); ?>;
+            const isDuplicate = existingIndicators.some(existing => 
+                existing.toLowerCase() === newName.toLowerCase() && 
+                existing.toLowerCase() !== currentEditIndicator.toLowerCase()
+            );
+            
+            if (isDuplicate) {
+                alert('This indicator name already exists! Please use a different name.');
+                return;
+            }
+            
+            const confirmBtn = document.querySelector('.modal .confirm-btn');
+            const originalText = confirmBtn.textContent;
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Updating...';
+            
+            const formData = new URLSearchParams();
+            formData.append('action', 'edit');
+            formData.append('old_name', currentEditOriginalName);
+            formData.append('new_name', newName);
+            
+            fetch('manage_indicators.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: formData.toString()
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showTemporaryMessage('✓ Indicator renamed from "' + currentEditOriginalName + '" to "' + newName + '" successfully!', 'success');
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else if (data.error) {
+                    alert('Error: ' + data.error);
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = originalText;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to edit indicator: ' + error.message);
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = originalText;
+            });
+        }
+        
+        function deleteIndicator(indicatorName) {
+            let confirmMessage = `Are you sure you want to delete "${indicatorName}"?\n\n`;
+            confirmMessage += `This will remove the indicator from CURRENT and FUTURE months only.\n`;
+            confirmMessage += `Past months data will be preserved.\n\n`;
+            confirmMessage += `Click OK to delete, Cancel to abort.`;
+            
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+            
+            const deleteBtns = document.querySelectorAll(`.delete-btn`);
+            deleteBtns.forEach(btn => {
+                if (btn.closest('tr') && btn.closest('tr').querySelector('.indicator-name')?.innerText === indicatorName) {
+                    btn.disabled = true;
+                    btn.textContent = '⏳';
+                }
+            });
+            
+            const formData = new URLSearchParams();
+            formData.append('action', 'delete');
+            formData.append('indicator_name', indicatorName);
+            formData.append('force', '1');
+            
+            fetch('manage_indicators.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: formData.toString()
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showTemporaryMessage(data.message || `✓ Indicator "${indicatorName}" deleted from current/future months!`, 'success');
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1500);
+                } else if (data.error) {
+                    alert('Error: ' + data.error);
+                    deleteBtns.forEach(btn => {
+                        btn.disabled = false;
+                        btn.textContent = '🗑️';
+                    });
+                } else if (data.warning) {
+                    if (confirm(data.message)) {
+                        // Retry with force
+                        const forceFormData = new URLSearchParams();
+                        forceFormData.append('action', 'delete');
+                        forceFormData.append('indicator_name', indicatorName);
+                        forceFormData.append('force', '1');
+                        
+                        fetch('manage_indicators.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                            },
+                            body: forceFormData.toString()
+                        })
+                        .then(response2 => response2.json())
+                        .then(data2 => {
+                            if (data2.success) {
+                                showTemporaryMessage(data2.message || `✓ Indicator "${indicatorName}" deleted!`, 'success');
+                                setTimeout(() => {
+                                    location.reload();
+                                }, 1500);
+                            } else {
+                                alert('Error: ' + data2.error);
+                            }
+                            deleteBtns.forEach(btn => {
+                                btn.disabled = false;
+                                btn.textContent = '🗑️';
+                            });
+                        });
+                    } else {
+                        deleteBtns.forEach(btn => {
+                            btn.disabled = false;
+                            btn.textContent = '🗑️';
+                        });
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to delete indicator: ' + error.message);
+                deleteBtns.forEach(btn => {
+                    btn.disabled = false;
+                    btn.textContent = '🗑️';
+                });
+            });
+        }
+        
+        function closeModal() {
+            document.getElementById('editModal').style.display = 'none';
+            currentEditIndicator = null;
+            currentEditOriginalName = null;
+        }
+        
+        window.onclick = function(event) {
+            const modal = document.getElementById('editModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+        
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                const modal = document.getElementById('editModal');
+                if (modal && modal.style.display === 'flex') {
+                    closeModal();
+                }
+            }
+        });
+        
+        document.getElementById('editIndicatorInput')?.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                confirmEdit();
+            }
+        });
+        
+        document.getElementById('newIndicatorName')?.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                addIndicator();
+            }
+        });
+        <?php endif; ?>
+        
         // Initialize theme and remainder calculations when page loads
         document.addEventListener('DOMContentLoaded', function() {
             new ThemeManager();
             initializeRemainders();
         });
+
+     // Function to open password change modal
+function openPasswordModal() {
+    // Check if modal already exists
+    if (document.getElementById('passwordModalOverlay')) {
+        return;
+    }
+    
+    // Create modal container
+    const modalOverlay = document.createElement('div');
+    modalOverlay.id = 'passwordModalOverlay';
+    modalOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 10001;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    
+    // Create iframe to load the password change page
+    const iframe = document.createElement('iframe');
+    iframe.src = '../change_password.php';  // Note: path goes up one level from director folder
+    iframe.style.cssText = `
+        width: 100%;
+        max-width: 450px;
+        height: auto;
+        min-height: 450px;
+        border: none;
+        border-radius: 16px;
+        background: transparent;
+    `;
+    
+    modalOverlay.appendChild(iframe);
+    document.body.appendChild(modalOverlay);
+    
+    // Store reference to close function
+    window.closePasswordPopup = function() {
+        if (modalOverlay && modalOverlay.parentNode) {
+            modalOverlay.remove();
+        }
+        delete window.closePasswordPopup;
+    };
+    
+    // Close on Escape key
+    const escapeHandler = function(e) {
+        if (e.key === 'Escape') {
+            if (modalOverlay && modalOverlay.parentNode) {
+                modalOverlay.remove();
+                delete window.closePasswordPopup;
+            }
+            document.removeEventListener('keydown', escapeHandler);
+        }
+    };
+    document.addEventListener('keydown', escapeHandler);
+}
     </script>
 </body>
 </html>

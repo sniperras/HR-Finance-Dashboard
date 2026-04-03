@@ -641,11 +641,12 @@ unset($_SESSION['error']);
                 <a href="../director/md_dashboard.php" >Dashboard</a>
                 <a href="master_data.php" >Master Data Entry</a>
                 <a href="../admin/report_mro_cpr.php">Director Data Entry</a>
-                <a href="verify_data.php" >Verify Data</a>
+                <!-- <a href="verify_data.php" >Verify Data</a> -->
                 <a href="data_history.php" style="color: var(--accent);">History</a>
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
                     <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
+                    <a href="#" onclick="openPasswordModal(); return false;" style="cursor: pointer;">🔑 Change Password</a>
                     <a href="../logout.php" class="btn">Logout</a>
                 </div>
             </div>
@@ -864,6 +865,66 @@ unset($_SESSION['error']);
         document.addEventListener('DOMContentLoaded', function() {
             new ThemeManager();
         });
+
+      // Function to open password change modal
+function openPasswordModal() {
+    // Check if modal already exists
+    if (document.getElementById('passwordModalOverlay')) {
+        return;
+    }
+    
+    // Create modal container
+    const modalOverlay = document.createElement('div');
+    modalOverlay.id = 'passwordModalOverlay';
+    modalOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 10001;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    
+    // Create iframe to load the password change page
+    const iframe = document.createElement('iframe');
+    iframe.src = '../change_password.php';  // Note: path goes up one level from director folder
+    iframe.style.cssText = `
+        width: 100%;
+        max-width: 450px;
+        height: auto;
+        min-height: 450px;
+        border: none;
+        border-radius: 16px;
+        background: transparent;
+    `;
+    
+    modalOverlay.appendChild(iframe);
+    document.body.appendChild(modalOverlay);
+    
+    // Store reference to close function
+    window.closePasswordPopup = function() {
+        if (modalOverlay && modalOverlay.parentNode) {
+            modalOverlay.remove();
+        }
+        delete window.closePasswordPopup;
+    };
+    
+    // Close on Escape key
+    const escapeHandler = function(e) {
+        if (e.key === 'Escape') {
+            if (modalOverlay && modalOverlay.parentNode) {
+                modalOverlay.remove();
+                delete window.closePasswordPopup;
+            }
+            document.removeEventListener('keydown', escapeHandler);
+        }
+    };
+    document.addEventListener('keydown', escapeHandler);
+}
     </script>
 </body>
 </html>

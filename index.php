@@ -28,10 +28,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $updateStmt->close();
 
             // Redirect based on role
-            if ($user['role'] === 'director') {
+            if ($user['role'] === 'hr') {
+                header('Location: admin/master_data.php');
+            } elseif ($user['role'] === 'manager') {
+                header('Location: director/manager_dashboard.php');
+            } elseif ($user['role'] === 'director') {
+                // Check if it's a Managing Director (admin director)
+                if ($username === 'director_admin') {
+                    header('Location: director/md_dashboard.php');
+                } else {
+                    header('Location: director/director_dashboard.php');
+                }
+            } elseif ($user['role'] === 'md') {
                 header('Location: director/md_dashboard.php');
             } else {
-                header('Location: admin/master_data.php');
+                header('Location: index.php');
             }
             exit();
         } else {
@@ -68,12 +79,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             justify-content: center;
             position: relative;
             background-color: #000;
-            /* Dark background for the dots */
             background-image: radial-gradient(rgba(255, 255, 255, 0.3) 1px, transparent 1px);
             background-size: 20px 20px;
         }
 
-        /* Optional: Add a subtle overlay gradient */
         body::before {
             content: '';
             position: absolute;
@@ -82,7 +91,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             pointer-events: none;
         }
 
-        /* Login Container */
         .login-container {
             position: relative;
             z-index: 10;
@@ -91,7 +99,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin: 1.5rem;
         }
 
-        /* Card Style */
         .login-card {
             background: rgba(255, 255, 255);
             backdrop-filter: blur(10px);
@@ -111,7 +118,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             padding: 2rem;
         }
 
-        /* Logo */
         .logo-container {
             text-align: center;
             margin-bottom: 1.5rem;
@@ -122,7 +128,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             height: auto;
         }
 
-        /* Title */
         .title {
             font-size: 1.25rem;
             font-weight: 600;
@@ -132,7 +137,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             letter-spacing: -0.01em;
         }
 
-        /* Form Styles */
         .form-group {
             margin-bottom: 1.25rem;
         }
@@ -173,7 +177,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             color: #9ca3af;
         }
 
-        /* Password field with eye button */
         .password-wrapper {
             position: relative;
         }
@@ -220,7 +223,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             border-width: 0;
         }
 
-        /* Button */
         .btn-signin {
             width: 100%;
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
@@ -268,7 +270,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
         }
 
-        /* Error Message */
         .error-message {
             background-color: #fee2e2;
             border-left: 4px solid #dc2626;
@@ -281,7 +282,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-weight: 500;
         }
 
-        /* Reset Password Link */
         .reset-link {
             margin-top: 1rem;
             text-align: center;
@@ -301,7 +301,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-underline-offset: 3px;
         }
 
-        /* Footer */
         .login-footer {
             text-align: center;
             margin-top: 1.5rem;
@@ -310,22 +309,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
         }
 
-        /* Responsive */
         @media (max-width: 480px) {
             .login-container {
                 margin: 1rem;
             }
-
             .card-content {
                 padding: 1.5rem;
             }
-
             .title {
                 font-size: 1.125rem;
             }
         }
 
-        /* Animation for card entry */
         @keyframes fadeInUp {
             from {
                 opacity: 0;
@@ -347,35 +342,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="login-container">
         <div class="login-card">
             <div class="card-content">
-                <!-- Logo Section -->
                 <div class="logo-container">
-                    <div class="logo-container">
-                    <img src="assets/images/logo.png" alt="Online Data Icon"  height="75">
-
-                </div>
+                    <img src="assets/images/logo.png" alt="Online Data Icon" height="75">
                 </div>
 
-                <!-- Title -->
                 <h2 class="title">Welcome to HR & Finance Dashboard</h2>
 
-                <!-- Error Message -->
                 <?php if ($error): ?>
                     <div class="error-message">
                         ⚠️ <?php echo htmlspecialchars($error); ?>
                     </div>
                 <?php endif; ?>
 
-                <!-- Login Form -->
                 <form method="POST" action="">
                     <div class="form-group">
                         <label for="username">Username</label>
-                        <input type="text" id="username" name="username" required autocomplete="off" placeholder="">
+                        <input type="text" id="username" name="username" required autocomplete="off" placeholder="Enter your username">
                     </div>
 
                     <div class="form-group">
                         <label for="password">Password</label>
                         <div class="password-wrapper">
-                            <input type="password" id="password" name="password" required autocomplete="off" placeholder="">
+                            <input type="password" id="password" name="password" required autocomplete="off" placeholder="Enter your password">
                             <button type="button" class="toggle-password" onclick="togglePassword()" aria-label="Show password">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0z"></path>
@@ -391,7 +379,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </button>
                 </form>
 
-                <!-- Reset Password Link -->
                 <div class="reset-link">
                     <a href="#">Forgot password?</a>
                 </div>
@@ -409,7 +396,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
             passwordInput.setAttribute('type', type);
             
-            // Change the eye icon style
             const button = document.querySelector('.toggle-password');
             if (type === 'text') {
                 button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0z"></path><circle cx="12" cy="12" r="3"></circle><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-3.8 0-7.2-2.1-9-5.4a10.07 10.07 0 0 1 3.06-3.06"></path><path d="M7.06 7.06A10.07 10.07 0 0 1 12 4c3.8 0 7.2 2.1 9 5.4a10.07 10.07 0 0 1-3.06 3.06"></path><line x1="2" y1="2" x2="22" y2="22"></line></svg>`;
@@ -420,7 +406,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Add Enter key support
         document.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 const form = document.querySelector('form');

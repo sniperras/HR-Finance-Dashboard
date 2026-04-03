@@ -27,11 +27,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $updateStmt->execute();
             $updateStmt->close();
 
-            // Redirect based on role
-            if ($user['role'] === 'director') {
-                header('Location: director/md_dashboard.php');
-            } else {
+            // Redirect based on role and username pattern
+            if ($user['role'] === 'hr') {
                 header('Location: admin/master_data.php');
+            } elseif ($user['role'] === 'director') {
+                // Check if it's a Managing Director (admin director)
+                if ($username === 'director_admin') {
+                    header('Location: director/md_dashboard.php');
+                } 
+                // Check if it's a department director (director_BMT, director_LMT, etc.)
+                elseif (preg_match('/director_([A-Z\/\s]+)/', $username, $matches)) {
+                    header('Location: director/director_dashboard.php');
+                }
+                // Default director fallback
+                else {
+                    header('Location: director/director_dashboard.php');
+                }
+            } else {
+                header('Location: index.php');
             }
             exit();
         } else {
@@ -62,29 +75,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         body {
             font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f5;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             position: relative;
+            background-color: #000;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.3) 1px, transparent 1px);
+            background-size: 20px 20px;
         }
 
-        /* Background pattern like Ethiopian Airlines page */
-        .background-pattern {
+        body::before {
+            content: '';
             position: absolute;
             inset: 0;
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.1) 100%);
             pointer-events: none;
-            z-index: 0;
         }
 
-        .background-pattern svg {
-            width: 100%;
-            height: 100%;
-            fill: #d4d4d4;
-        }
-
-        /* Login Container */
         .login-container {
             position: relative;
             z-index: 10;
@@ -93,23 +101,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin: 1.5rem;
         }
 
-        /* Card Style */
         .login-card {
-            background: #ffffff;
+            background: rgba(255, 255, 255);
+            backdrop-filter: blur(10px);
             border-radius: 1.4rem;
-            border: 1px solid #e5e5e5;
-            box-shadow: 0px 2px 3px 0px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0px 20px 40px rgba(0, 0, 0, 0.2), 0px 4px 12px rgba(0, 0, 0, 0.1);
             overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .login-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0px 25px 50px rgba(0, 0, 0, 0.25);
         }
 
         .card-content {
-            padding: 1.5rem;
+            padding: 2rem;
         }
 
-        /* Logo */
         .logo-container {
             text-align: center;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
         }
 
         .logo {
@@ -117,18 +130,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             height: auto;
         }
 
-        /* Title */
         .title {
             font-size: 1.25rem;
             font-weight: 600;
             text-align: center;
-            color: #000;
+            color: #111827;
             margin-bottom: 1.5rem;
+            letter-spacing: -0.01em;
         }
 
-        /* Form Styles */
         .form-group {
-            margin-bottom: 1rem;
+            margin-bottom: 1.25rem;
         }
 
         .form-group label {
@@ -136,7 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-size: 0.875rem;
             font-weight: 500;
             margin-bottom: 0.5rem;
-            color: #000;
+            color: #374151;
         }
 
         .input-wrapper {
@@ -145,13 +157,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .form-group input {
             width: 100%;
-            padding: 0.5rem 0.75rem;
+            padding: 0.625rem 0.875rem;
             font-size: 0.875rem;
             line-height: 1.5;
-            color: #000;
-            background-color: transparent;
-            border: 1px solid #e5e5e5;
-            border-radius: 0.375rem;
+            color: #111827;
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
             transition: all 0.2s ease;
             font-family: inherit;
         }
@@ -159,26 +171,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .form-group input:focus {
             outline: none;
             border-color: #10b981;
-            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+            background-color: #ffffff;
         }
 
         .form-group input::placeholder {
             color: #9ca3af;
         }
 
-        /* Password field with eye button */
         .password-wrapper {
             position: relative;
         }
 
         .password-wrapper input {
-            padding-right: 2.5rem;
+            padding-right: 2.75rem;
         }
 
         .toggle-password {
             position: absolute;
-            top: 0;
+            top: 50%;
             right: 0;
+            transform: translateY(-50%);
             height: 100%;
             display: flex;
             align-items: center;
@@ -187,37 +200,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background: transparent;
             border: none;
             cursor: pointer;
-            color: #6b7280;
+            color: #9ca3af;
             transition: color 0.2s;
         }
 
         .toggle-password:hover {
-            color: #000;
+            color: #10b981;
         }
 
         .toggle-password svg {
-            width: 1rem;
-            height: 1rem;
+            width: 1.125rem;
+            height: 1.125rem;
         }
 
-        /* Button */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border-width: 0;
+        }
+
         .btn-signin {
             width: 100%;
-            background-color: #10b981;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             color: white;
-            font-weight: 700;
-            padding: 0.5rem 1rem;
+            font-weight: 600;
+            padding: 0.625rem 1rem;
             font-size: 0.875rem;
             border: none;
-            border-radius: 0.375rem;
+            border-radius: 0.5rem;
             cursor: pointer;
-            transition: background-color 0.2s ease;
+            transition: all 0.2s ease;
             font-family: inherit;
             margin-top: 0.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-signin::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .btn-signin:hover::before {
+            left: 100%;
         }
 
         .btn-signin:hover {
-            background-color: #059669;
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-signin:active {
+            transform: translateY(0);
         }
 
         .btn-signin:focus {
@@ -225,148 +272,101 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
         }
 
-        /* Error Message */
         .error-message {
             background-color: #fee2e2;
-            border: 1px solid #fecaca;
-            color: #dc2626;
-            padding: 0.75rem;
+            border-left: 4px solid #dc2626;
+            color: #991b1b;
+            padding: 0.75rem 1rem;
             border-radius: 0.5rem;
-            margin-bottom: 1rem;
-            text-align: center;
+            margin-bottom: 1.25rem;
+            text-align: left;
             font-size: 0.875rem;
+            font-weight: 500;
         }
 
-        /* Reset Password Link */
         .reset-link {
             margin-top: 1rem;
-            text-align: right;
+            text-align: center;
         }
 
         .reset-link a {
             color: #10b981;
             font-size: 0.875rem;
-            font-weight: 700;
-            text-decoration: underline;
-            text-underline-offset: 4px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: color 0.2s;
         }
 
         .reset-link a:hover {
             color: #059669;
+            text-decoration: underline;
+            text-underline-offset: 3px;
         }
 
-        /* Footer */
         .login-footer {
             text-align: center;
             margin-top: 1.5rem;
             font-size: 0.75rem;
-            color: #6b7280;
+            color: rgba(255, 255, 255, 0.8);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
         }
 
-        /* Dark mode support */
-        @media (prefers-color-scheme: dark) {
-            body {
-                background: #0F172A;
-            }
-
-            .login-card {
-                background: #ffffff;
-                border-color: #ffffff;
-            }
-
-            .title {
-                color: #000000;
-            }
-
-            .form-group label {
-                color: #000000;
-            }
-
-            .form-group input {
-                background-color: #ffffff;
-                border-color: #4a4a4a;
-                color: #000000;
-            }
-
-            .form-group input:focus {
-                border-color: #10b981;
-                box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
-            }
-
-            .background-pattern svg {
-                fill: #2d2d2d;
-            }
-
-            .login-footer {
-                color: #ffffff;
-            }
-
-            .toggle-password {
-                color: #9ca3af;
-            }
-
-            .toggle-password:hover {
-                color: #000000;
-            }
-        }
-
-        /* Responsive */
         @media (max-width: 480px) {
             .login-container {
                 margin: 1rem;
             }
-
             .card-content {
-                padding: 1.25rem;
+                padding: 1.5rem;
             }
+            .title {
+                font-size: 1.125rem;
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-card {
+            animation: fadeInUp 0.5s ease-out;
         }
     </style>
 </head>
 
 <body>
-    <!-- Background pattern like Ethiopian Airlines page -->
-    <div class="background-pattern">
-        <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <defs>
-                <pattern id="dotPattern" width="16" height="16" patternUnits="userSpaceOnUse">
-                    <circle cx="1" cy="1" r="1" fill="currentColor" />
-                </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#dotPattern)" opacity="0.3" />
-        </svg>
-    </div>
-
     <div class="login-container">
         <div class="login-card">
             <div class="card-content">
-                <!-- Logo Section - You can replace with your actual logo -->
                 <div class="logo-container">
-                    <img src="assets/images/logo.png" alt="Online Data Icon"  height="75">
-
+                    <img src="assets/images/logo.png" alt="Online Data Icon" height="75">
                 </div>
 
-                <!-- Title -->
                 <h2 class="title">Welcome to HR & Finance Dashboard</h2>
 
-                <!-- Error Message -->
                 <?php if ($error): ?>
                     <div class="error-message">
-                        <?php echo htmlspecialchars($error); ?>
+                        ⚠️ <?php echo htmlspecialchars($error); ?>
                     </div>
                 <?php endif; ?>
 
-                <!-- Login Form -->
                 <form method="POST" action="">
                     <div class="form-group">
                         <label for="username">Username</label>
-                        <input type="text" id="username" name="username" required autocomplete="off">
+                        <input type="text" id="username" name="username" required autocomplete="off" placeholder="Enter your username">
                     </div>
 
                     <div class="form-group">
                         <label for="password">Password</label>
                         <div class="password-wrapper">
-                            <input type="password" id="password" name="password" required autocomplete="off">
-                            <button type="button" class="toggle-password" onclick="togglePassword()">
+                            <input type="password" id="password" name="password" required autocomplete="off" placeholder="Enter your password">
+                            <button type="button" class="toggle-password" onclick="togglePassword()" aria-label="Show password">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0z"></path>
                                     <circle cx="12" cy="12" r="3"></circle>
@@ -381,15 +381,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </button>
                 </form>
 
-                <!-- Reset Password Link -->
                 <div class="reset-link">
-                    <a href="#">Reset Password</a>
+                    <a href="#">Forgot password?</a>
                 </div>
             </div>
         </div>
 
         <div class="login-footer">
-            &copy; <?php echo date('Y'); ?> HR & Finance Dashboard
+            &copy; <?php echo date('Y'); ?> HR & Finance Dashboard. All rights reserved.
         </div>
     </div>
 
@@ -399,14 +398,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
             passwordInput.setAttribute('type', type);
             
-            // Optional: Change the eye icon style
             const button = document.querySelector('.toggle-password');
             if (type === 'text') {
                 button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0z"></path><circle cx="12" cy="12" r="3"></circle><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-3.8 0-7.2-2.1-9-5.4a10.07 10.07 0 0 1 3.06-3.06"></path><path d="M7.06 7.06A10.07 10.07 0 0 1 12 4c3.8 0 7.2 2.1 9 5.4a10.07 10.07 0 0 1-3.06 3.06"></path><line x1="2" y1="2" x2="22" y2="22"></line></svg>`;
+                button.setAttribute('aria-label', 'Hide password');
             } else {
                 button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+                button.setAttribute('aria-label', 'Show password');
             }
         }
+
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const form = document.querySelector('form');
+                if (form) {
+                    form.submit();
+                }
+            }
+        });
     </script>
 </body>
 

@@ -1,10 +1,15 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 require_once '../includes/auth.php';
 requireRole('director');
 
 $conn = getConnection();
 $currentMonth = $_GET['month'] ?? date('Y-m');
 $dataMonth = $currentMonth . '-01';
+$currentYear = date('Y', strtotime($dataMonth));
+$currentMonthNum = date('m', strtotime($dataMonth));
 
 // Get logged-in user's department from username
 $username = $_SESSION['username'];
@@ -15,131 +20,162 @@ if (preg_match('/director_([A-Z\/\s]+)/', $username, $matches)) {
     $userDept = trim($matches[1]);
 }
 
-// Check if this is a department director (not admin)
-$isAdminDirector = ($userDept === '' || $userDept === 'admin');
-
-// If admin director, redirect to admin dashboard
-if ($isAdminDirector) {
-    header('Location: md_dashboard.php?month=' . $currentMonth);
-    exit();
-}
-
 // If no department found, redirect to login
 if (empty($userDept)) {
-    header('Location: ../index.php');
+    header('Location: ../login.php');
     exit();
 }
 
-// Define all indicators with their display names
-$indicators = [
-    // 'Team Leaders Clock-in Data' => [
-    //     'display_name' => 'Team Leaders Clock-in',
-    //     'short_name' => 'Clock-in',
-    //     'id' => 'ind_clockin'
-    // ],
-    'Crew Meeting Minutes Submission' => [
-        'display_name' => 'Crew Meeting Minutes',
-        'short_name' => 'Meeting Minutes',
-        'id' => 'ind_meeting'
+// Define cost centers for the department
+$costCenters = [
+    'BMT' => [
+        'ACS' => 'Mgr. A/C Structure Maint',
+        'AVS' => 'Mgr. Avionics Sys Maint',
+        'B787' => 'Mgr. B787/767 Mainten',
+        'B737' => 'Mgr. B737 Maintenance',
+        'CAB' => 'Mgr. Cabin Maint',
+        'B777' => 'Mgr. B777/A350 Mainten',
+        'APS' => 'Mgr. A/C Patch Svs.',
+        'TEC' => 'Mgr. Technical Supp.',
+        'DIR' => 'Dir. BMT'
     ],
-    'Exceptional Customer Experience Training' => [
-        'display_name' => 'Customer Exp. Training',
-        'short_name' => 'Cust. Training',
-        'id' => 'ind_training'
+    'LMT' => [
+        'DMM' => 'Duty Manager MCC',
+        'ADM' => 'MGR. Admin & Outstation Maint',
+        'ALM' => 'Mgr. A/C Line Maint.',
+        'GAM' => 'Mgr. General Ava. A/C Maint.',
+        'TPL' => 'MGR. Turbo Prop & Light A/C Maint',
+        'ACM' => 'Mgr. A/C Cabin Maint',
+        'DIR' => 'Dir. LMT'
     ],
-    'CPR' => [
-        'display_name' => 'CPR',
-        'short_name' => 'CPR',
-        'id' => 'ind_cpr'
+    'CMT' => [
+        'WKH' => 'Mgr. Wire Kit & Harness Prod.',
+        'CES' => 'Mgr. Computerized Equipment Shop',
+        'NDT' => 'Mgr. NDT, Stand. & Part Recv. Insp.',
+        'MES' => 'Comp. Maint. Engineering Support',
+        'MCS' => 'Mgr. Mechanical Comp Shops',
+        'ACS' => 'Mgr. Avionics Comp Shops',
+        'DIR' => 'Dir. CMT'
     ],
-    '2025/26 1st Semiannual BSCI/ISC Target Status' => [
-        'display_name' => 'BSCI/ISC Target',
-        'short_name' => 'BSCI Target',
-        'id' => 'ind_bsci'
+    'EMT' => [
+        'EMI' => 'Mgr. Engine Maint. Inspection',
+        'ETS' => 'Mgr. Technical Support',
+        'RNP' => 'Mgr. RNP PW4000/LEAP/APU Eng. Maint.',
+        'CFM' => 'Mgr. CFM56/GE90/GENX & Turbo Prop. Engines',
+        'RSH' => 'Mgr. Repair Shops',
+        'DIR' => 'Dir. EMT'
     ],
-    'Activity Report Submission' => [
-        'display_name' => 'Activity Report',
-        'short_name' => 'Activity',
-        'id' => 'ind_activity'
+    'AEP' => [
+        'ALE' => 'MGR. A/C Lease, EIS & Special Projects',
+        'AMP' => 'MGR. A/C Maint. Prog. & Task Card Engineer',
+        'MPR' => 'MGR. Maint. Plng. & Record Control',
+        'EQA' => 'MGR. Engineering Quality Assurance',
+        'ASE' => 'Mgr. A/C Systems Eng',
+        'ADO' => 'MGR. A/C Design Organization',
+        'DIR' => 'Dir. AEP'
     ],
-    'Cost Saving Report Submission' => [
-        'display_name' => 'Cost Saving Report',
-        'short_name' => 'Cost Saving',
-        'id' => 'ind_cost'
+    'MSM' => [
+        'MSM' => 'Mgr. MRO Sales and Marketing',
+        'MCS' => 'Mgr. MRO Customer Support',
+        'DIR' => 'Dir. MSM'
     ],
-    'Lost Time Justification' => [
-        'display_name' => 'Lost Time Justification',
-        'short_name' => 'Lost Time',
-        'id' => 'ind_losttime'
+    'QA' => [
+        'QAS' => 'Mgr. MRO Qty Ass & S/a'
     ],
-    'Attendance Approval Status' => [
-        'display_name' => 'Attendance Approval',
-        'short_name' => 'Attendance',
-        'id' => 'ind_attendance'
+    'MRO HR' => [
+        'HR' => 'Mgr. Human Resources',
+        'DIR' => 'Dir. MRO HR'
     ],
-    'Productivity' => [
-        'display_name' => 'Productivity',
-        'short_name' => 'Productivity',
-        'id' => 'ind_productivity'
+    'MD/DIV.' => [
+        'FIN' => 'Mgr. Finance',
+        'DIR' => 'Dir. MD/DIV.'
     ],
-    'Employees Training Gap Clearance' => [
-        'display_name' => 'Training Gap',
-        'short_name' => 'Training',
-        'id' => 'ind_traininggap'
-    ],
-    'Employees Issue Resolution Rate' => [
-        'display_name' => 'Issue Resolution',
-        'short_name' => 'Issue Res.',
-        'id' => 'ind_issue'
+    'Remainder' => [
+        'REM' => 'Remainder',
+        'DIR' => 'Dir. Remainder'
     ]
 ];
 
-// Fetch actual data from database for the selected month and department
-$dbData = [];
-$query = "SELECT indicator_name, percentage_achievement, actual_value, target_value, id
-          FROM master_performance_data 
-          WHERE data_month = ? AND department = ? AND verification_status = 'verified'";
+// Define report types (indicators)
+$indicators = [
+    'Crew Meeting Minutes Submission' => 'Crew Meeting Minutes',
+    'Exceptional Customer Experience Training' => 'Customer Exp. Training',
+    'CPR' => 'CPR',
+    '2025/26 1st Semiannual BSCI/ISC Target Status' => 'BSCI/ISC Target',
+    'Activity Report Submission' => 'Activity Report',
+    'Cost Saving Report Submission' => 'Cost Saving Report',
+    'Lost time Justification' => 'Lost Time Justification',
+    'Attendance Approval Status' => 'Attendance Approval',
+    'Productivity' => 'Productivity',
+    'Employees Training Gap Clearance' => 'Training Gap',
+    'Employees Issue Resolution Rate' => 'Issue Resolution'
+];
 
+// Fetch ALL data from mro_cpr_report for this department (all cost centers)
+$reportData = [];
+$managerData = [];
+$query = "SELECT report_type, cost_center_code, expected, completed, percentage 
+          FROM mro_cpr_report 
+          WHERE report_month = ? AND report_year = ? AND department = ?";
 $stmt = $conn->prepare($query);
-$stmt->bind_param("ss", $dataMonth, $userDept);
+$stmt->bind_param("iis", $currentMonthNum, $currentYear, $userDept);
 $stmt->execute();
 $result = $stmt->get_result();
 
 while ($row = $result->fetch_assoc()) {
-    $indicator = $row['indicator_name'];
-    $dbData[$indicator] = [
-        'percentage' => round($row['percentage_achievement'], 1),
-        'actual' => $row['actual_value'],
-        'target' => $row['target_value'],
-        'record_id' => $row['id']
+    $reportType = $row['report_type'];
+    $costCenter = $row['cost_center_code'];
+    $expected = (int)$row['expected'];
+    $completed = (int)$row['completed'];
+    $percentage = round((float)$row['percentage'], 1);
+    
+    // Store manager-level data for detail view
+    if (!isset($managerData[$reportType])) {
+        $managerData[$reportType] = [];
+    }
+    $managerData[$reportType][$costCenter] = [
+        'expected' => $expected,
+        'completed' => $completed,
+        'percentage' => $percentage,
+        'name' => $costCenters[$userDept][$costCenter] ?? $costCenter
     ];
+    
+    // Store director-level data (for the card)
+    if ($costCenter === 'DIR') {
+        $reportData[$reportType] = $percentage;
+    }
 }
 $stmt->close();
 
-// Prepare metrics data for display
-$metricsData = [];
-foreach ($indicators as $indicatorKey => $indicatorInfo) {
-    if (isset($dbData[$indicatorKey])) {
-        $data = $dbData[$indicatorKey];
-        $metricsData[$indicatorKey] = [
-            'display_name' => $indicatorInfo['display_name'],
-            'short_name' => $indicatorInfo['short_name'],
-            'id' => $indicatorInfo['id'],
-            'percentage' => $data['percentage'],
-            'actual' => $data['actual'],
-            'target' => $data['target'],
-            'record_id' => $data['record_id']
-        ];
-    } else {
-        $metricsData[$indicatorKey] = [
-            'display_name' => $indicatorInfo['display_name'],
-            'short_name' => $indicatorInfo['short_name'],
-            'id' => $indicatorInfo['id'],
-            'percentage' => 0,
-            'actual' => 0,
-            'target' => 100,
-            'record_id' => null
-        ];
+// Also get data from master_performance_data for this department (fallback)
+$masterQuery = "SELECT indicator_name, percentage_achievement 
+                FROM master_performance_data 
+                WHERE data_month = ? AND department = ? AND verification_status = 'verified'";
+$masterStmt = $conn->prepare($masterQuery);
+$masterStmt->bind_param("ss", $dataMonth, $userDept);
+$masterStmt->execute();
+$masterResult = $masterStmt->get_result();
+
+while ($row = $masterResult->fetch_assoc()) {
+    $indicatorName = $row['indicator_name'];
+    $percentage = round((float)$row['percentage_achievement'], 1);
+    
+    // Find matching report type
+    foreach ($indicators as $key => $displayName) {
+        if (strpos($indicatorName, $key) !== false || strpos($key, $indicatorName) !== false) {
+            if (!isset($reportData[$key]) || $reportData[$key] == 0) {
+                $reportData[$key] = $percentage;
+            }
+            break;
+        }
+    }
+}
+$masterStmt->close();
+
+// Set default values for missing data
+foreach ($indicators as $indicatorKey => $indicatorDisplay) {
+    if (!isset($reportData[$indicatorKey])) {
+        $reportData[$indicatorKey] = 0;
     }
 }
 
@@ -151,7 +187,7 @@ $conn->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title><?php echo htmlspecialchars($userDept); ?> Department Performance Dashboard</title>
+    <title><?php echo htmlspecialchars($userDept); ?> Department - Performance Dashboard</title>
     <link rel="stylesheet" href="../css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -184,7 +220,6 @@ $conn->close();
             overflow-x: hidden;
         }
         
-        /* Navigation */
         .navbar {
             background: var(--medium-bg);
             padding: 0.5rem 0;
@@ -193,7 +228,6 @@ $conn->close();
             top: 0;
             z-index: 1000;
             border-bottom: 1px solid var(--border-light);
-            transition: background 0.3s;
         }
         
         .navbar-container {
@@ -205,12 +239,6 @@ $conn->close();
             align-items: center;
             flex-wrap: wrap;
             gap: 0.5rem;
-        }
-        
-        @media (max-width: 768px) {
-            .navbar-container {
-                padding: 0 1rem;
-            }
         }
         
         .navbar-brand {
@@ -282,7 +310,6 @@ $conn->close();
             background: var(--accent-hover);
         }
         
-        /* Theme Toggle Button */
         .theme-toggle {
             background: transparent;
             border: 1px solid var(--accent);
@@ -299,7 +326,6 @@ $conn->close();
             color: var(--dark-bg);
         }
         
-        /* Main Container */
         .container {
             width: 100%;
             max-width: 100%;
@@ -307,32 +333,12 @@ $conn->close();
             padding: 0.75rem 1rem;
         }
         
-        @media (min-width: 1400px) {
-            .container {
-                padding: 0.75rem 2rem;
-            }
-        }
-        
-        @media (min-width: 1920px) {
-            .container {
-                padding: 0.75rem 4rem;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .container {
-                padding: 0.5rem;
-            }
-        }
-        
-        /* Dashboard Header - Compact */
         .dashboard-header {
             background: linear-gradient(135deg, var(--medium-bg) 0%, var(--dark-bg) 100%);
             padding: 0.6rem 1rem;
             border-radius: 12px;
             margin-bottom: 1rem;
             border: 1px solid var(--border-light);
-            transition: background 0.3s;
         }
         
         .dashboard-header h1 {
@@ -365,64 +371,30 @@ $conn->close();
             font-size: 0.85rem;
         }
         
-        /* Department Header Card - Compact */
-        .department-header-card {
-            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
-            color: var(--dark-bg);
-            padding: 0.6rem 1rem;
-            border-radius: 12px;
+        .info-banner {
+            background: rgba(56,189,248,0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
             margin-bottom: 1rem;
             text-align: center;
+            font-size: 0.7rem;
+            color: var(--accent);
         }
         
-        .department-header-card h2 {
-            font-size: 1rem;
-            margin-bottom: 0.2rem;
-        }
-        
-        .department-header-card p {
-            font-size: 0.65rem;
-            opacity: 0.9;
-        }
-        
-        /* Metrics Grid - 4 columns on large screens for all 12 metrics in one view */
         .metrics-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0.8rem;
-            margin-bottom: 0.5rem;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
         }
         
-        @media (max-width: 1200px) {
-            .metrics-grid {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 0.7rem;
-            }
-        }
-        
-        @media (max-width: 900px) {
-            .metrics-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 0.6rem;
-            }
-        }
-        
-        @media (max-width: 600px) {
-            .metrics-grid {
-                grid-template-columns: 1fr;
-                gap: 0.5rem;
-            }
-        }
-        
-        /* Metric Card - Compact */
         .metric-card {
             background: var(--card-bg);
             border-radius: 12px;
-            padding: 0.6rem;
-            transition: all 0.2s;
+            padding: 0.8rem;
             border: 1px solid var(--border-light);
-            display: flex;
-            flex-direction: column;
+            transition: all 0.2s;
+            text-align: center;
             cursor: pointer;
         }
         
@@ -433,69 +405,133 @@ $conn->close();
         }
         
         .metric-title {
-            font-size: 0.7rem;
+            font-size: 0.85rem;
             font-weight: bold;
             color: var(--accent);
             margin-bottom: 0.5rem;
             padding-bottom: 0.3rem;
-            border-bottom: 1px solid var(--accent);
-            text-align: center;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            border-bottom: 1px solid var(--border-light);
         }
         
-        /* Chart Container - Smaller */
         .chart-container {
             position: relative;
-            width: 100%;
-            max-width: 130px;
-            margin: 0 auto;
-            cursor: pointer;
+            width: 120px;
+            height: 120px;
+            margin: 0.5rem auto;
         }
         
         .chart-container canvas {
             width: 100% !important;
-            height: auto !important;
-            max-height: 110px;
+            height: 100% !important;
         }
         
-        /* Metric Values - Compact */
-        .metric-values {
+        .percentage-display {
+            text-align: center;
+            margin-top: 0.5rem;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        
+        .actual-target {
             display: flex;
-            justify-content: space-between;
+            justify-content: space-around;
             margin-top: 0.5rem;
             padding-top: 0.5rem;
             border-top: 1px solid var(--border-light);
-            font-size: 0.6rem;
-        }
-        
-        .metric-values div {
-            text-align: center;
-            flex: 1;
-        }
-        
-        .metric-values .value-label {
-            color: var(--text-secondary);
-            font-size: 0.55rem;
-            margin-bottom: 0.15rem;
-        }
-        
-        .metric-values .value-number {
-            font-weight: bold;
             font-size: 0.7rem;
         }
         
-        .actual-value {
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: var(--medium-bg);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid var(--border-light);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid var(--accent);
+            position: sticky;
+            top: 0;
+            background: var(--medium-bg);
+        }
+        
+        .modal-header h3 {
             color: var(--accent);
         }
         
-        .target-value {
-            color: var(--warning);
+        .close-modal {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            cursor: pointer;
         }
         
-        .percentage-value {
+        .close-modal:hover {
+            color: var(--danger);
+        }
+        
+        .detail-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .detail-table th,
+        .detail-table td {
+            padding: 0.6rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-light);
+        }
+        
+        .detail-table th {
+            background: var(--dark-bg);
+            color: var(--accent);
             font-weight: bold;
+            position: sticky;
+            top: 60px;
+        }
+        
+        .detail-table tr:hover {
+            background: rgba(56,189,248,0.05);
+        }
+        
+        .director-row {
+            background: rgba(16, 185, 129, 0.1);
+            font-weight: bold;
+        }
+        
+        .progress-bar-modal {
+            width: 80px;
+            height: 6px;
+            background: var(--dark-bg);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        .progress-fill-modal {
+            height: 100%;
+            border-radius: 3px;
         }
         
         .no-data {
@@ -503,39 +539,6 @@ $conn->close();
             padding: 2rem;
             color: var(--text-primary);
             opacity: 0.7;
-            background: var(--card-bg);
-            border-radius: 12px;
-        }
-        
-        .spinner {
-            border: 2px solid var(--border-light);
-            border-top: 2px solid var(--accent);
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin: 1.5rem auto;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        /* Scrollbar */
-        ::-webkit-scrollbar {
-            width: 5px;
-            height: 5px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: var(--dark-bg);
-            border-radius: 3px;
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: var(--accent);
-            border-radius: 3px;
         }
         
         /* Light Theme */
@@ -560,40 +563,25 @@ $conn->close();
             background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
         }
         
-        body.light-theme .department-header-card {
-            background: linear-gradient(135deg, #0284C7 0%, #0EA5E9 100%);
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
         }
         
-        body.light-theme .theme-toggle {
-            border-color: #0284C7;
-            color: #0284C7;
-        }
-        
-        body.light-theme .theme-toggle:hover {
-            background: #0284C7;
-            color: white;
-        }
-        
-        /* Tooltip on hover */
-        .metric-card {
-            position: relative;
-        }
-        
-        .metric-card:hover::after {
-            content: "Click for detailed report";
-            position: absolute;
-            bottom: -25px;
-            left: 50%;
-            transform: translateX(-50%);
+        ::-webkit-scrollbar-track {
             background: var(--dark-bg);
-            color: var(--accent);
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.6rem;
-            white-space: nowrap;
-            z-index: 100;
-            pointer-events: none;
-            border: 1px solid var(--accent);
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent);
+            border-radius: 3px;
+        }
+        
+        @media (max-width: 768px) {
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -602,11 +590,13 @@ $conn->close();
         <div class="navbar-container">
             <a href="director_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
             <div class="navbar-menu">
-                <a href="director_dashboard.php" style="color: var(--accent);">Dashboard</a>
+                <a href="director_dashboard.php" style="color: var(--accent);">My Dashboard</a>
+                <!-- <a href="report_mro_cpr.php">Data Entry</a> -->
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
                     <span class="user-name">👤 <?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
-                    <span class="department-badge"> <?php echo htmlspecialchars($userDept); ?></span>
+                    <span class="department-badge"><?php echo htmlspecialchars($userDept); ?></span>
+                    <a href="#" onclick="openPasswordModal(); return false;" style="cursor: pointer;">🔑 Change Password</a>
                     <a href="../logout.php" class="btn">Logout</a>
                 </div>
             </div>
@@ -615,25 +605,248 @@ $conn->close();
     
     <div class="container">
         <div class="dashboard-header">
-            <h1>📈 <?php echo htmlspecialchars($userDept); ?> Department Performance Dashboard</h1>
+            <h1>📊 <?php echo htmlspecialchars($userDept); ?> Department - Performance Dashboard</h1>
             <div class="month-selector">
                 <button onclick="changeMonth('prev')">← Prev</button>
-                <h3 id="current-month">📅 <?php echo date('F Y', strtotime($dataMonth)); ?></h3>
+                <h3>📅 <?php echo date('F Y', strtotime($dataMonth)); ?></h3>
                 <button onclick="changeMonth('next')">Next →</button>
             </div>
         </div>
         
-        <div class="department-header-card">
-            <h2>🎯 <?php echo htmlspecialchars($userDept); ?> Department</h2>
-            <p>Performance Metrics for <?php echo date('F Y', strtotime($dataMonth)); ?> | Click any card for details</p>
+        <div class="info-banner">
+            📈 Welcome <?php echo htmlspecialchars($_SESSION['full_name']); ?> - Click on any card to view detailed manager breakdown
         </div>
         
-        <div id="dashboard-content">
-            <div class="spinner"></div>
+        <div class="metrics-grid" id="metricsGrid">
+            <?php 
+            $chartIndex = 0;
+            foreach ($indicators as $indicatorKey => $indicatorDisplay): 
+                $percentage = $reportData[$indicatorKey] ?? 0;
+                $percentageColor = $percentage >= 90 ? 'var(--success)' : ($percentage >= 70 ? 'var(--warning)' : 'var(--danger)');
+                $chartId = 'chart-' . $chartIndex;
+                $chartIndex++;
+            ?>
+                <div class="metric-card" onclick="showDetail('<?php echo htmlspecialchars($indicatorKey); ?>', '<?php echo htmlspecialchars($indicatorDisplay); ?>')">
+                    <div class="metric-title"><?php echo htmlspecialchars($indicatorDisplay); ?></div>
+                    <div class="chart-container">
+                        <canvas id="<?php echo $chartId; ?>" width="120" height="120"></canvas>
+                    </div>
+                    <div class="percentage-display" style="color: <?php echo $percentageColor; ?>;">
+                        <?php echo $percentage; ?>%
+                    </div>
+                    <div class="actual-target">
+                        <span>Target: 100%</span>
+                        <span>Achieved: <?php echo $percentage; ?>%</span>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    
+    <!-- Detail Modal -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Department Details</h3>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="modalBody" style="padding: 1rem;">
+                <div class="spinner">Loading...</div>
+            </div>
         </div>
     </div>
     
     <script>
+        // Data passed from PHP
+        const managerData = <?php echo json_encode($managerData); ?>;
+        const reportData = <?php echo json_encode($reportData); ?>;
+        const costCenters = <?php echo json_encode($costCenters[$userDept] ?? []); ?>;
+        const userDept = '<?php echo $userDept; ?>';
+        const currentMonth = '<?php echo $currentMonth; ?>';
+        
+        let chartInstances = {};
+        
+        function getColor(percentage) {
+            if (percentage >= 90) return '#10B981';
+            if (percentage >= 70) return '#F59E0B';
+            return '#EF4444';
+        }
+        
+        function createGaugeChart(canvasId, percentage) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return null;
+            
+            const remaining = Math.max(0, 100 - percentage);
+            const color = getColor(percentage);
+            
+            return new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Achieved', 'Remaining'],
+                    datasets: [{
+                        data: [percentage, remaining],
+                        backgroundColor: [color, 'rgba(51, 65, 85, 0.5)'],
+                        borderWidth: 0,
+                        hoverOffset: 6,
+                        cutout: '70%'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.label}: ${context.raw}%`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function showDetail(indicatorKey, indicatorDisplay) {
+            const modal = document.getElementById('detailModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalBody = document.getElementById('modalBody');
+            
+            modalTitle.innerHTML = `${indicatorDisplay} - ${userDept} Department Details`;
+            
+            const data = managerData[indicatorKey] || {};
+            
+            // Calculate totals
+            let totalExpected = 0;
+            let totalCompleted = 0;
+            let directorData = null;
+            const managerRows = [];
+            
+            for (const [code, manager] of Object.entries(costCenters)) {
+                const record = data[code] || { expected: 0, completed: 0, percentage: 0, name: manager };
+                
+                if (code === 'DIR') {
+                    directorData = record;
+                } else {
+                    totalExpected += record.expected;
+                    totalCompleted += record.completed;
+                    managerRows.push({
+                        name: manager,
+                        code: code,
+                        expected: record.expected,
+                        completed: record.completed,
+                        percentage: record.percentage
+                    });
+                }
+            }
+            
+            const totalPercentage = totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
+            
+            let tableHtml = `
+                <table class="detail-table">
+                    <thead>
+                        <tr>
+                            <th>Cost Center</th>
+                            <th>Expected Tasks</th>
+                            <th>Completed Tasks</th>
+                            <th>Not Completed</th>
+                            <th>Completion %</th>
+                            <th>Progress</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            // Manager rows
+            for (const manager of managerRows) {
+                const notCompleted = manager.expected - manager.completed;
+                const percentageColor = getColor(manager.percentage);
+                tableHtml += `
+                    <tr>
+                        <td>${escapeHtml(manager.name)}</td>
+                        <td>${manager.expected}</td>
+                        <td>${manager.completed}</td>
+                        <td>${notCompleted}</td>
+                        <td style="color: ${percentageColor}; font-weight: bold;">${manager.percentage}%</td>
+                        <td>
+                            <div class="progress-bar-modal">
+                                <div class="progress-fill-modal" style="width: ${manager.percentage}%; background: ${percentageColor};"></div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
+            
+            // Director row
+            if (directorData || totalExpected > 0) {
+                const dirExpected = directorData ? directorData.expected : totalExpected;
+                const dirCompleted = directorData ? directorData.completed : totalCompleted;
+                const dirPercentage = directorData ? directorData.percentage : totalPercentage;
+                const dirNotCompleted = dirExpected - dirCompleted;
+                const dirColor = getColor(dirPercentage);
+                tableHtml += `
+                    <tr class="director-row">
+                        <td><strong>${userDept === 'BMT' ? 'Dir. BMT' : 'Dir. ' + userDept}</strong></td>
+                        <td><strong>${dirExpected}</strong></td>
+                        <td><strong>${dirCompleted}</strong></td>
+                        <td><strong>${dirNotCompleted}</strong></td>
+                        <td style="color: ${dirColor}; font-weight: bold;"><strong>${dirPercentage.toFixed(1)}%</strong></td>
+                        <td>
+                            <div class="progress-bar-modal">
+                                <div class="progress-fill-modal" style="width: ${dirPercentage}%; background: ${dirColor};"></div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
+            
+            tableHtml += `
+                    </tbody>
+                </table>
+               
+            `;
+            
+            modalBody.innerHTML = tableHtml;
+            modal.style.display = 'flex';
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function closeModal() {
+            document.getElementById('detailModal').style.display = 'none';
+        }
+        
+        function changeMonth(direction) {
+            let currentUrl = new URL(window.location.href);
+            let currentMonthParam = currentUrl.searchParams.get('month') || '<?php echo $currentMonth; ?>';
+            let date = new Date(currentMonthParam + '-01');
+            
+            if (direction === 'prev') {
+                date.setMonth(date.getMonth() - 1);
+            } else {
+                date.setMonth(date.getMonth() + 1);
+            }
+            
+            let newMonth = date.toISOString().slice(0, 7);
+            window.location.href = `director_dashboard.php?month=${newMonth}`;
+        }
+        
+        function initializeCharts() {
+            let chartIndex = 0;
+            for (const [indicatorKey, indicatorDisplay] of Object.entries(<?php echo json_encode($indicators); ?>)) {
+                const percentage = reportData[indicatorKey] || 0;
+                const chartId = `chart-${chartIndex}`;
+                const chart = createGaugeChart(chartId, percentage);
+                if (chart) chartInstances[chartId] = chart;
+                chartIndex++;
+            }
+        }
+        
         // Theme Manager
         class ThemeManager {
             constructor() {
@@ -647,9 +860,11 @@ $conn->close();
                 if (savedTheme === 'light') {
                     document.body.classList.add('light-theme');
                     this.updateToggleButton(true);
+                    this.refreshCharts();
                 } else {
                     document.body.classList.remove('light-theme');
                     this.updateToggleButton(false);
+                    this.refreshCharts();
                 }
             }
             
@@ -663,6 +878,7 @@ $conn->close();
                     localStorage.setItem(this.themeKey, 'light');
                     this.updateToggleButton(true);
                 }
+                this.refreshCharts();
             }
             
             updateToggleButton(isLight) {
@@ -670,6 +886,18 @@ $conn->close();
                 if (toggleBtn) {
                     toggleBtn.innerHTML = isLight ? '🌙 Dark' : '☀️ Light';
                 }
+            }
+            
+            refreshCharts() {
+                setTimeout(() => {
+                    for (const [id, chart] of Object.entries(chartInstances)) {
+                        if (chart && typeof chart.destroy === 'function') {
+                            chart.destroy();
+                        }
+                    }
+                    chartInstances = {};
+                    initializeCharts();
+                }, 100);
             }
             
             initToggle() {
@@ -680,183 +908,77 @@ $conn->close();
             }
         }
         
-        // Data passed from PHP
-        const metricsData = <?php echo json_encode($metricsData); ?>;
-        const currentMonth = '<?php echo $currentMonth; ?>';
-        const userDepartment = '<?php echo $userDept; ?>';
-        
-        // Store chart instances
-        let chartInstances = {};
-        
-        // Function to get color based on percentage
-        function getScoreColor(percentage) {
-            if (percentage >= 90) return '#10B981';
-            if (percentage >= 70) return '#F59E0B';
-            return '#EF4444';
-        }
-        
-        // Function to handle click on metric card
-        function onMetricClick(indicatorKey, indicatorName, recordId, actualValue, targetValue, percentage) {
-            sessionStorage.setItem('selectedIndicator', indicatorKey);
-            sessionStorage.setItem('selectedIndicatorName', indicatorName);
-            sessionStorage.setItem('selectedRecordId', recordId);
-            sessionStorage.setItem('selectedMonth', currentMonth);
-            sessionStorage.setItem('selectedDepartment', userDepartment);
-            sessionStorage.setItem('actualValue', actualValue);
-            sessionStorage.setItem('targetValue', targetValue);
-            sessionStorage.setItem('percentageValue', percentage);
-            window.location.href = `indicator_detail.php?indicator=${encodeURIComponent(indicatorKey)}&month=${currentMonth}&dept=${encodeURIComponent(userDepartment)}`;
-        }
-        
-        // Create pie chart
-        function createPieChart(canvasId, percentage, indicatorKey, indicatorName, recordId, actualValue, targetValue) {
-            const ctx = document.getElementById(canvasId);
-            if (!ctx) return null;
-            
-            const achieved = percentage;
-            const remaining = Math.max(0, 100 - percentage);
-            const color = getScoreColor(percentage);
-            
-            return new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Achieved', 'Remaining'],
-                    datasets: [{
-                        data: [achieved, remaining],
-                        backgroundColor: [color, 'rgba(51, 65, 85, 0.5)'],
-                        borderWidth: 0,
-                        hoverOffset: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    cutout: '65%',
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return `${context.label}: ${context.raw}%`;
-                                }
-                            },
-                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                            titleColor: '#38BDF8',
-                            bodyColor: '#F1F5F9'
-                        }
-                    },
-                    onClick: function() {
-                        onMetricClick(indicatorKey, indicatorName, recordId, actualValue, targetValue, percentage);
-                    }
-                }
-            });
-        }
-        
-        function renderDashboard() {
-            const container = document.getElementById('dashboard-content');
-            container.innerHTML = '';
-            
-            let hasData = false;
-            for (const [metricKey, metric] of Object.entries(metricsData)) {
-                if (metric.percentage > 0) {
-                    hasData = true;
-                    break;
-                }
-            }
-            
-            if (!hasData) {
-                container.innerHTML = `<div class="no-data"><h4>📭 No Performance Data Available</h4><p>No verified data for ${document.getElementById('current-month').innerText}</p></div>`;
-                return;
-            }
-            
-            const metricsGrid = document.createElement('div');
-            metricsGrid.className = 'metrics-grid';
-            
-            for (const [metricKey, metric] of Object.entries(metricsData)) {
-                const percentage = metric.percentage;
-                const actual = metric.actual;
-                const target = metric.target;
-                const percentageColor = getScoreColor(percentage);
-                const chartId = `chart-${metricKey.replace(/\s+/g, '-').replace(/[\/]/g, '-')}`;
-                
-                const card = document.createElement('div');
-                card.className = 'metric-card';
-                card.onclick = () => onMetricClick(metricKey, metric.display_name, metric.record_id, actual, target, percentage);
-                
-                card.innerHTML = `
-                    <div class="metric-title" title="${metric.display_name}">${metric.display_name}</div>
-                    <div class="chart-container">
-                        <canvas id="${chartId}" width="120" height="120"></canvas>
-                    </div>
-                    <div class="metric-values">
-                        <div>
-                            <div class="value-label">Actual</div>
-                            <div class="value-number actual-value">${actual}${actual > 0 ? '%' : ''}</div>
-                        </div>
-                        <div>
-                            <div class="value-label">Target</div>
-                            <div class="value-number target-value">${target}${target > 0 ? '%' : ''}</div>
-                        </div>
-                        <div>
-                            <div class="value-label">%</div>
-                            <div class="value-number percentage-value" style="color: ${percentageColor};">${percentage}%</div>
-                        </div>
-                    </div>
-                `;
-                
-                metricsGrid.appendChild(card);
-                
-                // Create chart after card is added to DOM
-                setTimeout(() => {
-                    const chart = createPieChart(chartId, percentage, metricKey, metric.display_name, metric.record_id, actual, target);
-                    if (chart) chartInstances[chartId] = chart;
-                }, 10);
-            }
-            
-            container.appendChild(metricsGrid);
-        }
-        
-        // Change month function
-        function changeMonth(direction) {
-            let currentUrl = new URL(window.location.href);
-            let currentMonthParam = currentUrl.searchParams.get('month') || currentMonth;
-            let date = new Date(currentMonthParam + '-01');
-            
-            if (direction === 'prev') {
-                date.setMonth(date.getMonth() - 1);
-            } else {
-                date.setMonth(date.getMonth() + 1);
-            }
-            
-            let newMonth = date.toISOString().slice(0, 7);
-            window.location.href = `director_dashboard.php?month=${newMonth}`;
-        }
-        
-        // Cleanup charts on page unload
-        function cleanupCharts() {
-            for (const [id, chart] of Object.entries(chartInstances)) {
-                if (chart && typeof chart.destroy === 'function') {
-                    chart.destroy();
-                }
+        window.onclick = function(event) {
+            const modal = document.getElementById('detailModal');
+            if (event.target === modal) {
+                closeModal();
             }
         }
         
-        // Initialize dashboard
         document.addEventListener('DOMContentLoaded', function() {
             new ThemeManager();
-            renderDashboard();
+            initializeCharts();
         });
-        
-        window.addEventListener('beforeunload', cleanupCharts);
-        
-        // Handle window resize
-        let resizeTimeout;
-        window.addEventListener('resize', function() {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(() => {
-                renderDashboard();
-            }, 250);
-        });
+
+    // Function to open password change modal
+function openPasswordModal() {
+    // Check if modal already exists
+    if (document.getElementById('passwordModalOverlay')) {
+        return;
+    }
+    
+    // Create modal container
+    const modalOverlay = document.createElement('div');
+    modalOverlay.id = 'passwordModalOverlay';
+    modalOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 10001;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    
+    // Create iframe to load the password change page
+    const iframe = document.createElement('iframe');
+    iframe.src = '../change_password.php';
+    iframe.style.cssText = `
+        width: 100%;
+        max-width: 450px;
+        height: auto;
+        min-height: 450px;
+        border: none;
+        border-radius: 16px;
+        background: transparent;
+    `;
+    
+    modalOverlay.appendChild(iframe);
+    document.body.appendChild(modalOverlay);
+    
+    // Store reference to close function
+    window.closePasswordPopup = function() {
+        if (modalOverlay && modalOverlay.parentNode) {
+            modalOverlay.remove();
+        }
+        delete window.closePasswordPopup;
+    };
+    
+    // Close on Escape key
+    const escapeHandler = function(e) {
+        if (e.key === 'Escape') {
+            if (modalOverlay && modalOverlay.parentNode) {
+                modalOverlay.remove();
+                delete window.closePasswordPopup;
+            }
+            document.removeEventListener('keydown', escapeHandler);
+        }
+    };
+    document.addEventListener('keydown', escapeHandler);
+}
     </script>
 </body>
 </html>
