@@ -884,7 +884,7 @@ function hasDirector($costCentersList) {
             }
         });
 
-     // Function to open password change modal
+    // Function to open password change modal
 function openPasswordModal() {
     // Check if modal already exists
     if (document.getElementById('passwordModalOverlay')) {
@@ -909,7 +909,7 @@ function openPasswordModal() {
     
     // Create iframe to load the password change page
     const iframe = document.createElement('iframe');
-    iframe.src = '../change_password.php';  // Note: path goes up one level from director folder
+    iframe.src = '../change_password.php';
     iframe.style.cssText = `
         width: 100%;
         max-width: 450px;
