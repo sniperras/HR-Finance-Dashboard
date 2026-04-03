@@ -25,75 +25,38 @@ if (!$isAdminDirector) {
     exit();
 }
 
+// Define all departments (including PSCM)
+$allDepartments = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'PSCM', 'MRO HR', 'MD/DIV.', 'Remainder'];
 
-// Define all departments
-$allDepartments = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'MRO HR', 'MD/DIV.', 'Remainder'];
+// Get dynamic indicators from mro_cpr_report
+$indicatorsQuery = "SELECT DISTINCT report_type FROM mro_cpr_report ORDER BY report_type";
+$indicatorsResult = $conn->query($indicatorsQuery);
 
-// Define all indicators with their display names
-$indicators = [
-    // 'Team Leaders Clock-in Data' => [
-    //     'display_name' => 'Team Leaders Clock-in',
-    //     'short_name' => 'Clock-in',
-    //     'id' => 'ind_clockin'
-    // ],
-    'Crew Meeting Minutes Submission' => [
-        'display_name' => 'Crew Meeting Minutes',
-        'short_name' => 'Meeting Minutes',
-        'id' => 'ind_meeting'
-    ],
-    'Exceptional Customer Experience Training' => [
-        'display_name' => 'Customer Exp. Training',
-        'short_name' => 'Cust. Training',
-        'id' => 'ind_training'
-    ],
-    'CPR' => [
-        'display_name' => 'CPR',
-        'short_name' => 'CPR',
-        'id' => 'ind_cpr'
-    ],
-    '2025/26 1st Semiannual BSCI/ISC Target Status' => [
-        'display_name' => 'BSCI/ISC Target',
-        'short_name' => 'BSCI Target',
-        'id' => 'ind_bsci'
-    ],
-    'Activity Report Submission' => [
-        'display_name' => 'Activity Report',
-        'short_name' => 'Activity',
-        'id' => 'ind_activity'
-    ],
-    'Cost Saving Report Submission' => [
-        'display_name' => 'Cost Saving Report',
-        'short_name' => 'Cost Saving',
-        'id' => 'ind_cost'
-    ],
-    'Lost Time Justification' => [
-        'display_name' => 'Lost Time Justification',
-        'short_name' => 'Lost Time',
-        'id' => 'ind_losttime'
-    ],
-    'Attendance Approval Status' => [
-        'display_name' => 'Attendance Approval',
-        'short_name' => 'Attendance',
-        'id' => 'ind_attendance'
-    ],
-    'Productivity' => [
-        'display_name' => 'Productivity',
-        'short_name' => 'Productivity',
-        'id' => 'ind_productivity'
-    ],
-    'Employees Training Gap Clearance' => [
-        'display_name' => 'Training Gap',
-        'short_name' => 'Training',
-        'id' => 'ind_traininggap'
-    ],
-    'Employees Issue Resolution Rate' => [
-        'display_name' => 'Issue Resolution',
-        'short_name' => 'Issue Res.',
-        'id' => 'ind_issue'
-    ]
-];
+$indicators = [];
+if ($indicatorsResult && $indicatorsResult->num_rows > 0) {
+    while ($row = $indicatorsResult->fetch_assoc()) {
+        $reportType = $row['report_type'];
+        $indicators[$reportType] = [
+            'display_name' => $reportType,
+            'short_name' => strlen($reportType) > 25 ? substr($reportType, 0, 22) . '...' : $reportType,
+            'id' => 'ind_' . preg_replace('/[^a-zA-Z0-9]/', '_', $reportType)
+        ];
+    }
+} else {
+    // Fallback to performance_indicators table
+    $fallbackQuery = "SELECT DISTINCT TRIM(indicator_name) as indicator_name FROM performance_indicators ORDER BY indicator_name";
+    $fallbackResult = $conn->query($fallbackQuery);
+    while ($row = $fallbackResult->fetch_assoc()) {
+        $indicatorName = $row['indicator_name'];
+        $indicators[$indicatorName] = [
+            'display_name' => $indicatorName,
+            'short_name' => strlen($indicatorName) > 25 ? substr($indicatorName, 0, 22) . '...' : $indicatorName,
+            'id' => 'ind_' . preg_replace('/[^a-zA-Z0-9]/', '_', $indicatorName)
+        ];
+    }
+}
 
-// Color mapping for departments
+// Color mapping for departments (added PSCM)
 $departmentColors = [
     'BMT' => '#00ADB5',
     'LMT' => '#4ECDC4',
@@ -102,49 +65,82 @@ $departmentColors = [
     'AEP' => '#FFEAA7',
     'MSM' => '#DDA0DD',
     'QA' => '#98D8C8',
+    'PSCM' => '#FF6B6B',
     'MRO HR' => '#F7B05E',
     'MD/DIV.' => '#E67E22',
     'Remainder' => '#95A5A6'
 ];
 
-// Fetch actual data from database for the selected month
+// Fetch actual data from mro_cpr_report for the selected month
 $dbData = [];
-$query = "SELECT indicator_name, department, percentage_achievement, actual_value, target_value, id
-          FROM master_performance_data 
-          WHERE data_month = ? AND verification_status = 'verified'";
+$query = "SELECT report_type as indicator_name, department, percentage, expected, completed 
+          FROM mro_cpr_report 
+          WHERE report_month = ? AND report_year = ? AND cost_center_code = 'DIR'";
 
+$year = date('Y', strtotime($dataMonth));
+$month = date('m', strtotime($dataMonth));
 $stmt = $conn->prepare($query);
-$stmt->bind_param("s", $dataMonth);
+$stmt->bind_param("ii", $month, $year);
 $stmt->execute();
 $result = $stmt->get_result();
 
 while ($row = $result->fetch_assoc()) {
     $indicator = $row['indicator_name'];
     $dept = $row['department'];
-    $percentage = round($row['percentage_achievement'], 1);
+    $percentage = round($row['percentage'], 1);
+    $actual = $row['completed'];
+    $target = $row['expected'];
 
     if (!isset($dbData[$indicator])) {
         $dbData[$indicator] = [];
     }
     $dbData[$indicator][$dept] = [
         'percentage' => $percentage,
-        'actual' => $row['actual_value'],
-        'target' => $row['target_value'],
-        'record_id' => $row['id']
+        'actual' => $actual,
+        'target' => $target
     ];
 }
 $stmt->close();
+
+// Also fetch from master_performance_data for fallback
+$masterQuery = "SELECT indicator_name, department, percentage_achievement, actual_value, target_value
+                FROM master_performance_data 
+                WHERE data_month = ? AND verification_status = 'verified'";
+$masterStmt = $conn->prepare($masterQuery);
+$masterStmt->bind_param("s", $dataMonth);
+$masterStmt->execute();
+$masterResult = $masterStmt->get_result();
+
+while ($row = $masterResult->fetch_assoc()) {
+    $indicator = $row['indicator_name'];
+    $dept = $row['department'];
+    $percentage = round($row['percentage_achievement'], 1);
+    
+    if (!isset($dbData[$indicator]) || !isset($dbData[$indicator][$dept])) {
+        if (!isset($dbData[$indicator])) {
+            $dbData[$indicator] = [];
+        }
+        $dbData[$indicator][$dept] = [
+            'percentage' => $percentage,
+            'actual' => $row['actual_value'],
+            'target' => $row['target_value']
+        ];
+    }
+}
+$masterStmt->close();
 
 // Calculate overall percentages and prepare data for display
 $metricsData = [];
 foreach ($indicators as $indicatorKey => $indicatorInfo) {
     $departmentData = [];
-    $departmentRecordIds = [];
+    $departmentActuals = [];
+    $departmentTargets = [];
 
     if (isset($dbData[$indicatorKey]) && !empty($dbData[$indicatorKey])) {
         foreach ($dbData[$indicatorKey] as $dept => $values) {
             $departmentData[$dept] = $values['percentage'];
-            $departmentRecordIds[$dept] = $values['record_id'];
+            $departmentActuals[$dept] = $values['actual'];
+            $departmentTargets[$dept] = $values['target'];
         }
 
         if (!empty($departmentData)) {
@@ -155,10 +151,12 @@ foreach ($indicators as $indicatorKey => $indicatorInfo) {
     } else {
         $overall = 0;
         $departmentData = [];
-        $departmentRecordIds = [];
+        $departmentActuals = [];
+        $departmentTargets = [];
         foreach ($allDepartments as $dept) {
             $departmentData[$dept] = 0;
-            $departmentRecordIds[$dept] = null;
+            $departmentActuals[$dept] = null;
+            $departmentTargets[$dept] = null;
         }
     }
 
@@ -168,7 +166,8 @@ foreach ($indicators as $indicatorKey => $indicatorInfo) {
         'id' => $indicatorInfo['id'],
         'overall' => $overall,
         'departments' => $departmentData,
-        'record_ids' => $departmentRecordIds
+        'actuals' => $departmentActuals,
+        'targets' => $departmentTargets
     ];
 }
 
@@ -484,9 +483,14 @@ $conn->close();
             border-radius: 6px;
         }
 
-        .dept-bar-item:hover {
+        .dept-bar-item.clickable:hover {
             background: rgba(56, 189, 248, 0.1);
             transform: translateX(3px);
+        }
+
+        .dept-bar-item.disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
         }
 
         .dept-bar-label {
@@ -555,30 +559,99 @@ $conn->close();
             }
         }
 
-        [data-tooltip] {
-            position: relative;
-            cursor: help;
-        }
-
-        [data-tooltip]:before {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--dark-bg);
-            color: var(--text-primary);
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.6rem;
-            white-space: nowrap;
-            z-index: 1000;
+        /* Modal Styles */
+        .modal {
             display: none;
-            pointer-events: none;
+            position: fixed;
+            z-index: 1001;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            align-items: center;
+            justify-content: center;
         }
 
-        [data-tooltip]:hover:before {
-            display: block;
+        .modal-content {
+            background: var(--medium-bg);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid var(--border-light);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid var(--accent);
+            position: sticky;
+            top: 0;
+            background: var(--medium-bg);
+        }
+
+        .modal-header h3 {
+            color: var(--accent);
+            font-size: 0.9rem;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .close-modal:hover {
+            color: var(--danger);
+        }
+
+        .detail-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .detail-table th,
+        .detail-table td {
+            padding: 0.6rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-light);
+            font-size: 0.7rem;
+        }
+
+        .detail-table th {
+            background: var(--dark-bg);
+            color: var(--accent);
+            font-weight: bold;
+            position: sticky;
+            top: 60px;
+        }
+
+        .detail-table tr:hover {
+            background: rgba(56, 189, 248, 0.05);
+        }
+
+        .director-row {
+            background: rgba(16, 185, 129, 0.1);
+            font-weight: bold;
+        }
+
+        .progress-bar-modal {
+            width: 80px;
+            height: 6px;
+            background: var(--dark-bg);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill-modal {
+            height: 100%;
+            border-radius: 3px;
         }
 
         ::-webkit-scrollbar {
@@ -649,33 +722,19 @@ $conn->close();
 
 <body>
     <nav class="navbar">
-    <div class="navbar-container">
-        <a href="md_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
-        <div class="navbar-menu">
-            <?php 
-            $isAdminDirector = ($_SESSION['username'] === 'director_admin' && $_SESSION['user_role'] === 'director');
-            ?>
-            
-            <!-- Always show Dashboard -->
-            <a href="md_dashboard.php" style="color: var(--accent);">Dashboard</a>
-            
-            <!-- Show these only for non-admin directors -->
-            <?php if (!$isAdminDirector): ?>
-                <a href="../admin/master_data.php">Master Data</a>
-                <a href="../admin/report_mro_cpr.php">Director Data Entry</a>
-                <!-- <a href="../admin/verify_data.php">Verify</a> -->
-                <a href="../admin/data_history.php">History</a>
-            <?php endif; ?>
-            
-            <div class="user-info">
-                <button id="themeToggle" class="theme-toggle">☀️ Light</button>
-                <span class="user-name">👤 <?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
-                <a href="#" onclick="openPasswordModal(); return false;" style="cursor: pointer;">🔑 Change Password</a>
-                <a href="../logout.php" class="btn">Logout</a>
+        <div class="navbar-container">
+            <a href="md_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
+            <div class="navbar-menu">
+                <a href="md_dashboard.php" style="color: var(--accent);">Dashboard</a>
+                <div class="user-info">
+                    <button id="themeToggle" class="theme-toggle">☀️ Light</button>
+                    <span class="user-name">👤 <?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
+                    <a href="#" onclick="openPasswordModal(); return false;" style="cursor: pointer;">🔑 Change Password</a>
+                    <a href="../logout.php" class="btn">Logout</a>
+                </div>
             </div>
         </div>
-    </div>
-</nav>
+    </nav>
 
     <div class="container">
         <div class="dashboard-header">
@@ -688,11 +747,24 @@ $conn->close();
         </div>
 
         <div class="welcome-banner">
-            <strong>Managing Director</strong> - Viewing all departments performance metrics | Click on any metric or department for detailed report
+            <strong>Managing Director</strong> - Viewing all departments performance metrics | Click on any department bar for detailed report
         </div>
 
         <div id="dashboard-content">
             <div class="spinner"></div>
+        </div>
+    </div>
+
+    <!-- Department Detail Modal -->
+    <div id="deptModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="deptModalTitle">Department Details</h3>
+                <button class="close-modal" onclick="closeDeptModal()">&times;</button>
+            </div>
+            <div id="deptModalBody" style="padding: 1rem;">
+                <div class="spinner"></div>
+            </div>
         </div>
     </div>
 
@@ -747,6 +819,12 @@ $conn->close();
         const metricsData = <?php echo json_encode($metricsData); ?>;
         const departmentColors = <?php echo json_encode($departmentColors); ?>;
         const currentMonth = '<?php echo $currentMonth; ?>';
+        const currentYear = '<?php echo date('Y', strtotime($dataMonth)); ?>';
+        const currentMonthNum = '<?php echo date('m', strtotime($dataMonth)); ?>';
+        const allDepartments = <?php echo json_encode($allDepartments); ?>;
+
+        // Departments that are NOT clickable (MD/DIV. and Remainder)
+        const nonClickableDepts = ['MD/DIV.', 'Remainder'];
 
         // Function to get color based on percentage
         function getScoreColor(percentage) {
@@ -755,29 +833,145 @@ $conn->close();
             return '#EF4444';
         }
 
-        // Function to handle click on indicator
-        function onIndicatorClick(indicatorKey, indicatorName) {
-            sessionStorage.setItem('selectedIndicator', indicatorKey);
-            sessionStorage.setItem('selectedIndicatorName', indicatorName);
-            sessionStorage.setItem('selectedMonth', currentMonth);
-            window.location.href = `indicator_detail.php?indicator=${encodeURIComponent(indicatorKey)}&month=${currentMonth}`;
+        // Function to show department details modal
+        async function showDepartmentDetails(department, indicatorKey, indicatorName) {
+            const modal = document.getElementById('deptModal');
+            const modalTitle = document.getElementById('deptModalTitle');
+            const modalBody = document.getElementById('deptModalBody');
+            
+            modalTitle.innerHTML = `${department} Department - ${indicatorName} Details`;
+            modalBody.innerHTML = '<div class="spinner"></div>';
+            modal.style.display = 'flex';
+            
+            try {
+                // Fetch data for this department and indicator from mro_cpr_report
+                const response = await fetch(`get_dept_indicator_data.php?dept=${encodeURIComponent(department)}&indicator=${encodeURIComponent(indicatorKey)}&month=${currentMonthNum}&year=${currentYear}`);
+                const data = await response.json();
+                
+                if (data.success && data.data.length > 0) {
+                    let tableHtml = `
+                        <table class="detail-table">
+                            <thead>
+                                <tr>
+                                    <th>Cost Center</th>
+                                    <th>Expected Tasks</th>
+                                    <th>Completed Tasks</th>
+                                    <th>Not Completed</th>
+                                    <th>Completion %</th>
+                                    <th>Progress</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+                    
+                    let totalExpected = 0;
+                    let totalCompleted = 0;
+                    let directorData = null;
+                    
+                    for (const record of data.data) {
+                        const expected = parseInt(record.expected) || 0;
+                        const completed = parseInt(record.completed) || 0;
+                        const percentage = parseFloat(record.percentage) || 0;
+                        const notCompleted = expected - completed;
+                        const percentageColor = getScoreColor(percentage);
+                        
+                        if (record.cost_center_code === 'DIR') {
+                            directorData = record;
+                        } else {
+                            totalExpected += expected;
+                            totalCompleted += completed;
+                        }
+                        
+                        tableHtml += `
+                            <tr>
+                                <td>${record.cost_center_text || record.cost_center_code}</td>
+                                <td>${expected}</td>
+                                <td>${completed}</td>
+                                <td>${notCompleted}</td>
+                                <td style="color: ${percentageColor}; font-weight: bold;">${percentage}%</td>
+                                <td>
+                                    <div class="progress-bar-modal">
+                                        <div class="progress-fill-modal" style="width: ${percentage}%; background: ${percentageColor};"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    }
+                    
+                    // Add director/total row
+                    if (directorData) {
+                        const dirExpected = parseInt(directorData.expected) || 0;
+                        const dirCompleted = parseInt(directorData.completed) || 0;
+                        const dirPercentage = parseFloat(directorData.percentage) || 0;
+                        const dirNotCompleted = dirExpected - dirCompleted;
+                        const dirColor = getScoreColor(dirPercentage);
+                        
+                        tableHtml += `
+                            <tr class="director-row">
+                                <td><strong>${directorData.cost_center_text || 'Director/Total'}</strong></td>
+                                <td><strong>${dirExpected}</strong></td>
+                                <td><strong>${dirCompleted}</strong></td>
+                                <td><strong>${dirNotCompleted}</strong></td>
+                                <td style="color: ${dirColor}; font-weight: bold;"><strong>${dirPercentage}%</strong></td>
+                                <td>
+                                    <div class="progress-bar-modal">
+                                        <div class="progress-fill-modal" style="width: ${dirPercentage}%; background: ${dirColor};"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    } else if (totalExpected > 0) {
+                        const totalPercentage = (totalCompleted / totalExpected) * 100;
+                        const totalColor = getScoreColor(totalPercentage);
+                        const totalNotCompleted = totalExpected - totalCompleted;
+                        
+                        tableHtml += `
+                            <tr class="director-row">
+                                <td><strong>TOTAL (Calculated)</strong></td>
+                                <td><strong>${totalExpected}</strong></td>
+                                <td><strong>${totalCompleted}</strong></td>
+                                <td><strong>${totalNotCompleted}</strong></td>
+                                <td style="color: ${totalColor}; font-weight: bold;"><strong>${totalPercentage.toFixed(1)}%</strong></td>
+                                <td>
+                                    <div class="progress-bar-modal">
+                                        <div class="progress-fill-modal" style="width: ${totalPercentage}%; background: ${totalColor};"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    }
+                    
+                    tableHtml += `
+                            </tbody>
+                        </table>
+                    `;
+                    
+                    modalBody.innerHTML = tableHtml;
+                } else {
+                    modalBody.innerHTML = '<div class="no-data">No data available for this department and indicator.</div>';
+                }
+            } catch (error) {
+                console.error('Error fetching department data:', error);
+                modalBody.innerHTML = '<div class="no-data">Error loading data. Please try again.</div>';
+            }
+        }
+        
+        function closeDeptModal() {
+            document.getElementById('deptModal').style.display = 'none';
         }
 
         // Function to handle click on department
-        function onDepartmentClick(department, indicatorKey, recordId, actualValue, targetValue, percentage) {
-            sessionStorage.setItem('selectedDepartment', department);
-            sessionStorage.setItem('selectedIndicator', indicatorKey);
-            sessionStorage.setItem('selectedRecordId', recordId);
-            sessionStorage.setItem('selectedMonth', currentMonth);
-            sessionStorage.setItem('actualValue', actualValue);
-            sessionStorage.setItem('targetValue', targetValue);
-            sessionStorage.setItem('percentageValue', percentage);
-            window.location.href = `department_detail.php?dept=${encodeURIComponent(department)}&indicator=${encodeURIComponent(indicatorKey)}&record=${recordId}&month=${currentMonth}`;
+        function onDepartmentClick(department, indicatorKey, indicatorName) {
+            // Check if department is clickable (exclude MD/DIV. and Remainder)
+            if (nonClickableDepts.includes(department)) {
+                return;
+            }
+            showDepartmentDetails(department, indicatorKey, indicatorName);
         }
 
         let chartInstances = {};
 
-        function createPieChart(canvasId, percentage, metricName) {
+        function createPieChart(canvasId, percentage, metricName, indicatorKey) {
             const ctx = document.getElementById(canvasId);
             if (!ctx) return null;
 
@@ -811,15 +1005,12 @@ $conn->close();
                                 }
                             }
                         }
-                    },
-                    onClick: function() {
-                        onIndicatorClick(metricName.replace(/\s+/g, '-').toLowerCase(), metricName);
                     }
                 }
             });
         }
 
-        function renderDepartmentBars(containerId, departments, indicatorKey) {
+        function renderDepartmentBars(containerId, departments, indicatorKey, indicatorName, actuals, targets) {
             const container = document.getElementById(containerId);
             if (!container) return;
 
@@ -834,15 +1025,26 @@ $conn->close();
                 const barWidth = Math.min(percentageValue, 100);
                 const color = departmentColors[dept] || '#38BDF8';
                 const scoreColor = getScoreColor(percentageValue);
-
+                const isClickable = !nonClickableDepts.includes(dept);
+                const clickableClass = isClickable ? 'clickable' : 'disabled';
+                const onclickAttr = isClickable ? `onclick="onDepartmentClick('${dept}', '${indicatorKey}', '${indicatorName}')"` : '';
+                
+                // Get actual and target values
+                const actualVal = actuals[dept] !== undefined && actuals[dept] !== null ? actuals[dept] : '-';
+                const targetVal = targets[dept] !== undefined && targets[dept] !== null ? targets[dept] : '-';
+                
                 html += `
-                    <div class="dept-bar-item" onclick="onDepartmentClick('${dept}', '${indicatorKey}', null, ${percentageValue}, 100, ${percentageValue})">
+                    <div class="dept-bar-item ${clickableClass}" ${onclickAttr}>
                         <div class="dept-bar-label">
                             <span class="dept-name" style="color: ${color};">${dept}</span>
                             <span class="dept-percentage" style="color: ${scoreColor};">${percentageValue}%</span>
                         </div>
                         <div class="dept-bar-container">
                             <div class="dept-bar-fill" style="width: ${barWidth}%; background: ${color};"></div>
+                        </div>
+                        <div style="font-size: 0.55rem; margin-top: 0.2rem; display: flex; justify-content: space-between;">
+                            <span>Actual: ${actualVal}</span>
+                            <span>Target: ${targetVal}</span>
                         </div>
                     </div>
                 `;
@@ -863,7 +1065,7 @@ $conn->close();
             }
 
             if (!hasData) {
-                container.innerHTML = `<div class="no-data"><h4>📭 No Performance Data Available</h4><p>No verified data for ${document.getElementById('current-month').innerText}</p></div>`;
+                container.innerHTML = `<div class="no-data"><h4>📭 No Performance Data Available</h4><p>No data for ${document.getElementById('current-month').innerText}</p></div>`;
                 return;
             }
 
@@ -871,18 +1073,18 @@ $conn->close();
             metricsGrid.className = 'metrics-grid';
 
             for (const [metricKey, metric] of Object.entries(metricsData)) {
-                const chartId = `chart-${metricKey.replace(/\s+/g, '-').replace(/[\/]/g, '-')}`;
-                const barsId = `bars-${metricKey.replace(/\s+/g, '-').replace(/[\/]/g, '-')}`;
+                const chartId = `chart-${metric.id}`;
+                const barsId = `bars-${metric.id}`;
                 const overallColor = getScoreColor(metric.overall);
 
                 const card = document.createElement('div');
                 card.className = 'metric-card';
                 card.innerHTML = `
                     <div class="metric-header">
-                        <div class="metric-title" onclick="onIndicatorClick('${metricKey}', '${metric.display_name}')">${metric.display_name}</div>
-                        <div class="overall-score" style="color: ${overallColor};" onclick="onIndicatorClick('${metricKey}', '${metric.display_name}')">${metric.overall}%</div>
+                        <div class="metric-title">${metric.display_name}</div>
+                        <div class="overall-score" style="color: ${overallColor};">${metric.overall}%</div>
                     </div>
-                    <div class="chart-container" onclick="onIndicatorClick('${metricKey}', '${metric.display_name}')">
+                    <div class="chart-container">
                         <canvas id="${chartId}" width="180" height="140"></canvas>
                     </div>
                     <div id="${barsId}" class="dept-bars"></div>
@@ -890,9 +1092,9 @@ $conn->close();
                 metricsGrid.appendChild(card);
 
                 setTimeout(() => {
-                    const chart = createPieChart(chartId, metric.overall, metric.display_name);
+                    const chart = createPieChart(chartId, metric.overall, metric.display_name, metricKey);
                     if (chart) chartInstances[chartId] = chart;
-                    renderDepartmentBars(barsId, metric.departments, metricKey);
+                    renderDepartmentBars(barsId, metric.departments, metricKey, metric.display_name, metric.actuals || {}, metric.targets || {});
                 }, 10);
             }
             container.appendChild(metricsGrid);
@@ -920,76 +1122,78 @@ $conn->close();
             renderDashboard();
         });
 
-     // Function to open password change modal
-function openPasswordModal() {
-    // Check if modal already exists
-    if (document.getElementById('passwordModalOverlay')) {
-        return;
-    }
-    
-    // Create modal container
-    const modalOverlay = document.createElement('div');
-    modalOverlay.id = 'passwordModalOverlay';
-    modalOverlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        z-index: 10001;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
-    
-    // Create iframe to load the password change page
-    const iframe = document.createElement('iframe');
-    iframe.src = '../change_password.php';
-    iframe.style.cssText = `
-        width: 100%;
-        max-width: 450px;
-        height: auto;
-        min-height: 450px;
-        border: none;
-        border-radius: 16px;
-        background: transparent;
-    `;
-    
-    modalOverlay.appendChild(iframe);
-    document.body.appendChild(modalOverlay);
-    
-    // Store reference to close function
-    window.closePasswordPopup = function() {
-        if (modalOverlay && modalOverlay.parentNode) {
-            modalOverlay.remove();
-        }
-        delete window.closePasswordPopup;
-    };
-    
-    // Close on Escape key
-    const escapeHandler = function(e) {
-        if (e.key === 'Escape') {
-            if (modalOverlay && modalOverlay.parentNode) {
-                modalOverlay.remove();
-                delete window.closePasswordPopup;
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('deptModal');
+            if (event.target === modal) {
+                closeDeptModal();
             }
-            document.removeEventListener('keydown', escapeHandler);
         }
-    };
-    document.addEventListener('keydown', escapeHandler);
-}
 
-// Keep session alive by sending heartbeat every 5 minutes
-function keepSessionAlive() {
-    fetch('/HRandMDDash/keep_alive.php', {
-        method: 'GET',
-        cache: 'no-cache'
-    }).catch(error => console.log('Session keep-alive failed:', error));
-}
+        // Function to open password change modal
+        function openPasswordModal() {
+            if (document.getElementById('passwordModalOverlay')) {
+                return;
+            }
+            
+            const modalOverlay = document.createElement('div');
+            modalOverlay.id = 'passwordModalOverlay';
+            modalOverlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                z-index: 10001;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+            
+            const iframe = document.createElement('iframe');
+            iframe.src = '../change_password.php';
+            iframe.style.cssText = `
+                width: 100%;
+                max-width: 450px;
+                height: auto;
+                min-height: 450px;
+                border: none;
+                border-radius: 16px;
+                background: transparent;
+            `;
+            
+            modalOverlay.appendChild(iframe);
+            document.body.appendChild(modalOverlay);
+            
+            window.closePasswordPopup = function() {
+                if (modalOverlay && modalOverlay.parentNode) {
+                    modalOverlay.remove();
+                }
+                delete window.closePasswordPopup;
+            };
+            
+            const escapeHandler = function(e) {
+                if (e.key === 'Escape') {
+                    if (modalOverlay && modalOverlay.parentNode) {
+                        modalOverlay.remove();
+                        delete window.closePasswordPopup;
+                    }
+                    document.removeEventListener('keydown', escapeHandler);
+                }
+            };
+            document.addEventListener('keydown', escapeHandler);
+        }
 
-// Send heartbeat every 5 minutes
-setInterval(keepSessionAlive, 5 * 60 * 1000);
+        // Keep session alive by sending heartbeat every 5 minutes
+        function keepSessionAlive() {
+            fetch('/HRandMDDash/keep_alive.php', {
+                method: 'GET',
+                cache: 'no-cache'
+            }).catch(error => console.log('Session keep-alive failed:', error));
+        }
+
+        setInterval(keepSessionAlive, 5 * 60 * 1000);
     </script>
 </body>
 

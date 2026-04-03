@@ -5,27 +5,24 @@ requireRole('hr');
 $conn = getConnection();
 $currentMonth = $_GET['month'] ?? date('m');
 $currentYear = $_GET['year'] ?? date('Y');
-$selectedReport = $_GET['report'] ?? 'MRO CPR REPORT';
+$selectedReport = $_GET['report'] ?? '';
 $selectedDept = $_GET['department'] ?? '';
 
-// Get all available reports
-$reports = [
-    'MRO CPR REPORT' => 'MRO CPR Report',
-    'Crew Meeting Minutes Submission' => 'Crew Meeting Minutes Submission',
-    'Exceptional Customer Experience Training' => 'Exceptional Customer Experience Training',
-    '2025/26 1st Semiannual BSC/ISC Target Status' => '2025/26 1st Semiannual BSC/ISC Target Status',
-    '2025/26 1st Semiannual BSC/ISC Evaluation Status' => '2025/26 1st Semiannual BSC/ISC Evaluation Status',
-    'Activity Report Submission' => 'Activity Report Submission',
-    'Cost Saving Report Submission' => 'Cost Saving Report Submission',
-    'Lost time Justification' => 'Lost time Justification',
-    'Attendance Approval Status' => 'Attendance Approval Status',
-    'Productivity' => 'Productivity',
-    'Employees Training Gap Clearance' => 'Employees Training Gap Clearance',
-    'Employees Issue Resolution Rate' => 'Employees Issue Resolution Rate'
-];
+// Get all available reports from performance_indicators table
+$reportsQuery = "SELECT indicator_name FROM performance_indicators ORDER BY indicator_name";
+$reportsResult = $conn->query($reportsQuery);
+$reports = [];
+while ($row = $reportsResult->fetch_assoc()) {
+    $reports[$row['indicator_name']] = $row['indicator_name'];
+}
+
+// If no report selected and there are reports, select the first one
+if (empty($selectedReport) && !empty($reports)) {
+    $selectedReport = array_key_first($reports);
+}
 
 // Define departments
-$departments = ['ALL', 'BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'NSM', 'QA', 'PSCM'];
+$departments = ['ALL', 'BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'PSCM'];
 
 // Define cost centers for each department
 $costCenters = [
@@ -75,14 +72,13 @@ $costCenters = [
         ['code' => 'ADO', 'name' => 'MGR. A/C Design Organization', 'isDirector' => false],
         ['code' => 'DIR', 'name' => 'Dir. AEP', 'isDirector' => true],
     ],
-    'NSM' => [
+    'MSM' => [
         ['code' => 'MSM', 'name' => 'Mgr. MRO Sales and Marketing', 'isDirector' => false],
         ['code' => 'MCS', 'name' => 'Mgr. MRO Customer Support', 'isDirector' => false],
         ['code' => 'DIR', 'name' => 'Dir. MSM', 'isDirector' => true],
     ],
     'QA' => [
         ['code' => 'QAS', 'name' => 'Mgr. MRO Qty Ass & S/a', 'isDirector' => false],
-        // No DIR for QA - will show TOTAL row
     ],
     'PSCM' => [
         ['code' => 'GWC', 'name' => 'Mgr. Grp Warp Cont Mgt', 'isDirector' => false],
@@ -98,7 +94,7 @@ $costCenters = [
 
 // Fetch existing data if any
 $existingData = [];
-if ($selectedDept && $currentMonth && $currentYear) {
+if ($selectedDept && $currentMonth && $currentYear && $selectedReport) {
     $query = "SELECT * FROM mro_cpr_report
               WHERE report_type = ? AND report_month = ? AND report_year = ? AND department = ?";
     $stmt = $conn->prepare($query);
@@ -158,7 +154,7 @@ function hasDirector($costCentersList) {
             transition: background-color 0.3s, color 0.3s;
         }
 
-         .navbar {
+        .navbar {
             background: var(--medium-bg);
             padding: 0.5rem 0;
             transition: background-color 0.3s;
@@ -405,6 +401,17 @@ function hasDirector($costCentersList) {
             border: 1px solid var(--border-light);
         }
 
+        .refresh-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.3rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            margin-left: 0.5rem;
+        }
+
         /* Light Theme */
         body.light-theme {
             background: #F8FAFC;
@@ -518,8 +525,10 @@ function hasDirector($costCentersList) {
         <div class="filter-section">
             <form method="GET" action="" class="filter-form" id="filterForm">
                 <div class="filter-group">
-                    <label>Report Type</label>
-                    <select name="report" onchange="this.form.submit()">
+                    <label>Report Type 
+                        <button type="button" class="refresh-btn" onclick="refreshReports()" title="Refresh indicators from database">⟳</button>
+                    </label>
+                    <select name="report" id="reportSelect" onchange="this.form.submit()">
                         <?php foreach ($reports as $key => $name): ?>
                             <option value="<?php echo htmlspecialchars($key); ?>" <?php echo $selectedReport == $key ? 'selected' : ''; ?>>
                                 <?php echo htmlspecialchars($name); ?>
@@ -785,85 +794,131 @@ function hasDirector($costCentersList) {
         }
 
         function calculateDirectorAndTotals() {
-    const rows = document.querySelectorAll('#tableBody tr');
-    let totalExpected = 0;
-    let totalCompleted = 0;
-    let directorRow = null;
+            const rows = document.querySelectorAll('#tableBody tr');
+            let totalExpected = 0;
+            let totalCompleted = 0;
+            let directorRow = null;
 
-    rows.forEach(row => {
-        const isDirector = row.getAttribute('data-is-director') === 'true';
-        const expectedInput = row.querySelector('.expected-input');
-        const completedInput = row.querySelector('.completed-input');
-        
-        if (expectedInput && completedInput) {
-            if (!isDirector) {
-                // Sum up manager rows
-                totalExpected += parseInt(expectedInput.value) || 0;
-                totalCompleted += parseInt(completedInput.value) || 0;
-            } else {
-                directorRow = row;
+            rows.forEach(row => {
+                const isDirector = row.getAttribute('data-is-director') === 'true';
+                const expectedInput = row.querySelector('.expected-input');
+                const completedInput = row.querySelector('.completed-input');
+                
+                if (expectedInput && completedInput) {
+                    if (!isDirector) {
+                        totalExpected += parseInt(expectedInput.value) || 0;
+                        totalCompleted += parseInt(completedInput.value) || 0;
+                    } else {
+                        directorRow = row;
+                    }
+                }
+            });
+
+            if (directorRow) {
+                const directorExpected = directorRow.querySelector('.expected-input');
+                const directorCompleted = directorRow.querySelector('.completed-input');
+                const directorNotCompleted = directorRow.querySelector('.not-completed-cell');
+                const directorPercentageSpan = directorRow.querySelector('.percentage-value');
+                const directorProgressFill = directorRow.querySelector('.progress-fill');
+                
+                if (directorExpected && directorCompleted) {
+                    directorExpected.value = totalExpected;
+                    directorCompleted.value = totalCompleted;
+                    
+                    let notCompleted = Math.max(0, totalExpected - totalCompleted);
+                    let percentage = totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
+                    
+                    if (directorNotCompleted) directorNotCompleted.textContent = notCompleted;
+                    if (directorPercentageSpan) {
+                        directorPercentageSpan.textContent = percentage.toFixed(1);
+                        let color = percentage >= 90 ? '#10B981' : (percentage >= 70 ? '#F59E0B' : '#EF4444');
+                        directorPercentageSpan.parentElement.style.color = color;
+                    }
+                    if (directorProgressFill) {
+                        directorProgressFill.style.width = percentage + '%';
+                        let color = percentage >= 90 ? '#10B981' : (percentage >= 70 ? '#F59E0B' : '#EF4444');
+                        directorProgressFill.style.background = color;
+                    }
+                }
+            }
+
+            const totalRowExists = document.querySelector('tfoot .total-row');
+            if (totalRowExists) {
+                document.getElementById('total-expected').textContent = totalExpected;
+                document.getElementById('total-completed').textContent = totalCompleted;
+                document.getElementById('total-not-completed').textContent = totalExpected - totalCompleted;
+                
+                const totalPercentage = totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
+                const totalPercentSpan = document.querySelector('#total-percentage span');
+                if (totalPercentSpan) {
+                    totalPercentSpan.textContent = totalPercentage.toFixed(1);
+                    let color = totalPercentage >= 90 ? '#10B981' : (totalPercentage >= 70 ? '#F59E0B' : '#EF4444');
+                    totalPercentSpan.style.color = color;
+                }
+                
+                const totalProgressFill = document.querySelector('#total-percentage + td .progress-fill');
+                if (totalProgressFill) {
+                    totalProgressFill.style.width = totalPercentage + '%';
+                    let color = totalPercentage >= 90 ? '#10B981' : (totalPercentage >= 70 ? '#F59E0B' : '#EF4444');
+                    totalProgressFill.style.background = color;
+                }
             }
         }
-    });
 
-    // Update director row if it exists
-    if (directorRow) {
-        const directorExpected = directorRow.querySelector('.expected-input');
-        const directorCompleted = directorRow.querySelector('.completed-input');
-        const directorNotCompleted = directorRow.querySelector('.not-completed-cell');
-        const directorPercentageSpan = directorRow.querySelector('.percentage-value');
-        const directorProgressFill = directorRow.querySelector('.progress-fill');
-        
-        if (directorExpected && directorCompleted) {
-            // Update the values - these will be submitted because inputs are readonly (not disabled)
-            directorExpected.value = totalExpected;
-            directorCompleted.value = totalCompleted;
-            
-            let notCompleted = Math.max(0, totalExpected - totalCompleted);
-            let percentage = totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
-            
-            if (directorNotCompleted) directorNotCompleted.textContent = notCompleted;
-            if (directorPercentageSpan) {
-                directorPercentageSpan.textContent = percentage.toFixed(1);
-                let color = percentage >= 90 ? '#10B981' : (percentage >= 70 ? '#F59E0B' : '#EF4444');
-                directorPercentageSpan.parentElement.style.color = color;
-            }
-            if (directorProgressFill) {
-                directorProgressFill.style.width = percentage + '%';
-                let color = percentage >= 90 ? '#10B981' : (percentage >= 70 ? '#F59E0B' : '#EF4444');
-                directorProgressFill.style.background = color;
-            }
+        function refreshReports() {
+            // AJAX call to refresh the report dropdown without page reload
+            fetch('get_indicators.php')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.indicators) {
+                        const reportSelect = document.getElementById('reportSelect');
+                        const currentValue = reportSelect.value;
+                        
+                        // Clear existing options
+                        reportSelect.innerHTML = '';
+                        
+                        // Add new options
+                        data.indicators.forEach(indicator => {
+                            const option = document.createElement('option');
+                            option.value = indicator;
+                            option.textContent = indicator;
+                            if (indicator === currentValue) {
+                                option.selected = true;
+                            }
+                            reportSelect.appendChild(option);
+                        });
+                        
+                        // Show success message
+                        const msgDiv = document.getElementById('message');
+                        if (msgDiv) {
+                            msgDiv.innerHTML = `<div class="alert alert-success">✓ Indicators refreshed from database (${data.indicators.length} indicators)</div>`;
+                            setTimeout(() => {
+                                msgDiv.innerHTML = '';
+                            }, 3000);
+                        }
+                        
+                        // If the current selected value is no longer available, submit the form to reload
+                        if (!data.indicators.includes(currentValue) && data.indicators.length > 0) {
+                            reportSelect.value = data.indicators[0];
+                            reportSelect.form.submit();
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error refreshing indicators:', error);
+                    const msgDiv = document.getElementById('message');
+                    if (msgDiv) {
+                        msgDiv.innerHTML = `<div class="alert alert-error">✗ Failed to refresh indicators</div>`;
+                        setTimeout(() => {
+                            msgDiv.innerHTML = '';
+                        }, 3000);
+                    }
+                });
         }
-    }
-
-    // Update TOTAL row if it exists (for departments without director)
-    const totalRowExists = document.querySelector('tfoot .total-row');
-    if (totalRowExists) {
-        document.getElementById('total-expected').textContent = totalExpected;
-        document.getElementById('total-completed').textContent = totalCompleted;
-        document.getElementById('total-not-completed').textContent = totalExpected - totalCompleted;
-        
-        const totalPercentage = totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
-        const totalPercentSpan = document.querySelector('#total-percentage span');
-        if (totalPercentSpan) {
-            totalPercentSpan.textContent = totalPercentage.toFixed(1);
-            let color = totalPercentage >= 90 ? '#10B981' : (totalPercentage >= 70 ? '#F59E0B' : '#EF4444');
-            totalPercentSpan.style.color = color;
-        }
-        
-        const totalProgressFill = document.querySelector('#total-percentage + td .progress-fill');
-        if (totalProgressFill) {
-            totalProgressFill.style.width = totalPercentage + '%';
-            let color = totalPercentage >= 90 ? '#10B981' : (totalPercentage >= 70 ? '#F59E0B' : '#EF4444');
-            totalProgressFill.style.background = color;
-        }
-    }
-}
 
         document.addEventListener('DOMContentLoaded', function() {
             new ThemeManager();
 
-            // Add event listeners to all manager inputs
             document.querySelectorAll('#tableBody tr .expected-input, #tableBody tr .completed-input').forEach(input => {
                 if (!input.disabled) {
                     input.addEventListener('input', function() {
@@ -874,7 +929,6 @@ function hasDirector($costCentersList) {
                 }
             });
 
-            // Initial calculations
             document.querySelectorAll('#tableBody tr').forEach(row => {
                 if (row.getAttribute('data-is-director') !== 'true') {
                     calculateRow(row);
@@ -893,76 +947,68 @@ function hasDirector($costCentersList) {
             }
         });
 
-    // Function to open password change modal
-function openPasswordModal() {
-    // Check if modal already exists
-    if (document.getElementById('passwordModalOverlay')) {
-        return;
-    }
-    
-    // Create modal container
-    const modalOverlay = document.createElement('div');
-    modalOverlay.id = 'passwordModalOverlay';
-    modalOverlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        z-index: 10001;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
-    
-    // Create iframe to load the password change page
-    const iframe = document.createElement('iframe');
-    iframe.src = '../change_password.php';
-    iframe.style.cssText = `
-        width: 100%;
-        max-width: 450px;
-        height: auto;
-        min-height: 450px;
-        border: none;
-        border-radius: 16px;
-        background: transparent;
-    `;
-    
-    modalOverlay.appendChild(iframe);
-    document.body.appendChild(modalOverlay);
-    
-    // Store reference to close function
-    window.closePasswordPopup = function() {
-        if (modalOverlay && modalOverlay.parentNode) {
-            modalOverlay.remove();
-        }
-        delete window.closePasswordPopup;
-    };
-    
-    // Close on Escape key
-    const escapeHandler = function(e) {
-        if (e.key === 'Escape') {
-            if (modalOverlay && modalOverlay.parentNode) {
-                modalOverlay.remove();
-                delete window.closePasswordPopup;
+        function openPasswordModal() {
+            if (document.getElementById('passwordModalOverlay')) {
+                return;
             }
-            document.removeEventListener('keydown', escapeHandler);
+            
+            const modalOverlay = document.createElement('div');
+            modalOverlay.id = 'passwordModalOverlay';
+            modalOverlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                z-index: 10001;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+            
+            const iframe = document.createElement('iframe');
+            iframe.src = '../change_password.php';
+            iframe.style.cssText = `
+                width: 100%;
+                max-width: 450px;
+                height: auto;
+                min-height: 450px;
+                border: none;
+                border-radius: 16px;
+                background: transparent;
+            `;
+            
+            modalOverlay.appendChild(iframe);
+            document.body.appendChild(modalOverlay);
+            
+            window.closePasswordPopup = function() {
+                if (modalOverlay && modalOverlay.parentNode) {
+                    modalOverlay.remove();
+                }
+                delete window.closePasswordPopup;
+            };
+            
+            const escapeHandler = function(e) {
+                if (e.key === 'Escape') {
+                    if (modalOverlay && modalOverlay.parentNode) {
+                        modalOverlay.remove();
+                        delete window.closePasswordPopup;
+                    }
+                    document.removeEventListener('keydown', escapeHandler);
+                }
+            };
+            document.addEventListener('keydown', escapeHandler);
         }
-    };
-    document.addEventListener('keydown', escapeHandler);
-}
 
-// Keep session alive by sending heartbeat every 5 minutes
-function keepSessionAlive() {
-    fetch('/HRandMDDash/keep_alive.php', {
-        method: 'GET',
-        cache: 'no-cache'
-    }).catch(error => console.log('Session keep-alive failed:', error));
-}
+        function keepSessionAlive() {
+            fetch('/HRandMDDash/keep_alive.php', {
+                method: 'GET',
+                cache: 'no-cache'
+            }).catch(error => console.log('Session keep-alive failed:', error));
+        }
 
-// Send heartbeat every 5 minutes
-setInterval(keepSessionAlive, 5 * 60 * 1000);
+        setInterval(keepSessionAlive, 5 * 60 * 1000);
     </script>
 </body>
 

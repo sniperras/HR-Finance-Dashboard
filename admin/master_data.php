@@ -1,12 +1,15 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 require_once '../session_config.php';
 require_once '../includes/auth.php';
 requireRole('hr');
 
 $conn = getConnection();
 
-// Force clean duplicates on every page load for RamsisE
-if ($_SESSION['username'] === 'RamsisE') {
+// Force clean duplicates on every page load for RamsisE and mgrhr_mro to ensure data integrity
+if ($_SESSION['username'] === 'RamsisE' || $_SESSION['username'] === 'mgrhr_mro') {
     // First, update all master_performance_data to use the latest name for each indicator
     $syncQuery = "
         UPDATE master_performance_data mpd
@@ -31,6 +34,103 @@ if ($_SESSION['username'] === 'RamsisE') {
         AND LOWER(TRIM(p1.indicator_name)) = LOWER(TRIM(p2.indicator_name))
     ";
     $conn->query($cleanQuery);
+}
+
+// Function to sync data from mro_cpr_report to master_performance_data
+// Function to sync data from mro_cpr_report to master_performance_data
+function syncFromMroCprReport($conn, $indicatorName, $month, $year) {
+    $dataMonth = $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT) . '-01';
+    $currentDateForComparison = date('Y-m') . '-01';
+    
+    // Only sync for current and future months
+    if ($dataMonth >= $currentDateForComparison) {
+        // Get the DIRECTOR row data for each department (cost_center_code = 'DIR')
+        $query = "SELECT department, expected, completed, percentage 
+                  FROM mro_cpr_report 
+                  WHERE report_type = ? AND report_month = ? AND report_year = ? 
+                  AND cost_center_code = 'DIR'
+                  GROUP BY department";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("sii", $indicatorName, $month, $year);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        while ($row = $result->fetch_assoc()) {
+            $department = $row['department'];
+            $totalExpected = (float)$row['expected'];
+            $totalCompleted = (float)$row['completed'];
+            $percentage = (float)$row['percentage'];
+            
+            // Check if record exists in master_performance_data
+            $checkStmt = $conn->prepare("SELECT id FROM master_performance_data 
+                                          WHERE indicator_name = ? AND department = ? AND data_month = ?");
+            $checkStmt->bind_param("sss", $indicatorName, $department, $dataMonth);
+            $checkStmt->execute();
+            $checkResult = $checkStmt->get_result();
+            
+            if ($checkResult->num_rows > 0) {
+                // Update existing record
+                $updateStmt = $conn->prepare("UPDATE master_performance_data 
+                                              SET target_value = ?, actual_value = ?, percentage_achievement = ?, 
+                                                  updated_at = NOW(), updated_by = ?
+                                              WHERE indicator_name = ? AND department = ? AND data_month = ?");
+                $updateStmt->bind_param("dddisss", $totalExpected, $totalCompleted, $percentage, 
+                                        $_SESSION['user_id'], $indicatorName, $department, $dataMonth);
+                $updateStmt->execute();
+                $updateStmt->close();
+            } else {
+                // Insert new record
+                $insertStmt = $conn->prepare("INSERT INTO master_performance_data 
+                                              (indicator_name, department, target_value, actual_value, 
+                                               percentage_achievement, data_month, created_by, created_at, updated_by, updated_at)
+                                              VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, NOW())");
+                $insertStmt->bind_param("ssdddssi", $indicatorName, $department, $totalExpected, $totalCompleted, 
+                                        $percentage, $dataMonth, $_SESSION['user_id'], $_SESSION['user_id']);
+                $insertStmt->execute();
+                $insertStmt->close();
+            }
+            $checkStmt->close();
+        }
+        $stmt->close();
+    }
+}
+
+// Sync all data when page loads (for RamsisE and mgrhr_mro)
+if ($_SESSION['username'] === 'RamsisE' || $_SESSION['username'] === 'mgrhr_mro') {
+    // Get all distinct report data for current and future months
+    $syncQuery = "SELECT DISTINCT report_type, report_month, report_year 
+                  FROM mro_cpr_report 
+                  WHERE CONCAT(report_year, '-', LPAD(report_month, 2, '0'), '-01') >= CURDATE()";
+    $syncResult = $conn->query($syncQuery);
+    
+    if ($syncResult) {
+        while ($row = $syncResult->fetch_assoc()) {
+            syncFromMroCprReport($conn, $row['report_type'], $row['report_month'], $row['report_year']);
+        }
+    }
+    
+    // Also sync for the current selected month if it's current/future
+    $currentMonth = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
+    if ($currentMonth >= date('Y-m')) {
+        $currentYear = date('Y', strtotime($currentMonth));
+        $currentMonthNum = date('m', strtotime($currentMonth));
+        
+        // Get all report types for this month
+        $currentSyncQuery = "SELECT DISTINCT report_type 
+                             FROM mro_cpr_report 
+                             WHERE report_month = ? AND report_year = ?";
+        $currentStmt = $conn->prepare($currentSyncQuery);
+        if ($currentStmt) {
+            $currentStmt->bind_param("ii", $currentMonthNum, $currentYear);
+            $currentStmt->execute();
+            $currentResult = $currentStmt->get_result();
+            
+            while ($row = $currentResult->fetch_assoc()) {
+                syncFromMroCprReport($conn, $row['report_type'], $currentMonthNum, $currentYear);
+            }
+            $currentStmt->close();
+        }
+    }
 }
 
 $currentMonth = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
@@ -70,50 +170,38 @@ $indicatorsResult = $conn->query("SELECT DISTINCT TRIM(indicator_name) as indica
 $indicators = [];
 $seenNames = [];
 
-while ($row = $indicatorsResult->fetch_assoc()) {
-    $indicatorName = trim($row['indicator_name']);
-    $lowercaseName = strtolower($indicatorName);
-    
-    // Only add if we haven't seen this indicator name before
-    if (!in_array($lowercaseName, $seenNames)) {
-        $seenNames[] = $lowercaseName;
-        $indicators[$indicatorName] = [
-            'name' => $indicatorName,
-            'targets' => []
-        ];
-    }
-}
-
-// FOR PAST MONTHS: Also include indicators that have data but are no longer in master list
-if ($dataMonth < $currentDateForComparison) {
-    $pastIndicatorsQuery = "SELECT DISTINCT indicator_name FROM master_performance_data WHERE data_month = ? ORDER BY indicator_name";
-    $pastStmt = $conn->prepare($pastIndicatorsQuery);
-    $pastStmt->bind_param("s", $dataMonth);
-    $pastStmt->execute();
-    $pastResult = $pastStmt->get_result();
-    
-    while ($row = $pastResult->fetch_assoc()) {
-        $indicatorName = $row['indicator_name'];
-        // If this indicator has data but is not in the main indicators list, add it
-        $exists = false;
-        foreach ($indicators as $key => $info) {
-            if (strtolower($key) === strtolower($indicatorName)) {
-                $exists = true;
-                break;
-            }
-        }
-        if (!$exists) {
+if ($indicatorsResult) {
+    while ($row = $indicatorsResult->fetch_assoc()) {
+        $indicatorName = trim($row['indicator_name']);
+        $lowercaseName = strtolower($indicatorName);
+        
+        // Only add if we haven't seen this indicator name before
+        if (!in_array($lowercaseName, $seenNames)) {
+            $seenNames[] = $lowercaseName;
             $indicators[$indicatorName] = [
                 'name' => $indicatorName,
                 'targets' => []
             ];
-            // Set default targets
-            foreach ($departments as $dept) {
-                $indicators[$indicatorName]['targets'][$dept] = 100;
-            }
         }
     }
-    $pastStmt->close();
+}
+
+// Also include indicators that have data in mro_cpr_report but not in performance_indicators
+$mroIndicatorsQuery = "SELECT DISTINCT report_type FROM mro_cpr_report WHERE report_type NOT IN (SELECT indicator_name FROM performance_indicators)";
+$mroIndicatorsResult = $conn->query($mroIndicatorsQuery);
+if ($mroIndicatorsResult) {
+    while ($row = $mroIndicatorsResult->fetch_assoc()) {
+        $indicatorName = trim($row['report_type']);
+        $lowercaseName = strtolower($indicatorName);
+        
+        if (!in_array($lowercaseName, $seenNames)) {
+            $seenNames[] = $lowercaseName;
+            $indicators[$indicatorName] = [
+                'name' => $indicatorName,
+                'targets' => []
+            ];
+        }
+    }
 }
 
 $departments = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'MRO HR', 'MD/DIV.', 'Remainder'];
@@ -121,12 +209,14 @@ $departments = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'MRO HR', 'MD/DI
 // Load default targets
 $targetsQuery = "SELECT indicator_name, department, default_target FROM indicator_target_defaults";
 $targetsResult = $conn->query($targetsQuery);
-while ($row = $targetsResult->fetch_assoc()) {
-    $targetIndicatorName = trim($row['indicator_name']);
-    foreach ($indicators as $key => &$info) {
-        if (strtolower($key) === strtolower($targetIndicatorName)) {
-            $info['targets'][$row['department']] = (float)$row['default_target'];
-            break;
+if ($targetsResult) {
+    while ($row = $targetsResult->fetch_assoc()) {
+        $targetIndicatorName = trim($row['indicator_name']);
+        foreach ($indicators as $key => &$info) {
+            if (strtolower($key) === strtolower($targetIndicatorName)) {
+                $info['targets'][$row['department']] = (float)$row['default_target'];
+                break;
+            }
         }
     }
 }
@@ -186,6 +276,9 @@ function getCellLastUpdateInfo($dataMap, $dept, $indicator) {
         'person' => $updatedBy ?: 'N/A'
     ];
 }
+
+// Determine if user can edit (only RamsisE and mgrhr_mro can edit, and only for current/future months)
+$canEdit = ($_SESSION['username'] === 'RamsisE' || $_SESSION['username'] === 'mgrhr_mro') && $isEditable;
 
 $message = $_SESSION['message'] ?? '';
 $error = $_SESSION['error'] ?? '';
@@ -805,6 +898,15 @@ unset($_SESSION['message'], $_SESSION['error']);
         body.light-theme .table-wrapper::-webkit-scrollbar-track {
             background: var(--border-light);
         }
+        
+        .sync-badge {
+            background: var(--success);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.65rem;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
@@ -846,10 +948,11 @@ unset($_SESSION['message'], $_SESSION['error']);
         <?php endif; ?>
         
         <div class="info-banner">
-            <strong>Targets are editable</strong> for each department | <strong>Remainder:</strong> Auto-calculated from MD/DIV.
-            <?php if ($_SESSION['username'] === 'RamsisE'): ?>
-            <br><span style="font-size: 0.65rem;">🔧 <strong>Admin Note:</strong> Click on any indicator name or use ✏️/🗑️ buttons to manage indicators</span>
+            <strong>Data is automatically synced from Director Data Entry</strong>
+            <?php if ($_SESSION['username'] === 'RamsisE' || $_SESSION['username'] === 'mgrhr_mro'): ?>
+                <span class="sync-badge">🔄 Auto-sync enabled</span>
             <?php endif; ?>
+            <br><span style="font-size: 0.65rem;">Target = Sum of Expected across all cost centers | Actual = Sum of Completed across all cost centers</span>
         </div>
         
         <div class="form-container" style="padding: 0;">
@@ -874,10 +977,10 @@ unset($_SESSION['message'], $_SESSION['error']);
                                 <tr>
                                     <td class="indicator-cell">
                                         <div class="indicator-header">
-                                            <span class="indicator-name" <?php if ($_SESSION['username'] === 'RamsisE' && $isEditable): ?>onclick="editIndicator('<?php echo htmlspecialchars($indicatorName); ?>')" style="cursor: pointer;"<?php endif; ?>>
+                                            <span class="indicator-name" <?php if ($canEdit): ?>onclick="editIndicator('<?php echo htmlspecialchars($indicatorName); ?>')" style="cursor: pointer;"<?php endif; ?>>
                                                 <?php echo htmlspecialchars($indicatorInfo['name']); ?>
                                             </span>
-                                            <?php if ($_SESSION['username'] === 'RamsisE' && $isEditable): ?>
+                                            <?php if ($canEdit): ?>
                                             <div class="indicator-actions">
                                                 <button type="button" class="indicator-btn edit-btn" onclick="editIndicator('<?php echo htmlspecialchars($indicatorName); ?>')" title="Edit Indicator">✏️</button>
                                                 <button type="button" class="indicator-btn delete-btn" onclick="deleteIndicator('<?php echo htmlspecialchars($indicatorName); ?>')" title="Delete Indicator">🗑️</button>
@@ -888,11 +991,11 @@ unset($_SESSION['message'], $_SESSION['error']);
                                     
                                     <?php foreach ($departments as $dept):
                                         $actualValue = getValue($dataMap, $dept, $indicatorName, 'actual_value');
-                                        $targetValue = $indicatorInfo['targets'][$dept] ?? 100;
+                                        $targetValue = getValue($dataMap, $dept, $indicatorName, 'target_value');
                                         $percentageValue = getValue($dataMap, $dept, $indicatorName, 'percentage_achievement');
                                         
                                         $actualFormatted = $actualValue !== null ? number_format((float)$actualValue, 2) : '';
-                                        $targetFormatted = number_format((float)$targetValue, 2);
+                                        $targetFormatted = $targetValue !== null ? number_format((float)$targetValue, 2) : '';
                                         $percentageFormatted = $percentageValue !== null ? number_format((float)$percentageValue, 2) : '';
                                         
                                         $isRemainder = ($dept === 'Remainder');
@@ -931,8 +1034,8 @@ unset($_SESSION['message'], $_SESSION['error']);
                                                 <input type="number" step="0.01" 
                                                        name="data[<?php echo $dept; ?>][<?php echo htmlspecialchars($indicatorName); ?>][actual]" 
                                                        value="<?php echo htmlspecialchars($actualFormatted); ?>" 
-                                                       <?php echo !$isEditable ? 'disabled' : ''; ?>
-                                                       class="actual-input <?php echo $isEditable ? 'editable' : 'non-editable'; ?>"
+                                                       <?php echo !$canEdit ? 'disabled' : ''; ?>
+                                                       class="actual-input <?php echo $canEdit ? 'editable' : 'non-editable'; ?>"
                                                        data-dept="<?php echo $dept; ?>"
                                                        data-indicator="<?php echo htmlspecialchars($indicatorName); ?>"
                                                        placeholder="Actual">
@@ -940,8 +1043,8 @@ unset($_SESSION['message'], $_SESSION['error']);
                                                 <input type="number" step="0.01" 
                                                        name="data[<?php echo $dept; ?>][<?php echo htmlspecialchars($indicatorName); ?>][target]" 
                                                        value="<?php echo htmlspecialchars($targetFormatted); ?>" 
-                                                       <?php echo !$isEditable ? 'disabled' : ''; ?>
-                                                       class="target-input <?php echo $isEditable ? 'editable' : 'non-editable'; ?>"
+                                                       <?php echo !$canEdit ? 'disabled' : ''; ?>
+                                                       class="target-input <?php echo $canEdit ? 'editable' : 'non-editable'; ?>"
                                                        data-dept="<?php echo $dept; ?>"
                                                        data-indicator="<?php echo htmlspecialchars($indicatorName); ?>"
                                                        placeholder="Target"
@@ -973,7 +1076,7 @@ unset($_SESSION['message'], $_SESSION['error']);
                                 </tr>
                             <?php endforeach; ?>
                             
-                            <?php if ($_SESSION['username'] === 'RamsisE' && $isEditable): ?>
+                            <?php if ($canEdit): ?>
                             <tr class="add-indicator-row">
                                 <td class="add-indicator-cell indicator-cell">
                                     <div class="add-indicator-form">
@@ -997,8 +1100,8 @@ unset($_SESSION['message'], $_SESSION['error']);
                                         <input type="text" 
                                                name="remarks[<?php echo $dept; ?>]" 
                                                value="<?php echo htmlspecialchars($remarksValue ?? ''); ?>" 
-                                               <?php echo !$isEditable ? 'disabled' : ''; ?>
-                                               class="<?php echo $isEditable ? 'editable' : 'non-editable'; ?>"
+                                               <?php echo !$canEdit ? 'disabled' : ''; ?>
+                                               class="<?php echo $canEdit ? 'editable' : 'non-editable'; ?>"
                                                placeholder="Add remarks..."
                                                style="width: 100%; text-align: left; font-size: 0.65rem;">
                                     </td>
@@ -1008,7 +1111,7 @@ unset($_SESSION['message'], $_SESSION['error']);
                     </table>
                 </div>
                 
-                <?php if ($isEditable): ?>
+                <?php if ($canEdit): ?>
                     <div class="save-section">
                         <button type="submit" class="btn" style="font-size: 0.9rem; padding: 0.6rem 1.5rem;">
                             💾 Save All Changes
@@ -1146,6 +1249,8 @@ unset($_SESSION['message'], $_SESSION['error']);
             });
         }
         
+        // Only add event listeners if user can edit
+        <?php if ($canEdit): ?>
         // Add event listeners to all inputs
         document.querySelectorAll('.actual-input').forEach(input => {
             const newInput = input.cloneNode(true);
@@ -1185,9 +1290,9 @@ unset($_SESSION['message'], $_SESSION['error']);
                 recalculateFromTarget(this);
             });
         });
+        <?php endif; ?>
         
         // Change month function
-                // Change month function
         function changeMonth(direction) {
             let currentUrl = new URL(window.location.href);
             let currentMonth = currentUrl.searchParams.get('month') || '<?php echo $currentMonth; ?>';
@@ -1203,7 +1308,7 @@ unset($_SESSION['message'], $_SESSION['error']);
             window.location.href = `master_data.php?month=${newMonth}`;
         }
         
-        <?php if ($_SESSION['username'] === 'RamsisE'): ?>
+        <?php if ($canEdit): ?>
         // Global variables for indicator management
         let currentEditIndicator = null;
         let currentEditOriginalName = null;
@@ -1489,76 +1594,70 @@ unset($_SESSION['message'], $_SESSION['error']);
             initializeRemainders();
         });
 
-    // Function to open password change modal
-function openPasswordModal() {
-    // Check if modal already exists
-    if (document.getElementById('passwordModalOverlay')) {
-        return;
-    }
-    
-    // Create modal container
-    const modalOverlay = document.createElement('div');
-    modalOverlay.id = 'passwordModalOverlay';
-    modalOverlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        z-index: 10001;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
-    
-    // Create iframe to load the password change page
-    const iframe = document.createElement('iframe');
-    iframe.src = '../change_password.php';
-    iframe.style.cssText = `
-        width: 100%;
-        max-width: 450px;
-        height: auto;
-        min-height: 450px;
-        border: none;
-        border-radius: 16px;
-        background: transparent;
-    `;
-    
-    modalOverlay.appendChild(iframe);
-    document.body.appendChild(modalOverlay);
-    
-    // Store reference to close function
-    window.closePasswordPopup = function() {
-        if (modalOverlay && modalOverlay.parentNode) {
-            modalOverlay.remove();
-        }
-        delete window.closePasswordPopup;
-    };
-    
-    // Close on Escape key
-    const escapeHandler = function(e) {
-        if (e.key === 'Escape') {
-            if (modalOverlay && modalOverlay.parentNode) {
-                modalOverlay.remove();
-                delete window.closePasswordPopup;
+        // Function to open password change modal
+        function openPasswordModal() {
+            if (document.getElementById('passwordModalOverlay')) {
+                return;
             }
-            document.removeEventListener('keydown', escapeHandler);
+            
+            const modalOverlay = document.createElement('div');
+            modalOverlay.id = 'passwordModalOverlay';
+            modalOverlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                z-index: 10001;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+            
+            const iframe = document.createElement('iframe');
+            iframe.src = '../change_password.php';
+            iframe.style.cssText = `
+                width: 100%;
+                max-width: 450px;
+                height: auto;
+                min-height: 450px;
+                border: none;
+                border-radius: 16px;
+                background: transparent;
+            `;
+            
+            modalOverlay.appendChild(iframe);
+            document.body.appendChild(modalOverlay);
+            
+            window.closePasswordPopup = function() {
+                if (modalOverlay && modalOverlay.parentNode) {
+                    modalOverlay.remove();
+                }
+                delete window.closePasswordPopup;
+            };
+            
+            const escapeHandler = function(e) {
+                if (e.key === 'Escape') {
+                    if (modalOverlay && modalOverlay.parentNode) {
+                        modalOverlay.remove();
+                        delete window.closePasswordPopup;
+                    }
+                    document.removeEventListener('keydown', escapeHandler);
+                }
+            };
+            document.addEventListener('keydown', escapeHandler);
         }
-    };
-    document.addEventListener('keydown', escapeHandler);
-}
 
-// Keep session alive by sending heartbeat every 5 minutes
-function keepSessionAlive() {
-    fetch('/HRandMDDash/keep_alive.php', {
-        method: 'GET',
-        cache: 'no-cache'
-    }).catch(error => console.log('Session keep-alive failed:', error));
-}
+        // Keep session alive by sending heartbeat every 5 minutes
+        function keepSessionAlive() {
+            fetch('/HRandMDDash/keep_alive.php', {
+                method: 'GET',
+                cache: 'no-cache'
+            }).catch(error => console.log('Session keep-alive failed:', error));
+        }
 
-// Send heartbeat every 5 minutes
-setInterval(keepSessionAlive, 5 * 60 * 1000);
+        setInterval(keepSessionAlive, 5 * 60 * 1000);
     </script>
 </body>
 </html>

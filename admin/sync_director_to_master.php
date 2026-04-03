@@ -4,7 +4,7 @@ require_once '../session_config.php';
 require_once '../includes/auth.php';
 requireRole('hr');
 
-if ($_SESSION['username'] !== 'RamsisE') {
+if ($_SESSION['username'] === 'RamsisE' || $_SESSION['username'] === 'mgrhr_mro') {
     die("Only RamsisE can run this script");
 }
 

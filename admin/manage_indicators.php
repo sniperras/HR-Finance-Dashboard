@@ -6,8 +6,8 @@ require_once '../session_config.php';
 require_once '../includes/auth.php';
 requireRole('hr');
 
-// Only allow RamsisE to manage indicators
-if ($_SESSION['username'] !== 'RamsisE') {
+// Allow both RamsisE and mgrhr_mro to manage indicators
+if (!in_array($_SESSION['username'], ['RamsisE', 'mgrhr_mro'])) {
     http_response_code(403);
     echo json_encode(['error' => 'Unauthorized']);
     exit();

@@ -12,7 +12,7 @@ function requireLogin() {
     if (!isLoggedIn()) {
         // Clear any existing session data
         session_write_close();
-        header('Location: /HRandMDDash/login.php');
+        header('Location: ../index.php');
         exit();
     }
 }
@@ -50,7 +50,7 @@ function requireRole($role) {
         } elseif ($_SESSION['user_role'] === 'md') {
             header('Location: /HRandMDDash/director/md_dashboard.php');
         } else {
-            header('Location: /HRandMDDash/login.php');
+            header('Location: ../index.php');
         }
         exit();
     }
@@ -77,7 +77,7 @@ function checkAccess($allowedRoles = []) {
     } elseif ($_SESSION['user_role'] === 'md') {
         header('Location: /HRandMDDash/director/md_dashboard.php');
     } else {
-        header('Location: /HRandMDDash/login.php');
+        header('Location: ../index.php');
     }
     exit();
 }

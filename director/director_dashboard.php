@@ -23,7 +23,7 @@ if (preg_match('/director_([A-Z\/\s]+)/', $username, $matches)) {
 
 // If no department found, redirect to login
 if (empty($userDept)) {
-    header('Location: ../login.php');
+    header('Location: ../index.php');
     exit();
 }
 
@@ -97,20 +97,27 @@ $costCenters = [
     ]
 ];
 
-// Define report types (indicators)
-$indicators = [
-    'Crew Meeting Minutes Submission' => 'Crew Meeting Minutes',
-    'Exceptional Customer Experience Training' => 'Customer Exp. Training',
-    'CPR' => 'CPR',
-    '2025/26 1st Semiannual BSCI/ISC Target Status' => 'BSCI/ISC Target',
-    'Activity Report Submission' => 'Activity Report',
-    'Cost Saving Report Submission' => 'Cost Saving Report',
-    'Lost time Justification' => 'Lost Time Justification',
-    'Attendance Approval Status' => 'Attendance Approval',
-    'Productivity' => 'Productivity',
-    'Employees Training Gap Clearance' => 'Training Gap',
-    'Employees Issue Resolution Rate' => 'Issue Resolution'
-];
+// Get all indicators from mro_cpr_report table dynamically
+$indicatorsQuery = "SELECT DISTINCT report_type FROM mro_cpr_report WHERE department = ? ORDER BY report_type";
+$stmt = $conn->prepare($indicatorsQuery);
+$stmt->bind_param("s", $userDept);
+$stmt->execute();
+$indicatorsResult = $stmt->get_result();
+
+$indicators = [];
+while ($row = $indicatorsResult->fetch_assoc()) {
+    $indicators[$row['report_type']] = $row['report_type'];
+}
+$stmt->close();
+
+// If no indicators found for this department, get from performance_indicators table
+if (empty($indicators)) {
+    $fallbackQuery = "SELECT DISTINCT TRIM(indicator_name) as indicator_name FROM performance_indicators ORDER BY indicator_name";
+    $fallbackResult = $conn->query($fallbackQuery);
+    while ($row = $fallbackResult->fetch_assoc()) {
+        $indicators[$row['indicator_name']] = $row['indicator_name'];
+    }
+}
 
 // Fetch ALL data from mro_cpr_report for this department (all cost centers)
 $reportData = [];
@@ -134,11 +141,13 @@ while ($row = $result->fetch_assoc()) {
     if (!isset($managerData[$reportType])) {
         $managerData[$reportType] = [];
     }
+    
+    $costCenterName = $costCenters[$userDept][$costCenter] ?? $costCenter;
     $managerData[$reportType][$costCenter] = [
         'expected' => $expected,
         'completed' => $completed,
         'percentage' => $percentage,
-        'name' => $costCenters[$userDept][$costCenter] ?? $costCenter
+        'name' => $costCenterName
     ];
     
     // Store director-level data (for the card)
@@ -148,7 +157,7 @@ while ($row = $result->fetch_assoc()) {
 }
 $stmt->close();
 
-// Also get data from master_performance_data for this department (fallback)
+// Also get data from master_performance_data for this department (fallback for missing DIR rows)
 $masterQuery = "SELECT indicator_name, percentage_achievement 
                 FROM master_performance_data 
                 WHERE data_month = ? AND department = ? AND verification_status = 'verified'";
@@ -161,14 +170,9 @@ while ($row = $masterResult->fetch_assoc()) {
     $indicatorName = $row['indicator_name'];
     $percentage = round((float)$row['percentage_achievement'], 1);
     
-    // Find matching report type
-    foreach ($indicators as $key => $displayName) {
-        if (strpos($indicatorName, $key) !== false || strpos($key, $indicatorName) !== false) {
-            if (!isset($reportData[$key]) || $reportData[$key] == 0) {
-                $reportData[$key] = $percentage;
-            }
-            break;
-        }
+    // If no DIR row found in mro_cpr_report, use master data
+    if (!isset($reportData[$indicatorName]) || $reportData[$indicatorName] == 0) {
+        $reportData[$indicatorName] = $percentage;
     }
 }
 $masterStmt->close();
@@ -412,6 +416,7 @@ $conn->close();
             margin-bottom: 0.5rem;
             padding-bottom: 0.3rem;
             border-bottom: 1px solid var(--border-light);
+            word-break: break-word;
         }
         
         .chart-container {
@@ -479,6 +484,7 @@ $conn->close();
         
         .modal-header h3 {
             color: var(--accent);
+            font-size: 0.9rem;
         }
         
         .close-modal {
@@ -503,6 +509,7 @@ $conn->close();
             padding: 0.6rem;
             text-align: left;
             border-bottom: 1px solid var(--border-light);
+            font-size: 0.7rem;
         }
         
         .detail-table th {
@@ -540,6 +547,17 @@ $conn->close();
             padding: 2rem;
             color: var(--text-primary);
             opacity: 0.7;
+        }
+        
+        .refresh-btn {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 0.2rem 0.6rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.65rem;
+            margin-left: 0.5rem;
         }
         
         /* Light Theme */
@@ -592,7 +610,6 @@ $conn->close();
             <a href="director_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
             <div class="navbar-menu">
                 <a href="director_dashboard.php" style="color: var(--accent);">My Dashboard</a>
-                <!-- <a href="report_mro_cpr.php">Data Entry</a> -->
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
                     <span class="user-name">👤 <?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
@@ -611,12 +628,14 @@ $conn->close();
                 <button onclick="changeMonth('prev')">← Prev</button>
                 <h3>📅 <?php echo date('F Y', strtotime($dataMonth)); ?></h3>
                 <button onclick="changeMonth('next')">Next →</button>
+                <button class="refresh-btn" onclick="refreshDashboard()">⟳ Refresh</button>
             </div>
         </div>
         
-        <div class="info-banner">
+        <!-- <div class="info-banner">
             📈 Welcome <?php echo htmlspecialchars($_SESSION['full_name']); ?> - Click on any card to view detailed manager breakdown
-        </div>
+            <span style="display: inline-block; margin-left: 10px; font-size: 0.6rem;">🔄 Cards automatically update when new indicators are added</span>
+        </div> -->
         
         <div class="metrics-grid" id="metricsGrid">
             <?php 
@@ -627,7 +646,7 @@ $conn->close();
                 $chartId = 'chart-' . $chartIndex;
                 $chartIndex++;
             ?>
-                <div class="metric-card" onclick="showDetail('<?php echo htmlspecialchars($indicatorKey); ?>', '<?php echo htmlspecialchars($indicatorDisplay); ?>')">
+                <div class="metric-card" onclick="showDetail('<?php echo htmlspecialchars(addslashes($indicatorKey)); ?>', '<?php echo htmlspecialchars(addslashes($indicatorDisplay)); ?>')">
                     <div class="metric-title"><?php echo htmlspecialchars($indicatorDisplay); ?></div>
                     <div class="chart-container">
                         <canvas id="<?php echo $chartId; ?>" width="120" height="120"></canvas>
@@ -642,6 +661,13 @@ $conn->close();
                 </div>
             <?php endforeach; ?>
         </div>
+        
+        <?php if (empty($indicators)): ?>
+            <div class="no-data">
+                <p>No data available for this department yet.</p>
+                <p>Please add performance indicators to get started.</p>
+            </div>
+        <?php endif; ?>
     </div>
     
     <!-- Detail Modal -->
@@ -805,7 +831,6 @@ $conn->close();
             tableHtml += `
                     </tbody>
                 </table>
-               
             `;
             
             modalBody.innerHTML = tableHtml;
@@ -837,9 +862,15 @@ $conn->close();
             window.location.href = `director_dashboard.php?month=${newMonth}`;
         }
         
+        function refreshDashboard() {
+            // Simple page reload to fetch latest data
+            window.location.reload();
+        }
+        
         function initializeCharts() {
             let chartIndex = 0;
-            for (const [indicatorKey, indicatorDisplay] of Object.entries(<?php echo json_encode($indicators); ?>)) {
+            const indicators = <?php echo json_encode($indicators); ?>;
+            for (const [indicatorKey, indicatorDisplay] of Object.entries(indicators)) {
                 const percentage = reportData[indicatorKey] || 0;
                 const chartId = `chart-${chartIndex}`;
                 const chart = createGaugeChart(chartId, percentage);
@@ -921,76 +952,70 @@ $conn->close();
             initializeCharts();
         });
 
-    // Function to open password change modal
-function openPasswordModal() {
-    // Check if modal already exists
-    if (document.getElementById('passwordModalOverlay')) {
-        return;
-    }
-    
-    // Create modal container
-    const modalOverlay = document.createElement('div');
-    modalOverlay.id = 'passwordModalOverlay';
-    modalOverlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        z-index: 10001;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
-    
-    // Create iframe to load the password change page
-    const iframe = document.createElement('iframe');
-    iframe.src = '../change_password.php';
-    iframe.style.cssText = `
-        width: 100%;
-        max-width: 450px;
-        height: auto;
-        min-height: 450px;
-        border: none;
-        border-radius: 16px;
-        background: transparent;
-    `;
-    
-    modalOverlay.appendChild(iframe);
-    document.body.appendChild(modalOverlay);
-    
-    // Store reference to close function
-    window.closePasswordPopup = function() {
-        if (modalOverlay && modalOverlay.parentNode) {
-            modalOverlay.remove();
-        }
-        delete window.closePasswordPopup;
-    };
-    
-    // Close on Escape key
-    const escapeHandler = function(e) {
-        if (e.key === 'Escape') {
-            if (modalOverlay && modalOverlay.parentNode) {
-                modalOverlay.remove();
-                delete window.closePasswordPopup;
+        // Function to open password change modal
+        function openPasswordModal() {
+            if (document.getElementById('passwordModalOverlay')) {
+                return;
             }
-            document.removeEventListener('keydown', escapeHandler);
+            
+            const modalOverlay = document.createElement('div');
+            modalOverlay.id = 'passwordModalOverlay';
+            modalOverlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                z-index: 10001;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+            
+            const iframe = document.createElement('iframe');
+            iframe.src = '../change_password.php';
+            iframe.style.cssText = `
+                width: 100%;
+                max-width: 450px;
+                height: auto;
+                min-height: 450px;
+                border: none;
+                border-radius: 16px;
+                background: transparent;
+            `;
+            
+            modalOverlay.appendChild(iframe);
+            document.body.appendChild(modalOverlay);
+            
+            window.closePasswordPopup = function() {
+                if (modalOverlay && modalOverlay.parentNode) {
+                    modalOverlay.remove();
+                }
+                delete window.closePasswordPopup;
+            };
+            
+            const escapeHandler = function(e) {
+                if (e.key === 'Escape') {
+                    if (modalOverlay && modalOverlay.parentNode) {
+                        modalOverlay.remove();
+                        delete window.closePasswordPopup;
+                    }
+                    document.removeEventListener('keydown', escapeHandler);
+                }
+            };
+            document.addEventListener('keydown', escapeHandler);
         }
-    };
-    document.addEventListener('keydown', escapeHandler);
-}
 
-// Keep session alive by sending heartbeat every 5 minutes
-function keepSessionAlive() {
-    fetch('/HRandMDDash/keep_alive.php', {
-        method: 'GET',
-        cache: 'no-cache'
-    }).catch(error => console.log('Session keep-alive failed:', error));
-}
+        // Keep session alive by sending heartbeat every 5 minutes
+        function keepSessionAlive() {
+            fetch('/HRandMDDash/keep_alive.php', {
+                method: 'GET',
+                cache: 'no-cache'
+            }).catch(error => console.log('Session keep-alive failed:', error));
+        }
 
-// Send heartbeat every 5 minutes
-setInterval(keepSessionAlive, 5 * 60 * 1000);
+        setInterval(keepSessionAlive, 5 * 60 * 1000);
     </script>
 </body>
 </html>
