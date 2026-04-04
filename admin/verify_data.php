@@ -62,8 +62,9 @@ $statsStmt->close();
 $conn->close();
 
 // Helper function to get status badge
-function getStatusBadge($status) {
-    switch($status) {
+function getStatusBadge($status)
+{
+    switch ($status) {
         case 'pending':
             return '<span class="status-badge status-pending">⏳ Pending</span>';
         case 'verified':
@@ -83,65 +84,67 @@ unset($_SESSION['error']);
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Data Verification - HR Dashboard</title>
     <link rel="stylesheet" href="../css/style.css">
+    <link rel="icon" type="image/png" href="../assets/images/ethiopian_logo.ico">
     <style>
         .container {
             max-width: 1400px;
             margin: 2rem auto;
             padding: 0 2rem;
         }
-        
+
         .verification-header {
             background: linear-gradient(135deg, var(--medium-bg) 0%, var(--dark-bg) 100%);
             padding: 1.5rem;
             border-radius: 15px;
             margin-bottom: 2rem;
         }
-        
+
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 1rem;
             margin-top: 1.5rem;
         }
-        
+
         .stat-card {
             background: var(--dark-bg);
             padding: 1rem;
             border-radius: 10px;
             text-align: center;
         }
-        
+
         .stat-number {
             font-size: 2rem;
             font-weight: bold;
             color: var(--accent);
         }
-        
+
         .stat-label {
             font-size: 0.8rem;
             color: var(--light-bg);
             opacity: 0.8;
             margin-top: 0.25rem;
         }
-        
+
         .verification-table-wrapper {
             overflow-x: auto;
             background: var(--medium-bg);
             border-radius: 15px;
             padding: 1rem;
         }
-        
+
         .verification-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.85rem;
         }
-        
+
         .verification-table th,
         .verification-table td {
             padding: 0.75rem;
@@ -149,7 +152,7 @@ unset($_SESSION['error']);
             border-bottom: 1px solid var(--dark-bg);
             vertical-align: top;
         }
-        
+
         .verification-table th {
             background: var(--dark-bg);
             color: var(--accent);
@@ -158,11 +161,11 @@ unset($_SESSION['error']);
             top: 0;
             z-index: 10;
         }
-        
+
         .verification-table tr:hover {
-            background: rgba(0,173,181,0.05);
+            background: rgba(0, 173, 181, 0.05);
         }
-        
+
         .status-badge {
             display: inline-block;
             padding: 0.25rem 0.75rem;
@@ -170,48 +173,48 @@ unset($_SESSION['error']);
             font-size: 0.75rem;
             font-weight: bold;
         }
-        
+
         .status-pending {
             background: var(--warning);
             color: var(--dark-bg);
         }
-        
+
         .status-verified {
             background: var(--success);
             color: white;
         }
-        
+
         .status-rejected {
             background: var(--danger);
             color: white;
         }
-        
+
         .action-buttons {
             display: flex;
             gap: 0.5rem;
             flex-wrap: wrap;
         }
-        
+
         .btn-sm {
             padding: 0.3rem 0.8rem;
             font-size: 0.75rem;
         }
-        
+
         .btn-verify {
             background: var(--success);
             color: white;
         }
-        
+
         .btn-reject {
             background: var(--danger);
             color: white;
         }
-        
+
         .btn-view {
             background: var(--info);
             color: white;
         }
-        
+
         .modal {
             display: none;
             position: fixed;
@@ -220,10 +223,10 @@ unset($_SESSION['error']);
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0,0,0,0.5);
+            background-color: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(5px);
         }
-        
+
         .modal-content {
             background: var(--medium-bg);
             margin: 5% auto;
@@ -231,9 +234,9 @@ unset($_SESSION['error']);
             border-radius: 15px;
             width: 90%;
             max-width: 600px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
         }
-        
+
         .modal-header {
             display: flex;
             justify-content: space-between;
@@ -242,42 +245,42 @@ unset($_SESSION['error']);
             border-bottom: 2px solid var(--accent);
             padding-bottom: 0.5rem;
         }
-        
+
         .modal-header h3 {
             color: var(--accent);
             margin: 0;
         }
-        
+
         .close {
             color: var(--light-bg);
             font-size: 1.5rem;
             font-weight: bold;
             cursor: pointer;
         }
-        
+
         .close:hover {
             color: var(--accent);
         }
-        
+
         .detail-row {
             margin-bottom: 1rem;
             padding: 0.5rem;
             background: var(--dark-bg);
             border-radius: 8px;
         }
-        
+
         .detail-label {
             font-weight: bold;
             color: var(--accent);
             margin-bottom: 0.25rem;
             font-size: 0.8rem;
         }
-        
+
         .detail-value {
             color: var(--light-bg);
             font-size: 0.9rem;
         }
-        
+
         .remarks-text {
             background: var(--dark-bg);
             padding: 0.5rem;
@@ -285,13 +288,13 @@ unset($_SESSION['error']);
             margin-top: 0.5rem;
             font-style: italic;
         }
-        
+
         .verification-info {
             font-size: 0.7rem;
             color: var(--accent);
             margin-top: 0.25rem;
         }
-        
+
         .filter-section {
             margin-bottom: 1rem;
             display: flex;
@@ -299,7 +302,7 @@ unset($_SESSION['error']);
             flex-wrap: wrap;
             align-items: center;
         }
-        
+
         .filter-btn {
             background: var(--dark-bg);
             color: var(--light-bg);
@@ -309,17 +312,17 @@ unset($_SESSION['error']);
             cursor: pointer;
             transition: all 0.3s;
         }
-        
+
         .filter-btn.active {
             background: var(--accent);
             color: var(--dark-bg);
         }
-        
+
         .filter-btn:hover {
             background: var(--accent);
             color: var(--dark-bg);
         }
-        
+
         .month-navigation {
             display: flex;
             justify-content: space-between;
@@ -328,26 +331,26 @@ unset($_SESSION['error']);
             flex-wrap: wrap;
             gap: 1rem;
         }
-        
+
         @media (max-width: 768px) {
             .container {
                 padding: 0 1rem;
             }
-            
+
             .verification-table {
                 font-size: 0.7rem;
             }
-            
+
             .verification-table th,
             .verification-table td {
                 padding: 0.5rem;
             }
-            
+
             .action-buttons {
                 flex-direction: column;
             }
         }
-        
+
         .department-badge {
             background: var(--accent);
             color: var(--dark-bg);
@@ -357,22 +360,22 @@ unset($_SESSION['error']);
             font-weight: bold;
             display: inline-block;
         }
-        
+
         .percentage-high {
             color: var(--success);
             font-weight: bold;
         }
-        
+
         .percentage-medium {
             color: var(--warning);
             font-weight: bold;
         }
-        
+
         .percentage-low {
             color: var(--danger);
             font-weight: bold;
         }
-        
+
         textarea {
             width: 100%;
             padding: 0.5rem;
@@ -383,14 +386,14 @@ unset($_SESSION['error']);
             font-family: inherit;
             resize: vertical;
         }
-        
+
         .modal-footer {
             margin-top: 1.5rem;
             display: flex;
             justify-content: flex-end;
             gap: 1rem;
         }
-        
+
         .batch-actions {
             margin-top: 1rem;
             padding: 1rem;
@@ -401,7 +404,7 @@ unset($_SESSION['error']);
             align-items: center;
             flex-wrap: wrap;
         }
-        
+
         .batch-actions select {
             background: var(--medium-bg);
             color: var(--light-bg);
@@ -409,7 +412,7 @@ unset($_SESSION['error']);
             border-radius: 5px;
             border: 1px solid var(--accent);
         }
-        
+
         .warning-banner {
             background: var(--warning);
             color: var(--dark-bg);
@@ -419,7 +422,7 @@ unset($_SESSION['error']);
             text-align: center;
             font-weight: bold;
         }
-        
+
         .success-banner {
             background: var(--success);
             color: white;
@@ -428,7 +431,7 @@ unset($_SESSION['error']);
             margin-bottom: 1rem;
             text-align: center;
         }
-        
+
         .error-banner {
             background: var(--danger);
             color: white;
@@ -439,13 +442,14 @@ unset($_SESSION['error']);
         }
     </style>
 </head>
+
 <body>
     <nav class="navbar">
         <div class="navbar-container">
             <a href="master_data.php" class="navbar-brand">HR & Finance Dashboard</a>
             <div class="navbar-menu">
                 <a href="master_data.php">Master Data Entry</a>
-                  <a href="report_mro_cpr.php">Director Data Entry</a>
+                <a href="report_mro_cpr.php">Director Data Entry</a>
                 <a href="verify_data.php" style="color: var(--accent);">Verify Data</a>
                 <a href="data_history.php">History</a>
                 <div class="user-info">
@@ -455,22 +459,22 @@ unset($_SESSION['error']);
             </div>
         </div>
     </nav>
-    
+
     <div class="container">
         <div class="month-navigation">
             <button onclick="changeMonth('prev')" class="btn">&larr; Previous Month</button>
             <h2>Data Verification - <?php echo date('F Y', strtotime($dataMonth)); ?></h2>
             <button onclick="changeMonth('next')" class="btn">Next Month &rarr;</button>
         </div>
-        
+
         <?php if ($message): ?>
             <div class="success-banner">✓ <?php echo htmlspecialchars($message); ?></div>
         <?php endif; ?>
-        
+
         <?php if ($error): ?>
             <div class="error-banner">⚠ <?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
-        
+
         <div class="verification-header">
             <h3>📋 Verification Dashboard</h3>
             <div class="stats-grid">
@@ -492,7 +496,7 @@ unset($_SESSION['error']);
                 </div>
             </div>
         </div>
-        
+
         <div class="filter-section">
             <span style="color: var(--accent);">Filter by status:</span>
             <button class="filter-btn active" data-filter="all">All</button>
@@ -500,7 +504,7 @@ unset($_SESSION['error']);
             <button class="filter-btn" data-filter="verified">Verified</button>
             <button class="filter-btn" data-filter="rejected">Rejected</button>
         </div>
-        
+
         <div class="verification-table-wrapper">
             <table class="verification-table" id="verificationTable">
                 <thead>
@@ -520,7 +524,7 @@ unset($_SESSION['error']);
                     </tr>
                 </thead>
                 <tbody>
-                    <?php while ($record = $records->fetch_assoc()): 
+                    <?php while ($record = $records->fetch_assoc()):
                         $percentage = round($record['percentage_achievement'], 1);
                         $percentageClass = '';
                         if ($percentage >= 90) $percentageClass = 'percentage-high';
@@ -565,7 +569,7 @@ unset($_SESSION['error']);
                 </tbody>
             </table>
         </div>
-        
+
         <?php if ($stats['pending'] > 0): ?>
             <div class="batch-actions">
                 <span style="color: var(--accent);">Batch Actions:</span>
@@ -579,7 +583,7 @@ unset($_SESSION['error']);
             </div>
         <?php endif; ?>
     </div>
-    
+
     <!-- Modal for Viewing Details -->
     <div id="detailsModal" class="modal">
         <div class="modal-content">
@@ -592,7 +596,7 @@ unset($_SESSION['error']);
             </div>
         </div>
     </div>
-    
+
     <!-- Modal for Verification -->
     <div id="verifyModal" class="modal">
         <div class="modal-content">
@@ -604,12 +608,12 @@ unset($_SESSION['error']);
                 <input type="hidden" name="record_id" id="verifyRecordId">
                 <input type="hidden" name="action" id="verifyAction">
                 <input type="hidden" name="month" value="<?php echo $currentMonth; ?>">
-                
+
                 <div class="detail-row">
                     <div class="detail-label">Verification Notes</div>
                     <textarea name="notes" id="verificationNotes" rows="4" placeholder="Enter verification notes or reason for rejection..."></textarea>
                 </div>
-                
+
                 <div class="modal-footer">
                     <button type="button" class="btn" onclick="closeVerifyModal()">Cancel</button>
                     <button type="submit" class="btn btn-verify">Confirm</button>
@@ -617,17 +621,17 @@ unset($_SESSION['error']);
             </form>
         </div>
     </div>
-    
+
     <script>
         // Filter functionality
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
                 this.classList.add('active');
-                
+
                 const filter = this.dataset.filter;
                 const rows = document.querySelectorAll('#verificationTable tbody tr');
-                
+
                 rows.forEach(row => {
                     if (filter === 'all' || row.dataset.status === filter) {
                         row.style.display = '';
@@ -637,7 +641,7 @@ unset($_SESSION['error']);
                 });
             });
         });
-        
+
         // Select All functionality
         const selectAllCheckbox = document.getElementById('selectAll');
         if (selectAllCheckbox) {
@@ -649,7 +653,7 @@ unset($_SESSION['error']);
                 updateSelectedCount();
             });
         }
-        
+
         // Update selected count
         function updateSelectedCount() {
             const checkboxes = document.querySelectorAll('.record-checkbox:checked');
@@ -659,50 +663,50 @@ unset($_SESSION['error']);
                 selectedSpan.innerHTML = `${count} selected`;
             }
         }
-        
+
         // Add event listeners to checkboxes
         document.querySelectorAll('.record-checkbox').forEach(cb => {
             cb.addEventListener('change', updateSelectedCount);
         });
-        
+
         // Batch action
         function batchAction() {
             const action = document.getElementById('batchAction').value;
             const selected = document.querySelectorAll('.record-checkbox:checked');
-            
+
             if (selected.length === 0) {
                 alert('Please select at least one record');
                 return;
             }
-            
+
             if (!action) {
                 alert('Please select an action');
                 return;
             }
-            
+
             const recordIds = Array.from(selected).map(cb => cb.value);
-            
+
             if (confirm(`Are you sure you want to ${action} ${selected.length} record(s)?`)) {
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.action = 'update_verification.php';
-                
+
                 form.innerHTML = `
                     <input type="hidden" name="batch_ids" value='${JSON.stringify(recordIds)}'>
                     <input type="hidden" name="batch_action" value="${action}">
                     <input type="hidden" name="month" value="<?php echo $currentMonth; ?>">
                 `;
-                
+
                 document.body.appendChild(form);
                 form.submit();
             }
         }
-        
+
         // View record details
         function viewDetails(recordId) {
             const modal = document.getElementById('detailsModal');
             const modalBody = document.getElementById('modalBody');
-            
+
             fetch(`get_record_details.php?id=${recordId}&month=<?php echo $currentMonth; ?>`)
                 .then(response => response.json())
                 .then(data => {
@@ -757,31 +761,31 @@ unset($_SESSION['error']);
                     alert('Error loading record details');
                 });
         }
-        
+
         // Verify/Reject record
         function verifyRecord(recordId, action) {
             const modal = document.getElementById('verifyModal');
             const title = document.getElementById('verifyModalTitle');
             const verifyRecordId = document.getElementById('verifyRecordId');
             const verifyAction = document.getElementById('verifyAction');
-            
+
             title.innerHTML = action === 'verify' ? '✓ Verify Record' : '✗ Reject Record';
             verifyRecordId.value = recordId;
             verifyAction.value = action;
-            
+
             modal.style.display = 'block';
         }
-        
+
         // Close modals
         function closeModal() {
             document.getElementById('detailsModal').style.display = 'none';
         }
-        
+
         function closeVerifyModal() {
             document.getElementById('verifyModal').style.display = 'none';
             document.getElementById('verificationNotes').value = '';
         }
-        
+
         // Close modal when clicking outside
         window.onclick = function(event) {
             const modal = document.getElementById('detailsModal');
@@ -793,37 +797,38 @@ unset($_SESSION['error']);
                 verifyModal.style.display = 'none';
             }
         }
-        
+
         // Change month function
         function changeMonth(direction) {
             let currentUrl = new URL(window.location.href);
             let currentMonth = currentUrl.searchParams.get('month') || '<?php echo $currentMonth; ?>';
             let date = new Date(currentMonth + '-01');
-            
+
             if (direction === 'prev') {
                 date.setMonth(date.getMonth() - 1);
             } else {
                 date.setMonth(date.getMonth() + 1);
             }
-            
+
             let newMonth = date.toISOString().slice(0, 7);
             window.location.href = `verify_data.php?month=${newMonth}`;
         }
-        
+
         // Initialize
         updateSelectedCount();
 
 
         // Keep session alive by sending heartbeat every 5 minutes
-function keepSessionAlive() {
-    fetch('/HRandMDDash/keep_alive.php', {
-        method: 'GET',
-        cache: 'no-cache'
-    }).catch(error => console.log('Session keep-alive failed:', error));
-}
+        function keepSessionAlive() {
+            fetch('/HRandMDDash/keep_alive.php', {
+                method: 'GET',
+                cache: 'no-cache'
+            }).catch(error => console.log('Session keep-alive failed:', error));
+        }
 
-// Send heartbeat every 5 minutes
-setInterval(keepSessionAlive, 5 * 60 * 1000);
+        // Send heartbeat every 5 minutes
+        setInterval(keepSessionAlive, 5 * 60 * 1000);
     </script>
 </body>
+
 </html>

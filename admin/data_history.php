@@ -100,7 +100,7 @@ if ($filterDataType == 'master') {
               LEFT JOIN users u ON al.performed_by = u.id
               LEFT JOIN mro_cpr_report m ON al.record_id = m.id
               $whereClause)";
-    
+
     // CRITICAL FIX: Duplicate parameters for UNION query
     // Since the WHERE clause appears twice, we need twice the parameters
     if (!empty($params)) {
@@ -158,14 +158,15 @@ if ($statsMroResult && $statsMroResult->num_rows > 0) {
 $conn->close();
 
 // Helper function to format JSON data nicely
-function formatChangeData($oldData, $newData) {
+function formatChangeData($oldData, $newData)
+{
     $old = json_decode($oldData, true);
     $new = json_decode($newData, true);
-    
+
     if (!$old && !$new) return '<span style="color: #888;">No data</span>';
-    
+
     $html = '<table style="width:100%; font-size:0.7rem; border-collapse:collapse;">';
-    
+
     if ($old) {
         $html .= ' tr><td style="padding:2px; color:#dc3545;"><strong>OLD:</strong></td><td style="padding:2px;">';
         foreach ($old as $key => $value) {
@@ -174,7 +175,7 @@ function formatChangeData($oldData, $newData) {
         }
         $html .= '</td></tr>';
     }
-    
+
     if ($new) {
         $html .= ' tr><td style="padding:2px; color:#28a745;"><strong>NEW:</strong></td><td style="padding:2px;">';
         foreach ($new as $key => $value) {
@@ -183,14 +184,15 @@ function formatChangeData($oldData, $newData) {
         }
         $html .= '</td></tr>';
     }
-    
+
     $html .= '</table>';
     return $html;
 }
 
 // Helper function for action badge
-function getActionBadge($action) {
-    switch($action) {
+function getActionBadge($action)
+{
+    switch ($action) {
         case 'insert':
             return '<span class="badge badge-insert">➕ Insert</span>';
         case 'update':
@@ -205,9 +207,10 @@ function getActionBadge($action) {
 }
 
 // Helper function for data type badge
-function getDataTypeBadge($dataType) {
+function getDataTypeBadge($dataType)
+{
     if ($dataType == 'master') {
-        return '<span class="badge badge-master">📊 Master Data</span>';
+        return '<span class="badge badge-master">Master Data</span>';
     } else {
         return '<span class="badge badge-mro">🔧 MRO Report</span>';
     }
@@ -221,11 +224,13 @@ unset($_SESSION['error']);
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Data History - Audit Trail</title>
     <link rel="stylesheet" href="../css/style.css">
+    <link rel="icon" type="image/png" href="../assets/images/ethiopian_logo.ico">
     <style>
         :root {
             --dark-bg: #0F172A;
@@ -239,26 +244,26 @@ unset($_SESSION['error']);
             --border-light: #334155;
             --card-bg: #1E293B;
         }
-        
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
             background: var(--dark-bg);
             color: var(--light-bg);
             transition: background-color 0.3s, color 0.3s;
         }
-        
+
         .container {
             max-width: 1400px;
             margin: 2rem auto;
             padding: 0 2rem;
         }
-        
+
         .history-header {
             background: linear-gradient(135deg, var(--medium-bg) 0%, var(--dark-bg) 100%);
             padding: 1.5rem;
@@ -266,14 +271,14 @@ unset($_SESSION['error']);
             margin-bottom: 2rem;
             transition: background 0.3s;
         }
-        
+
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 1rem;
             margin-top: 1.5rem;
         }
-        
+
         .stat-card {
             background: var(--dark-bg);
             padding: 1rem;
@@ -281,20 +286,20 @@ unset($_SESSION['error']);
             text-align: center;
             transition: background 0.3s;
         }
-        
+
         .stat-number {
             font-size: 1.5rem;
             font-weight: bold;
             color: var(--accent);
         }
-        
+
         .stat-label {
             font-size: 0.75rem;
             color: var(--light-bg);
             opacity: 0.8;
             margin-top: 0.25rem;
         }
-        
+
         .filter-section {
             background: var(--medium-bg);
             padding: 1rem;
@@ -302,26 +307,26 @@ unset($_SESSION['error']);
             margin-bottom: 1.5rem;
             transition: background 0.3s;
         }
-        
+
         .filter-form {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 1rem;
             align-items: end;
         }
-        
+
         .filter-group {
             display: flex;
             flex-direction: column;
             gap: 0.25rem;
         }
-        
+
         .filter-group label {
             font-size: 0.7rem;
             color: var(--accent);
             font-weight: bold;
         }
-        
+
         .filter-group select,
         .filter-group input {
             padding: 0.5rem;
@@ -332,13 +337,13 @@ unset($_SESSION['error']);
             font-size: 0.8rem;
             transition: all 0.3s;
         }
-        
+
         .filter-group select:focus,
         .filter-group input:focus {
             outline: none;
             border-color: var(--accent);
         }
-        
+
         .table-wrapper {
             overflow-x: auto;
             background: var(--medium-bg);
@@ -346,13 +351,13 @@ unset($_SESSION['error']);
             padding: 1rem;
             transition: background 0.3s;
         }
-        
+
         .history-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.75rem;
         }
-        
+
         .history-table th,
         .history-table td {
             padding: 0.75rem;
@@ -360,7 +365,7 @@ unset($_SESSION['error']);
             border-bottom: 1px solid var(--border-light);
             vertical-align: top;
         }
-        
+
         .history-table th {
             background: var(--dark-bg);
             color: var(--accent);
@@ -369,11 +374,11 @@ unset($_SESSION['error']);
             top: 0;
             z-index: 10;
         }
-        
+
         .history-table tr:hover {
-            background: rgba(56,189,248,0.05);
+            background: rgba(56, 189, 248, 0.05);
         }
-        
+
         .badge {
             display: inline-block;
             padding: 0.2rem 0.5rem;
@@ -381,47 +386,47 @@ unset($_SESSION['error']);
             font-size: 0.65rem;
             font-weight: bold;
         }
-        
+
         .badge-insert {
             background: #28a745;
             color: white;
         }
-        
+
         .badge-update {
             background: #ffc107;
             color: #222;
         }
-        
+
         .badge-verify {
             background: #17a2b8;
             color: white;
         }
-        
+
         .badge-reject {
             background: #dc3545;
             color: white;
         }
-        
+
         .badge-master {
             background: #3b82f6;
             color: white;
         }
-        
+
         .badge-mro {
             background: #f59e0b;
             color: white;
         }
-        
+
         .record-link {
             color: var(--accent);
             text-decoration: none;
             font-weight: bold;
         }
-        
+
         .record-link:hover {
             text-decoration: underline;
         }
-        
+
         .clear-filter {
             background: var(--accent);
             color: var(--dark-bg);
@@ -435,39 +440,39 @@ unset($_SESSION['error']);
             text-decoration: none;
             display: inline-block;
         }
-        
+
         .clear-filter:hover {
             transform: translateY(-1px);
         }
-        
+
         @media (max-width: 768px) {
             .container {
                 padding: 0 1rem;
             }
-            
+
             .filter-form {
                 grid-template-columns: 1fr;
             }
-            
+
             .history-table {
                 font-size: 0.65rem;
             }
-            
+
             .history-table th,
             .history-table td {
                 padding: 0.5rem;
             }
         }
-        
+
         .timestamp {
             font-family: monospace;
             font-size: 0.7rem;
         }
-        
+
         .change-details {
             max-width: 300px;
         }
-        
+
         /* Theme Toggle Button */
         .theme-toggle {
             background: transparent;
@@ -479,19 +484,25 @@ unset($_SESSION['error']);
             font-size: 0.8rem;
             transition: all 0.3s;
         }
-        
+
         .theme-toggle:hover {
             background: var(--accent);
             color: var(--dark-bg);
         }
-        
+
         /* Navbar styles */
-         .navbar {
+        .navbar {
             background: var(--medium-bg);
             padding: 0.5rem 0;
             transition: background-color 0.3s;
         }
-        
+
+        .navbar {
+            background: var(--medium-bg);
+            padding: 0.5rem 0;
+            transition: background-color 0.3s;
+        }
+
         .navbar-container {
             max-width: 100%;
             margin: 0 auto;
@@ -502,37 +513,44 @@ unset($_SESSION['error']);
             flex-wrap: wrap;
             gap: 0.5rem;
         }
-        
+
         .navbar-brand {
             font-size: 1rem;
             font-weight: bold;
             color: var(--accent);
             text-decoration: none;
         }
-        
+
         .navbar-menu {
             display: flex;
             gap: 1rem;
             align-items: center;
             flex-wrap: wrap;
         }
-        
+
         .navbar-menu a {
             color: var(--text-primary);
             text-decoration: none;
             font-size: 0.8rem;
             transition: color 0.2s;
         }
-        
+
         .navbar-menu a:hover {
             color: var(--accent);
         }
+
+        .user-info {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
         .user-name {
             color: var(--accent);
             font-weight: bold;
             font-size: 0.8rem;
         }
-        
+
         .btn {
             background: var(--accent);
             color: var(--dark-bg);
@@ -546,19 +564,19 @@ unset($_SESSION['error']);
             text-decoration: none;
             display: inline-block;
         }
-        
+
         .btn:hover {
             transform: translateY(-1px);
-            box-shadow: 0 2px 5px rgba(56,189,248,0.3);
+            box-shadow: 0 2px 5px rgba(56, 189, 248, 0.3);
             background: var(--accent-hover);
         }
-        
+
         /* Light Theme */
         body.light-theme {
             background: #F8FAFC;
             color: #0F172A;
         }
-        
+
         body.light-theme .navbar,
         body.light-theme .history-header,
         body.light-theme .filter-section,
@@ -566,75 +584,76 @@ unset($_SESSION['error']);
             background: white !important;
             border-color: #E2E8F0 !important;
         }
-        
+
         body.light-theme .navbar {
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
-        
+
         body.light-theme .history-header {
             background: linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 100%) !important;
         }
-        
+
         body.light-theme .stat-card {
             background: #F1F5F9;
         }
-        
+
         body.light-theme .history-table th {
             background: #F1F5F9;
             color: #0284C7;
         }
-        
+
         body.light-theme .history-table td {
             border-bottom-color: #E2E8F0;
         }
-        
+
         body.light-theme .filter-group select,
         body.light-theme .filter-group input {
             background: white;
             color: #0F172A;
             border-color: #CBD5E1;
         }
-        
+
         body.light-theme .btn {
             background: #0284C7;
             color: white;
         }
-        
+
         body.light-theme .theme-toggle {
             border-color: #0284C7;
             color: #0284C7;
         }
-        
+
         body.light-theme .theme-toggle:hover {
             background: #0284C7;
             color: white;
         }
-        
+
         body.light-theme .record-link {
             color: #0284C7;
         }
-        
+
         body.light-theme .badge-master {
             background: #3b82f6;
         }
-        
+
         body.light-theme .badge-mro {
             background: #f59e0b;
         }
-        
+
         body.light-theme .clear-filter {
             background: #0284C7;
             color: white;
         }
     </style>
 </head>
+
 <body>
     <nav class="navbar">
         <div class="navbar-container">
             <a href="master_data.php" class="navbar-brand">HR & Finance Dashboard</a>
             <div class="navbar-menu">
-                <a href="../director/md_dashboard.php" >Dashboard</a>
-                <a href="master_data.php" >Master Data Entry</a>
+                <a href="master_data.php">Master Data</a>
+                <a href="../director/md_dashboard.php">Dashboard</a>
                 <a href="../admin/report_mro_cpr.php">Director Data Entry</a>
                 <!-- <a href="verify_data.php" >Verify Data</a> -->
                 <a href="data_history.php" style="color: var(--accent);">History</a>
@@ -647,12 +666,12 @@ unset($_SESSION['error']);
             </div>
         </div>
     </nav>
-    
+
     <div class="container">
         <div class="history-header">
             <h2>📜 Data History & Audit Trail</h2>
             <p>Complete history of all changes made to Master Data and MRO CPR Reports</p>
-            
+
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-number"><?php echo number_format($statsMaster['total_actions']); ?></div>
@@ -672,23 +691,23 @@ unset($_SESSION['error']);
                 </div>
             </div>
         </div>
-        
+
         <div class="filter-section">
             <form method="GET" action="" class="filter-form">
                 <div class="filter-group">
                     <label>Data Type</label>
                     <select name="data_type" onchange="this.form.submit()">
                         <option value="all" <?php echo $filterDataType == 'all' ? 'selected' : ''; ?>>All Data Types</option>
-                        <option value="master" <?php echo $filterDataType == 'master' ? 'selected' : ''; ?>>📊 Master Data</option>
+                        <option value="master" <?php echo $filterDataType == 'master' ? 'selected' : ''; ?>>Master Data</option>
                         <option value="mro" <?php echo $filterDataType == 'mro' ? 'selected' : ''; ?>>🔧 MRO Reports</option>
                     </select>
                 </div>
-                
+
                 <div class="filter-group">
                     <label>Record ID</label>
                     <input type="number" name="record_id" placeholder="Filter by Record ID" value="<?php echo htmlspecialchars($filterRecord); ?>">
                 </div>
-                
+
                 <div class="filter-group">
                     <label>User</label>
                     <select name="user_id">
@@ -700,7 +719,7 @@ unset($_SESSION['error']);
                         <?php endwhile; ?>
                     </select>
                 </div>
-                
+
                 <div class="filter-group">
                     <label>Action</label>
                     <select name="action">
@@ -711,24 +730,24 @@ unset($_SESSION['error']);
                         <option value="reject" <?php echo $filterAction == 'reject' ? 'selected' : ''; ?>>Reject</option>
                     </select>
                 </div>
-                
+
                 <div class="filter-group">
                     <label>Date From</label>
                     <input type="date" name="date_from" value="<?php echo htmlspecialchars($filterDateFrom); ?>">
                 </div>
-                
+
                 <div class="filter-group">
                     <label>Date To</label>
                     <input type="date" name="date_to" value="<?php echo htmlspecialchars($filterDateTo); ?>">
                 </div>
-                
+
                 <div class="filter-group">
                     <button type="submit" class="btn">🔍 Apply Filters</button>
                     <a href="data_history.php" class="clear-filter">🗑️ Clear Filters</a>
                 </div>
             </form>
         </div>
-        
+
         <div class="table-wrapper">
             <table class="history-table">
                 <thead>
@@ -740,7 +759,7 @@ unset($_SESSION['error']);
                         <th>Data Type</th>
                         <th>Record</th>
                         <th>Changes</th>
-                    </thead>
+                </thead>
                 <tbody>
                     <?php if ($logs && $logs->num_rows > 0): ?>
                         <?php while ($log = $logs->fetch_assoc()): ?>
@@ -769,28 +788,28 @@ unset($_SESSION['error']);
                                     <?php else: ?>
                                         <span style="color: #888;">Record Deleted</span>
                                     <?php endif; ?>
-                                 </td>
+                                </td>
                                 <td class="change-details">
                                     <?php echo formatChangeData($log['old_data'], $log['new_data']); ?>
-                                 </td>
-                             </tr>
+                                </td>
+                            </tr>
                         <?php endwhile; ?>
                     <?php else: ?>
-                         <tr>
+                        <tr>
                             <td colspan="7" style="text-align: center; padding: 2rem;">
                                 <div style="color: #888;">No history records found</div>
-                             </td>
-                         </tr>
+                            </td>
+                        </tr>
                     <?php endif; ?>
                 </tbody>
-             </table>
+            </table>
         </div>
-        
+
         <div style="margin-top: 1rem; text-align: right;">
             <small style="color: #888;">Showing last 100 records. Use filters to narrow down results.</small>
         </div>
     </div>
-    
+
     <script>
         // Theme Manager
         class ThemeManager {
@@ -799,7 +818,7 @@ unset($_SESSION['error']);
                 this.loadTheme();
                 this.initToggle();
             }
-            
+
             loadTheme() {
                 const savedTheme = localStorage.getItem(this.themeKey);
                 if (savedTheme === 'light') {
@@ -810,7 +829,7 @@ unset($_SESSION['error']);
                     this.updateToggleButton(false);
                 }
             }
-            
+
             toggleTheme() {
                 if (document.body.classList.contains('light-theme')) {
                     document.body.classList.remove('light-theme');
@@ -822,14 +841,14 @@ unset($_SESSION['error']);
                     this.updateToggleButton(true);
                 }
             }
-            
+
             updateToggleButton(isLight) {
                 const toggleBtn = document.getElementById('themeToggle');
                 if (toggleBtn) {
                     toggleBtn.innerHTML = isLight ? '🌙 Dark' : '☀️ Light';
                 }
             }
-            
+
             initToggle() {
                 const toggleBtn = document.getElementById('themeToggle');
                 if (toggleBtn) {
@@ -837,14 +856,14 @@ unset($_SESSION['error']);
                 }
             }
         }
-        
+
         // Auto-submit form when filters change (except for text inputs)
         document.querySelectorAll('select, input[type="date"]').forEach(element => {
             element.addEventListener('change', function() {
                 this.closest('form').submit();
             });
         });
-        
+
         // Add loading indicator on form submit
         document.querySelectorAll('form').forEach(form => {
             form.addEventListener('submit', function() {
@@ -855,23 +874,23 @@ unset($_SESSION['error']);
                 }
             });
         });
-        
+
         // Initialize theme manager
         document.addEventListener('DOMContentLoaded', function() {
             new ThemeManager();
         });
 
-      // Function to open password change modal
-function openPasswordModal() {
-    // Check if modal already exists
-    if (document.getElementById('passwordModalOverlay')) {
-        return;
-    }
-    
-    // Create modal container
-    const modalOverlay = document.createElement('div');
-    modalOverlay.id = 'passwordModalOverlay';
-    modalOverlay.style.cssText = `
+        // Function to open password change modal
+        function openPasswordModal() {
+            // Check if modal already exists
+            if (document.getElementById('passwordModalOverlay')) {
+                return;
+            }
+
+            // Create modal container
+            const modalOverlay = document.createElement('div');
+            modalOverlay.id = 'passwordModalOverlay';
+            modalOverlay.style.cssText = `
         position: fixed;
         top: 0;
         left: 0;
@@ -883,11 +902,11 @@ function openPasswordModal() {
         align-items: center;
         justify-content: center;
     `;
-    
-    // Create iframe to load the password change page
-    const iframe = document.createElement('iframe');
-    iframe.src = '../change_password.php';
-    iframe.style.cssText = `
+
+            // Create iframe to load the password change page
+            const iframe = document.createElement('iframe');
+            iframe.src = '../change_password.php';
+            iframe.style.cssText = `
         width: 100%;
         max-width: 450px;
         height: auto;
@@ -896,41 +915,42 @@ function openPasswordModal() {
         border-radius: 16px;
         background: transparent;
     `;
-    
-    modalOverlay.appendChild(iframe);
-    document.body.appendChild(modalOverlay);
-    
-    // Store reference to close function
-    window.closePasswordPopup = function() {
-        if (modalOverlay && modalOverlay.parentNode) {
-            modalOverlay.remove();
-        }
-        delete window.closePasswordPopup;
-    };
-    
-    // Close on Escape key
-    const escapeHandler = function(e) {
-        if (e.key === 'Escape') {
-            if (modalOverlay && modalOverlay.parentNode) {
-                modalOverlay.remove();
+
+            modalOverlay.appendChild(iframe);
+            document.body.appendChild(modalOverlay);
+
+            // Store reference to close function
+            window.closePasswordPopup = function() {
+                if (modalOverlay && modalOverlay.parentNode) {
+                    modalOverlay.remove();
+                }
                 delete window.closePasswordPopup;
-            }
-            document.removeEventListener('keydown', escapeHandler);
+            };
+
+            // Close on Escape key
+            const escapeHandler = function(e) {
+                if (e.key === 'Escape') {
+                    if (modalOverlay && modalOverlay.parentNode) {
+                        modalOverlay.remove();
+                        delete window.closePasswordPopup;
+                    }
+                    document.removeEventListener('keydown', escapeHandler);
+                }
+            };
+            document.addEventListener('keydown', escapeHandler);
         }
-    };
-    document.addEventListener('keydown', escapeHandler);
-}
 
-// Keep session alive by sending heartbeat every 5 minutes
-function keepSessionAlive() {
-    fetch('/HRandMDDash/keep_alive.php', {
-        method: 'GET',
-        cache: 'no-cache'
-    }).catch(error => console.log('Session keep-alive failed:', error));
-}
+        // Keep session alive by sending heartbeat every 5 minutes
+        function keepSessionAlive() {
+            fetch('/HRandMDDash/keep_alive.php', {
+                method: 'GET',
+                cache: 'no-cache'
+            }).catch(error => console.log('Session keep-alive failed:', error));
+        }
 
-// Send heartbeat every 5 minutes
-setInterval(keepSessionAlive, 5 * 60 * 1000);
+        // Send heartbeat every 5 minutes
+        setInterval(keepSessionAlive, 5 * 60 * 1000);
     </script>
 </body>
+
 </html>

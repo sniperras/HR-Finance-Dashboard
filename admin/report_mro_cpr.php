@@ -110,7 +110,8 @@ if ($selectedDept && $currentMonth && $currentYear && $selectedReport) {
 $conn->close();
 
 // Helper function to check if department has director
-function hasDirector($costCentersList) {
+function hasDirector($costCentersList)
+{
     foreach ($costCentersList as $cc) {
         if (isset($cc['isDirector']) && $cc['isDirector'] === true) {
             return true;
@@ -127,6 +128,7 @@ function hasDirector($costCentersList) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MRO CPR Report - Director Dashboard</title>
     <link rel="stylesheet" href="../css/style.css">
+    <link rel="icon" type="image/png" href="../assets/images/ethiopian_logo.ico">
     <style>
         :root {
             --dark-bg: #0F172A;
@@ -159,7 +161,13 @@ function hasDirector($costCentersList) {
             padding: 0.5rem 0;
             transition: background-color 0.3s;
         }
-        
+
+        .navbar {
+            background: var(--medium-bg);
+            padding: 0.5rem 0;
+            transition: background-color 0.3s;
+        }
+
         .navbar-container {
             max-width: 100%;
             margin: 0 auto;
@@ -170,30 +178,36 @@ function hasDirector($costCentersList) {
             flex-wrap: wrap;
             gap: 0.5rem;
         }
-        
+
         .navbar-brand {
             font-size: 1rem;
             font-weight: bold;
             color: var(--accent);
             text-decoration: none;
         }
-        
+
         .navbar-menu {
             display: flex;
             gap: 1rem;
             align-items: center;
             flex-wrap: wrap;
         }
-        
+
         .navbar-menu a {
             color: var(--text-primary);
             text-decoration: none;
             font-size: 0.8rem;
             transition: color 0.2s;
         }
-        
+
         .navbar-menu a:hover {
             color: var(--accent);
+        }
+
+        .user-info {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
         }
 
         .user-name {
@@ -209,7 +223,7 @@ function hasDirector($costCentersList) {
             padding: 0.3rem 0.8rem;
             cursor: pointer;
         }
-        
+
         .theme-toggle:hover {
             background: var(--accent);
             color: var(--dark-bg);
@@ -525,7 +539,7 @@ function hasDirector($costCentersList) {
         <div class="filter-section">
             <form method="GET" action="" class="filter-form" id="filterForm">
                 <div class="filter-group">
-                    <label>Report Type 
+                    <label>Report Type
                         <button type="button" class="refresh-btn" onclick="refreshReports()" title="Refresh indicators from database">⟳</button>
                     </label>
                     <select name="report" id="reportSelect" onchange="this.form.submit()">
@@ -599,18 +613,18 @@ function hasDirector($costCentersList) {
                             $costCentersList = $costCenters[$selectedDept] ?? [];
                             $hasDirectorDept = hasDirector($costCentersList);
                             $directorRowIndex = -1;
-                            
+
                             // First pass: display all non-director rows and track director position
                             foreach ($costCentersList as $index => $cc):
                                 $code = $cc['code'];
                                 $name = $cc['name'];
                                 $isDirector = isset($cc['isDirector']) && $cc['isDirector'] === true;
-                                
+
                                 if ($isDirector) {
                                     $directorRowIndex = $index;
                                     continue; // Skip director row for now, will add after calculating totals
                                 }
-                                
+
                                 $expected = isset($existingData[$code]) ? $existingData[$code]['expected'] : 0;
                                 $completed = isset($existingData[$code]) ? $existingData[$code]['completed'] : 0;
                                 $percentage = $expected > 0 ? round(($completed / $expected) * 100, 1) : 0;
@@ -642,14 +656,14 @@ function hasDirector($costCentersList) {
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
-                            
-                            <?php 
+
+                            <?php
                             // Calculate totals for director row if department has director
                             if ($hasDirectorDept && $directorRowIndex >= 0):
                                 $directorCC = $costCentersList[$directorRowIndex];
                                 $directorCode = $directorCC['code'];
                                 $directorName = $directorCC['name'];
-                                
+
                                 // Calculate totals from all non-director rows
                                 $totalExpected = 0;
                                 $totalCompleted = 0;
@@ -659,7 +673,7 @@ function hasDirector($costCentersList) {
                                     $totalExpected += isset($existingData[$code]) ? $existingData[$code]['expected'] : 0;
                                     $totalCompleted += isset($existingData[$code]) ? $existingData[$code]['completed'] : 0;
                                 endforeach;
-                                
+
                                 $totalPercentage = $totalExpected > 0 ? round(($totalCompleted / $totalExpected) * 100, 1) : 0;
                                 $totalNotCompleted = $totalExpected - $totalCompleted;
                                 $totalColor = $totalPercentage >= 90 ? 'var(--success)' : ($totalPercentage >= 70 ? 'var(--warning)' : 'var(--danger)');
@@ -672,13 +686,13 @@ function hasDirector($costCentersList) {
                                     </td>
                                     <td>
                                         <input type="number" name="cost_center[<?php echo $directorCode; ?>][expected]"
-                                            class="expected-input director-input" value="<?php echo $totalExpected; ?>" 
+                                            class="expected-input director-input" value="<?php echo $totalExpected; ?>"
                                             min="0" step="1" readonly style="background: var(--medium-bg);">
                                     </td>
                                     <td>
                                         <input type="number" name="cost_center[<?php echo $directorCode; ?>][completed]"
-                                            class="completed-input director-input" value="<?php echo $totalCompleted; ?>" 
-                                            min="0" step="1" readonly  style="background: var(--medium-bg);">
+                                            class="completed-input director-input" value="<?php echo $totalCompleted; ?>"
+                                            min="0" step="1" readonly style="background: var(--medium-bg);">
                                     </td>
                                     <td class="not-completed-cell"><?php echo $totalNotCompleted; ?></td>
                                     <td class="percentage-cell" style="color: <?php echo $totalColor; ?>;">
@@ -693,22 +707,22 @@ function hasDirector($costCentersList) {
                             <?php endif; ?>
                         </tbody>
                         <?php if (!$hasDirectorDept): ?>
-                        <tfoot>
-                            <tr class="total-row">
-                                <td><strong>TOTAL</strong></td>
-                                <td id="total-expected">0</td>
-                                <td id="total-completed">0</td>
-                                <td id="total-not-completed">0</td>
-                                <td id="total-percentage" class="percentage-cell">
-                                    <span>0%</span>
-                                </td>
-                                <td>
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" style="width: 0%;"></div>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tfoot>
+                            <tfoot>
+                                <tr class="total-row">
+                                    <td><strong>TOTAL</strong></td>
+                                    <td id="total-expected">0</td>
+                                    <td id="total-completed">0</td>
+                                    <td id="total-not-completed">0</td>
+                                    <td id="total-percentage" class="percentage-cell">
+                                        <span>0%</span>
+                                    </td>
+                                    <td>
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" style="width: 0%;"></div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tfoot>
                         <?php endif; ?>
                     </table>
                 </div>
@@ -803,7 +817,7 @@ function hasDirector($costCentersList) {
                 const isDirector = row.getAttribute('data-is-director') === 'true';
                 const expectedInput = row.querySelector('.expected-input');
                 const completedInput = row.querySelector('.completed-input');
-                
+
                 if (expectedInput && completedInput) {
                     if (!isDirector) {
                         totalExpected += parseInt(expectedInput.value) || 0;
@@ -820,14 +834,14 @@ function hasDirector($costCentersList) {
                 const directorNotCompleted = directorRow.querySelector('.not-completed-cell');
                 const directorPercentageSpan = directorRow.querySelector('.percentage-value');
                 const directorProgressFill = directorRow.querySelector('.progress-fill');
-                
+
                 if (directorExpected && directorCompleted) {
                     directorExpected.value = totalExpected;
                     directorCompleted.value = totalCompleted;
-                    
+
                     let notCompleted = Math.max(0, totalExpected - totalCompleted);
                     let percentage = totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
-                    
+
                     if (directorNotCompleted) directorNotCompleted.textContent = notCompleted;
                     if (directorPercentageSpan) {
                         directorPercentageSpan.textContent = percentage.toFixed(1);
@@ -847,7 +861,7 @@ function hasDirector($costCentersList) {
                 document.getElementById('total-expected').textContent = totalExpected;
                 document.getElementById('total-completed').textContent = totalCompleted;
                 document.getElementById('total-not-completed').textContent = totalExpected - totalCompleted;
-                
+
                 const totalPercentage = totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
                 const totalPercentSpan = document.querySelector('#total-percentage span');
                 if (totalPercentSpan) {
@@ -855,7 +869,7 @@ function hasDirector($costCentersList) {
                     let color = totalPercentage >= 90 ? '#10B981' : (totalPercentage >= 70 ? '#F59E0B' : '#EF4444');
                     totalPercentSpan.style.color = color;
                 }
-                
+
                 const totalProgressFill = document.querySelector('#total-percentage + td .progress-fill');
                 if (totalProgressFill) {
                     totalProgressFill.style.width = totalPercentage + '%';
@@ -873,10 +887,10 @@ function hasDirector($costCentersList) {
                     if (data.success && data.indicators) {
                         const reportSelect = document.getElementById('reportSelect');
                         const currentValue = reportSelect.value;
-                        
+
                         // Clear existing options
                         reportSelect.innerHTML = '';
-                        
+
                         // Add new options
                         data.indicators.forEach(indicator => {
                             const option = document.createElement('option');
@@ -887,7 +901,7 @@ function hasDirector($costCentersList) {
                             }
                             reportSelect.appendChild(option);
                         });
-                        
+
                         // Show success message
                         const msgDiv = document.getElementById('message');
                         if (msgDiv) {
@@ -896,7 +910,7 @@ function hasDirector($costCentersList) {
                                 msgDiv.innerHTML = '';
                             }, 3000);
                         }
-                        
+
                         // If the current selected value is no longer available, submit the form to reload
                         if (!data.indicators.includes(currentValue) && data.indicators.length > 0) {
                             reportSelect.value = data.indicators[0];
@@ -951,7 +965,7 @@ function hasDirector($costCentersList) {
             if (document.getElementById('passwordModalOverlay')) {
                 return;
             }
-            
+
             const modalOverlay = document.createElement('div');
             modalOverlay.id = 'passwordModalOverlay';
             modalOverlay.style.cssText = `
@@ -966,7 +980,7 @@ function hasDirector($costCentersList) {
                 align-items: center;
                 justify-content: center;
             `;
-            
+
             const iframe = document.createElement('iframe');
             iframe.src = '../change_password.php';
             iframe.style.cssText = `
@@ -978,17 +992,17 @@ function hasDirector($costCentersList) {
                 border-radius: 16px;
                 background: transparent;
             `;
-            
+
             modalOverlay.appendChild(iframe);
             document.body.appendChild(modalOverlay);
-            
+
             window.closePasswordPopup = function() {
                 if (modalOverlay && modalOverlay.parentNode) {
                     modalOverlay.remove();
                 }
                 delete window.closePasswordPopup;
             };
-            
+
             const escapeHandler = function(e) {
                 if (e.key === 'Escape') {
                     if (modalOverlay && modalOverlay.parentNode) {

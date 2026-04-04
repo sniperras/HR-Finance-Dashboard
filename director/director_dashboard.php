@@ -83,6 +83,16 @@ $costCenters = [
     'QA' => [
         'QAS' => 'Mgr. MRO Qty Ass & S/a'
     ],
+    'PSCM' => [
+        'GWC' => 'Mgr. Grp Warp Cont Mgt',
+        'TPU' => 'Mgr. Tactical Purchase',
+        'MMP' => 'Mgr. MRO Material Planning',
+        'EMP' => 'Mgr. Engine Maint/Tactical Pur',
+        'WAP' => 'Mgr. Warehouse A/C Part',
+        'EXT' => 'Extra Sourcing',
+        'PLC' => 'Mgr. Purchase-LMT&CMT Maint.',
+        'DIR' => 'Dir. Prop. & Supp. Chain Mgt'
+    ],
     'MRO HR' => [
         'HR' => 'Mgr. Human Resources',
         'DIR' => 'Dir. MRO HR'
@@ -97,26 +107,43 @@ $costCenters = [
     ]
 ];
 
-// Get all indicators from mro_cpr_report table dynamically
-$indicatorsQuery = "SELECT DISTINCT report_type FROM mro_cpr_report WHERE department = ? ORDER BY report_type";
-$stmt = $conn->prepare($indicatorsQuery);
-$stmt->bind_param("s", $userDept);
-$stmt->execute();
-$indicatorsResult = $stmt->get_result();
+// Get ALL indicators from performance_indicators table first (as master list)
+$indicatorsQuery = "SELECT DISTINCT TRIM(indicator_name) as indicator_name FROM performance_indicators ORDER BY created_at ASC";
+$indicatorsResult = $conn->query($indicatorsQuery);
 
 $indicators = [];
-while ($row = $indicatorsResult->fetch_assoc()) {
-    $indicators[$row['report_type']] = $row['report_type'];
+$indicatorOrder = []; // To maintain order
+
+if ($indicatorsResult && $indicatorsResult->num_rows > 0) {
+    while ($row = $indicatorsResult->fetch_assoc()) {
+        $indicatorName = trim($row['indicator_name']);
+        $indicators[$indicatorName] = $indicatorName;
+        $indicatorOrder[] = $indicatorName;
+    }
+}
+
+// Also include any indicators from mro_cpr_report that might not be in performance_indicators
+$mroIndicatorsQuery = "SELECT DISTINCT report_type FROM mro_cpr_report WHERE department = ? AND report_type NOT IN (SELECT indicator_name FROM performance_indicators) ORDER BY report_type";
+$stmt = $conn->prepare($mroIndicatorsQuery);
+$stmt->bind_param("s", $userDept);
+$stmt->execute();
+$mroIndicatorsResult = $stmt->get_result();
+
+if ($mroIndicatorsResult && $mroIndicatorsResult->num_rows > 0) {
+    while ($row = $mroIndicatorsResult->fetch_assoc()) {
+        $indicatorName = trim($row['report_type']);
+        if (!isset($indicators[$indicatorName])) {
+            $indicators[$indicatorName] = $indicatorName;
+            $indicatorOrder[] = $indicatorName;
+        }
+    }
 }
 $stmt->close();
 
-// If no indicators found for this department, get from performance_indicators table
+// If no indicators found at all, create a default message
 if (empty($indicators)) {
-    $fallbackQuery = "SELECT DISTINCT TRIM(indicator_name) as indicator_name FROM performance_indicators ORDER BY indicator_name";
-    $fallbackResult = $conn->query($fallbackQuery);
-    while ($row = $fallbackResult->fetch_assoc()) {
-        $indicators[$row['indicator_name']] = $row['indicator_name'];
-    }
+    $indicators['No Indicators Available'] = 'No Indicators Available';
+    $indicatorOrder = ['No Indicators Available'];
 }
 
 // Fetch ALL data from mro_cpr_report for this department (all cost centers)
@@ -124,7 +151,7 @@ $reportData = [];
 $managerData = [];
 $query = "SELECT report_type, cost_center_code, expected, completed, percentage 
           FROM mro_cpr_report 
-          WHERE report_month = ? AND report_year = ? AND department = ?";
+          WHERE report_month = ? AND report_year = ? AND department = ? AND verification_status = 'verified'";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("iis", $currentMonthNum, $currentYear, $userDept);
 $stmt->execute();
@@ -136,12 +163,12 @@ while ($row = $result->fetch_assoc()) {
     $expected = (int)$row['expected'];
     $completed = (int)$row['completed'];
     $percentage = round((float)$row['percentage'], 1);
-    
+
     // Store manager-level data for detail view
     if (!isset($managerData[$reportType])) {
         $managerData[$reportType] = [];
     }
-    
+
     $costCenterName = $costCenters[$userDept][$costCenter] ?? $costCenter;
     $managerData[$reportType][$costCenter] = [
         'expected' => $expected,
@@ -149,7 +176,7 @@ while ($row = $result->fetch_assoc()) {
         'percentage' => $percentage,
         'name' => $costCenterName
     ];
-    
+
     // Store director-level data (for the card)
     if ($costCenter === 'DIR') {
         $reportData[$reportType] = $percentage;
@@ -169,7 +196,7 @@ $masterResult = $masterStmt->get_result();
 while ($row = $masterResult->fetch_assoc()) {
     $indicatorName = $row['indicator_name'];
     $percentage = round((float)$row['percentage_achievement'], 1);
-    
+
     // If no DIR row found in mro_cpr_report, use master data
     if (!isset($reportData[$indicatorName]) || $reportData[$indicatorName] == 0) {
         $reportData[$indicatorName] = $percentage;
@@ -177,7 +204,7 @@ while ($row = $masterResult->fetch_assoc()) {
 }
 $masterStmt->close();
 
-// Set default values for missing data
+// Set default values for ALL indicators (even those with no data)
 foreach ($indicators as $indicatorKey => $indicatorDisplay) {
     if (!isset($reportData[$indicatorKey])) {
         $reportData[$indicatorKey] = 0;
@@ -189,12 +216,14 @@ $conn->close();
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title><?php echo htmlspecialchars($userDept); ?> Department - Performance Dashboard</title>
     <link rel="stylesheet" href="../css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="icon" type="image/png" href="../assets/images/ethiopian_logo.ico">
     <style>
         :root {
             --dark-bg: #0F172A;
@@ -210,13 +239,13 @@ $conn->close();
             --text-primary: #F1F5F9;
             --text-secondary: #94A3B8;
         }
-        
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
             background: var(--dark-bg);
@@ -224,17 +253,17 @@ $conn->close();
             transition: background-color 0.3s, color 0.3s;
             overflow-x: hidden;
         }
-        
+
         .navbar {
             background: var(--medium-bg);
             padding: 0.5rem 0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
             position: sticky;
             top: 0;
             z-index: 1000;
             border-bottom: 1px solid var(--border-light);
         }
-        
+
         .navbar-container {
             max-width: 100%;
             margin: 0 auto;
@@ -245,21 +274,21 @@ $conn->close();
             flex-wrap: wrap;
             gap: 0.5rem;
         }
-        
+
         .navbar-brand {
             font-size: 0.95rem;
             font-weight: bold;
             color: var(--accent);
             text-decoration: none;
         }
-        
+
         .navbar-menu {
             display: flex;
             gap: 0.8rem;
             align-items: center;
             flex-wrap: wrap;
         }
-        
+
         .navbar-menu a {
             color: var(--text-primary);
             text-decoration: none;
@@ -268,24 +297,24 @@ $conn->close();
             padding: 0.25rem 0.4rem;
             border-radius: 5px;
         }
-        
+
         .navbar-menu a:hover {
             color: var(--accent);
-            background: rgba(56,189,248,0.1);
+            background: rgba(56, 189, 248, 0.1);
         }
-        
+
         .user-info {
             display: flex;
             align-items: center;
             gap: 0.5rem;
         }
-        
+
         .user-name {
             color: var(--accent);
             font-weight: bold;
             font-size: 0.75rem;
         }
-        
+
         .department-badge {
             background: var(--accent);
             color: var(--dark-bg);
@@ -294,7 +323,7 @@ $conn->close();
             font-size: 0.65rem;
             font-weight: bold;
         }
-        
+
         .btn {
             background: var(--accent);
             color: var(--dark-bg);
@@ -308,13 +337,13 @@ $conn->close();
             text-decoration: none;
             display: inline-block;
         }
-        
+
         .btn:hover {
             transform: translateY(-1px);
-            box-shadow: 0 2px 5px rgba(56,189,248,0.3);
+            box-shadow: 0 2px 5px rgba(56, 189, 248, 0.3);
             background: var(--accent-hover);
         }
-        
+
         .theme-toggle {
             background: transparent;
             border: 1px solid var(--accent);
@@ -325,19 +354,19 @@ $conn->close();
             font-size: 0.65rem;
             transition: all 0.3s;
         }
-        
+
         .theme-toggle:hover {
             background: var(--accent);
             color: var(--dark-bg);
         }
-        
+
         .container {
             width: 100%;
             max-width: 100%;
             margin: 0;
             padding: 0.75rem 1rem;
         }
-        
+
         .dashboard-header {
             background: linear-gradient(135deg, var(--medium-bg) 0%, var(--dark-bg) 100%);
             padding: 0.6rem 1rem;
@@ -345,20 +374,20 @@ $conn->close();
             margin-bottom: 1rem;
             border: 1px solid var(--border-light);
         }
-        
+
         .dashboard-header h1 {
             color: var(--accent);
             margin-bottom: 0.2rem;
             font-size: 1rem;
         }
-        
+
         .month-selector {
             display: flex;
             gap: 0.5rem;
             align-items: center;
             margin-top: 0.3rem;
         }
-        
+
         .month-selector button {
             background: var(--accent);
             color: var(--dark-bg);
@@ -369,15 +398,15 @@ $conn->close();
             font-weight: bold;
             font-size: 0.7rem;
         }
-        
+
         .month-selector h3 {
             color: var(--text-primary);
             margin: 0;
             font-size: 0.85rem;
         }
-        
+
         .info-banner {
-            background: rgba(56,189,248,0.1);
+            background: rgba(56, 189, 248, 0.1);
             padding: 0.5rem 1rem;
             border-radius: 8px;
             margin-bottom: 1rem;
@@ -385,14 +414,14 @@ $conn->close();
             font-size: 0.7rem;
             color: var(--accent);
         }
-        
+
         .metrics-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
             gap: 1rem;
             margin-bottom: 1rem;
         }
-        
+
         .metric-card {
             background: var(--card-bg);
             border-radius: 12px;
@@ -402,13 +431,13 @@ $conn->close();
             text-align: center;
             cursor: pointer;
         }
-        
+
         .metric-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             border-color: var(--accent);
         }
-        
+
         .metric-title {
             font-size: 0.85rem;
             font-weight: bold;
@@ -418,26 +447,26 @@ $conn->close();
             border-bottom: 1px solid var(--border-light);
             word-break: break-word;
         }
-        
+
         .chart-container {
             position: relative;
             width: 120px;
             height: 120px;
             margin: 0.5rem auto;
         }
-        
+
         .chart-container canvas {
             width: 100% !important;
             height: 100% !important;
         }
-        
+
         .percentage-display {
             text-align: center;
             margin-top: 0.5rem;
             font-size: 1.2rem;
             font-weight: bold;
         }
-        
+
         .actual-target {
             display: flex;
             justify-content: space-around;
@@ -446,7 +475,7 @@ $conn->close();
             border-top: 1px solid var(--border-light);
             font-size: 0.7rem;
         }
-        
+
         /* Modal Styles */
         .modal {
             display: none;
@@ -456,11 +485,11 @@ $conn->close();
             top: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0, 0, 0, 0.7);
             align-items: center;
             justify-content: center;
         }
-        
+
         .modal-content {
             background: var(--medium-bg);
             border-radius: 12px;
@@ -470,7 +499,7 @@ $conn->close();
             overflow-y: auto;
             border: 1px solid var(--border-light);
         }
-        
+
         .modal-header {
             display: flex;
             justify-content: space-between;
@@ -481,12 +510,12 @@ $conn->close();
             top: 0;
             background: var(--medium-bg);
         }
-        
+
         .modal-header h3 {
             color: var(--accent);
             font-size: 0.9rem;
         }
-        
+
         .close-modal {
             background: none;
             border: none;
@@ -494,16 +523,16 @@ $conn->close();
             font-size: 1.5rem;
             cursor: pointer;
         }
-        
+
         .close-modal:hover {
             color: var(--danger);
         }
-        
+
         .detail-table {
             width: 100%;
             border-collapse: collapse;
         }
-        
+
         .detail-table th,
         .detail-table td {
             padding: 0.6rem;
@@ -511,7 +540,7 @@ $conn->close();
             border-bottom: 1px solid var(--border-light);
             font-size: 0.7rem;
         }
-        
+
         .detail-table th {
             background: var(--dark-bg);
             color: var(--accent);
@@ -519,16 +548,16 @@ $conn->close();
             position: sticky;
             top: 60px;
         }
-        
+
         .detail-table tr:hover {
-            background: rgba(56,189,248,0.05);
+            background: rgba(56, 189, 248, 0.05);
         }
-        
+
         .director-row {
             background: rgba(16, 185, 129, 0.1);
             font-weight: bold;
         }
-        
+
         .progress-bar-modal {
             width: 80px;
             height: 6px;
@@ -536,19 +565,19 @@ $conn->close();
             border-radius: 3px;
             overflow: hidden;
         }
-        
+
         .progress-fill-modal {
             height: 100%;
             border-radius: 3px;
         }
-        
+
         .no-data {
             text-align: center;
             padding: 2rem;
             color: var(--text-primary);
             opacity: 0.7;
         }
-        
+
         .refresh-btn {
             background: var(--success);
             color: white;
@@ -559,7 +588,7 @@ $conn->close();
             font-size: 0.65rem;
             margin-left: 0.5rem;
         }
-        
+
         /* Light Theme */
         body.light-theme {
             --dark-bg: #F8FAFC;
@@ -572,31 +601,31 @@ $conn->close();
             --text-primary: #0F172A;
             --text-secondary: #475569;
         }
-        
+
         body.light-theme .navbar {
             background: white;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
         }
-        
+
         body.light-theme .dashboard-header {
             background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
         }
-        
+
         ::-webkit-scrollbar {
             width: 5px;
             height: 5px;
         }
-        
+
         ::-webkit-scrollbar-track {
             background: var(--dark-bg);
             border-radius: 3px;
         }
-        
+
         ::-webkit-scrollbar-thumb {
             background: var(--accent);
             border-radius: 3px;
         }
-        
+
         @media (max-width: 768px) {
             .metrics-grid {
                 grid-template-columns: 1fr;
@@ -604,15 +633,16 @@ $conn->close();
         }
     </style>
 </head>
+
 <body>
     <nav class="navbar">
         <div class="navbar-container">
             <a href="director_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
             <div class="navbar-menu">
-                <a href="director_dashboard.php" style="color: var(--accent);">My Dashboard</a>
+                <a href="director_dashboard.php" style="color: var(--accent);">Dashboard</a>
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
-                    <span class="user-name">👤 <?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
+                    <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
                     <span class="department-badge"><?php echo htmlspecialchars($userDept); ?></span>
                     <a href="#" onclick="openPasswordModal(); return false;" style="cursor: pointer;">🔑 Change Password</a>
                     <a href="../logout.php" class="btn">Logout</a>
@@ -620,10 +650,10 @@ $conn->close();
             </div>
         </div>
     </nav>
-    
+
     <div class="container">
         <div class="dashboard-header">
-            <h1>📊 <?php echo htmlspecialchars($userDept); ?> Department - Performance Dashboard</h1>
+            <h1><?php echo htmlspecialchars($userDept); ?> Department - Performance Dashboard</h1>
             <div class="month-selector">
                 <button onclick="changeMonth('prev')">← Prev</button>
                 <h3>📅 <?php echo date('F Y', strtotime($dataMonth)); ?></h3>
@@ -631,16 +661,16 @@ $conn->close();
                 <button class="refresh-btn" onclick="refreshDashboard()">⟳ Refresh</button>
             </div>
         </div>
-        
-        <!-- <div class="info-banner">
-            📈 Welcome <?php echo htmlspecialchars($_SESSION['full_name']); ?> - Click on any card to view detailed manager breakdown
-            <span style="display: inline-block; margin-left: 10px; font-size: 0.6rem;">🔄 Cards automatically update when new indicators are added</span>
-        </div> -->
-        
+
+        <div class="info-banner">
+
+            <span style="display: inline-block; margin-left: 10px; font-size: 0.6rem;">Click on any card to view detailed manager breakdown | Cards automatically update when new data are added</span>
+        </div>
+
         <div class="metrics-grid" id="metricsGrid">
-            <?php 
+            <?php
             $chartIndex = 0;
-            foreach ($indicators as $indicatorKey => $indicatorDisplay): 
+            foreach ($indicators as $indicatorKey => $indicatorDisplay):
                 $percentage = $reportData[$indicatorKey] ?? 0;
                 $percentageColor = $percentage >= 90 ? 'var(--success)' : ($percentage >= 70 ? 'var(--warning)' : 'var(--danger)');
                 $chartId = 'chart-' . $chartIndex;
@@ -661,15 +691,8 @@ $conn->close();
                 </div>
             <?php endforeach; ?>
         </div>
-        
-        <?php if (empty($indicators)): ?>
-            <div class="no-data">
-                <p>No data available for this department yet.</p>
-                <p>Please add performance indicators to get started.</p>
-            </div>
-        <?php endif; ?>
     </div>
-    
+
     <!-- Detail Modal -->
     <div id="detailModal" class="modal">
         <div class="modal-content">
@@ -682,7 +705,7 @@ $conn->close();
             </div>
         </div>
     </div>
-    
+
     <script>
         // Data passed from PHP
         const managerData = <?php echo json_encode($managerData); ?>;
@@ -690,22 +713,22 @@ $conn->close();
         const costCenters = <?php echo json_encode($costCenters[$userDept] ?? []); ?>;
         const userDept = '<?php echo $userDept; ?>';
         const currentMonth = '<?php echo $currentMonth; ?>';
-        
+
         let chartInstances = {};
-        
+
         function getColor(percentage) {
             if (percentage >= 90) return '#10B981';
             if (percentage >= 70) return '#F59E0B';
             return '#EF4444';
         }
-        
+
         function createGaugeChart(canvasId, percentage) {
             const ctx = document.getElementById(canvasId);
             if (!ctx) return null;
-            
+
             const remaining = Math.max(0, 100 - percentage);
             const color = getColor(percentage);
-            
+
             return new Chart(ctx, {
                 type: 'doughnut',
                 data: {
@@ -722,7 +745,9 @@ $conn->close();
                     responsive: true,
                     maintainAspectRatio: true,
                     plugins: {
-                        legend: { display: false },
+                        legend: {
+                            display: false
+                        },
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
@@ -734,25 +759,30 @@ $conn->close();
                 }
             });
         }
-        
+
         function showDetail(indicatorKey, indicatorDisplay) {
             const modal = document.getElementById('detailModal');
             const modalTitle = document.getElementById('modalTitle');
             const modalBody = document.getElementById('modalBody');
-            
+
             modalTitle.innerHTML = `${indicatorDisplay} - ${userDept} Department Details`;
-            
+
             const data = managerData[indicatorKey] || {};
-            
+
             // Calculate totals
             let totalExpected = 0;
             let totalCompleted = 0;
             let directorData = null;
             const managerRows = [];
-            
+
             for (const [code, manager] of Object.entries(costCenters)) {
-                const record = data[code] || { expected: 0, completed: 0, percentage: 0, name: manager };
-                
+                const record = data[code] || {
+                    expected: 0,
+                    completed: 0,
+                    percentage: 0,
+                    name: manager
+                };
+
                 if (code === 'DIR') {
                     directorData = record;
                 } else {
@@ -767,9 +797,9 @@ $conn->close();
                     });
                 }
             }
-            
+
             const totalPercentage = totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
-            
+
             let tableHtml = `
                 <table class="detail-table">
                     <thead>
@@ -784,7 +814,7 @@ $conn->close();
                     </thead>
                     <tbody>
             `;
-            
+
             // Manager rows
             for (const manager of managerRows) {
                 const notCompleted = manager.expected - manager.completed;
@@ -804,21 +834,22 @@ $conn->close();
                     </tr>
                 `;
             }
-            
-            // Director row
-            if (directorData || totalExpected > 0) {
-                const dirExpected = directorData ? directorData.expected : totalExpected;
-                const dirCompleted = directorData ? directorData.completed : totalCompleted;
-                const dirPercentage = directorData ? directorData.percentage : totalPercentage;
+
+            // Director row (only show if there is data, or if there are manager rows)
+            if (directorData && (directorData.expected > 0 || directorData.completed > 0)) {
+                const dirExpected = directorData.expected;
+                const dirCompleted = directorData.completed;
+                const dirPercentage = directorData.percentage;
                 const dirNotCompleted = dirExpected - dirCompleted;
                 const dirColor = getColor(dirPercentage);
+                const dirName = costCenters['DIR'] || (userDept === 'BMT' ? 'Dir. BMT' : 'Dir. ' + userDept);
                 tableHtml += `
                     <tr class="director-row">
-                        <td><strong>${userDept === 'BMT' ? 'Dir. BMT' : 'Dir. ' + userDept}</strong></td>
+                        <td><strong>${dirName}</strong></td>
                         <td><strong>${dirExpected}</strong></td>
                         <td><strong>${dirCompleted}</strong></td>
                         <td><strong>${dirNotCompleted}</strong></td>
-                        <td style="color: ${dirColor}; font-weight: bold;"><strong>${dirPercentage.toFixed(1)}%</strong></td>
+                        <td style="color: ${dirColor}; font-weight: bold;"><strong>${dirPercentage}%</strong></td>
                         <td>
                             <div class="progress-bar-modal">
                                 <div class="progress-fill-modal" style="width: ${dirPercentage}%; background: ${dirColor};"></div>
@@ -826,47 +857,64 @@ $conn->close();
                         </td>
                     </tr>
                 `;
+            } else if (totalExpected > 0) {
+                const totalPercentageCalc = (totalCompleted / totalExpected) * 100;
+                const totalColor = getColor(totalPercentageCalc);
+                const totalNotCompleted = totalExpected - totalCompleted;
+                tableHtml += `
+                    <tr class="director-row">
+                        <td><strong>TOTAL</strong></td>
+                        <td><strong>${totalExpected}</strong></td>
+                        <td><strong>${totalCompleted}</strong></td>
+                        <td><strong>${totalNotCompleted}</strong></td>
+                        <td style="color: ${totalColor}; font-weight: bold;"><strong>${totalPercentageCalc.toFixed(1)}%</strong></td>
+                        <td>
+                            <div class="progress-bar-modal">
+                                <div class="progress-fill-modal" style="width: ${totalPercentageCalc}%; background: ${totalColor};"></div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
             }
-            
+
             tableHtml += `
                     </tbody>
                 </table>
             `;
-            
+
             modalBody.innerHTML = tableHtml;
             modal.style.display = 'flex';
         }
-        
+
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
-        
+
         function closeModal() {
             document.getElementById('detailModal').style.display = 'none';
         }
-        
+
         function changeMonth(direction) {
             let currentUrl = new URL(window.location.href);
             let currentMonthParam = currentUrl.searchParams.get('month') || '<?php echo $currentMonth; ?>';
             let date = new Date(currentMonthParam + '-01');
-            
+
             if (direction === 'prev') {
                 date.setMonth(date.getMonth() - 1);
             } else {
                 date.setMonth(date.getMonth() + 1);
             }
-            
+
             let newMonth = date.toISOString().slice(0, 7);
             window.location.href = `director_dashboard.php?month=${newMonth}`;
         }
-        
+
         function refreshDashboard() {
-            // Simple page reload to fetch latest data
             window.location.reload();
         }
-        
+
         function initializeCharts() {
             let chartIndex = 0;
             const indicators = <?php echo json_encode($indicators); ?>;
@@ -878,7 +926,7 @@ $conn->close();
                 chartIndex++;
             }
         }
-        
+
         // Theme Manager
         class ThemeManager {
             constructor() {
@@ -886,7 +934,7 @@ $conn->close();
                 this.loadTheme();
                 this.initToggle();
             }
-            
+
             loadTheme() {
                 const savedTheme = localStorage.getItem(this.themeKey);
                 if (savedTheme === 'light') {
@@ -899,7 +947,7 @@ $conn->close();
                     this.refreshCharts();
                 }
             }
-            
+
             toggleTheme() {
                 if (document.body.classList.contains('light-theme')) {
                     document.body.classList.remove('light-theme');
@@ -912,14 +960,14 @@ $conn->close();
                 }
                 this.refreshCharts();
             }
-            
+
             updateToggleButton(isLight) {
                 const toggleBtn = document.getElementById('themeToggle');
                 if (toggleBtn) {
                     toggleBtn.innerHTML = isLight ? '🌙 Dark' : '☀️ Light';
                 }
             }
-            
+
             refreshCharts() {
                 setTimeout(() => {
                     for (const [id, chart] of Object.entries(chartInstances)) {
@@ -931,7 +979,7 @@ $conn->close();
                     initializeCharts();
                 }, 100);
             }
-            
+
             initToggle() {
                 const toggleBtn = document.getElementById('themeToggle');
                 if (toggleBtn) {
@@ -939,14 +987,14 @@ $conn->close();
                 }
             }
         }
-        
+
         window.onclick = function(event) {
             const modal = document.getElementById('detailModal');
             if (event.target === modal) {
                 closeModal();
             }
         }
-        
+
         document.addEventListener('DOMContentLoaded', function() {
             new ThemeManager();
             initializeCharts();
@@ -957,7 +1005,7 @@ $conn->close();
             if (document.getElementById('passwordModalOverlay')) {
                 return;
             }
-            
+
             const modalOverlay = document.createElement('div');
             modalOverlay.id = 'passwordModalOverlay';
             modalOverlay.style.cssText = `
@@ -972,7 +1020,7 @@ $conn->close();
                 align-items: center;
                 justify-content: center;
             `;
-            
+
             const iframe = document.createElement('iframe');
             iframe.src = '../change_password.php';
             iframe.style.cssText = `
@@ -984,17 +1032,17 @@ $conn->close();
                 border-radius: 16px;
                 background: transparent;
             `;
-            
+
             modalOverlay.appendChild(iframe);
             document.body.appendChild(modalOverlay);
-            
+
             window.closePasswordPopup = function() {
                 if (modalOverlay && modalOverlay.parentNode) {
                     modalOverlay.remove();
                 }
                 delete window.closePasswordPopup;
             };
-            
+
             const escapeHandler = function(e) {
                 if (e.key === 'Escape') {
                     if (modalOverlay && modalOverlay.parentNode) {
@@ -1018,4 +1066,5 @@ $conn->close();
         setInterval(keepSessionAlive, 5 * 60 * 1000);
     </script>
 </body>
+
 </html>

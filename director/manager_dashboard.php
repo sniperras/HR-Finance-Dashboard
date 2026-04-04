@@ -1,5 +1,4 @@
 <?php
-session_start();
 require_once '../session_config.php';
 require_once '../includes/auth.php';
 requireRole('manager');
@@ -25,9 +24,11 @@ $conn->close();
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="../assets/images/ethiopian_logo.ico">
     <title>Manager Dashboard - Under Development</title>
     <link rel="stylesheet" href="../css/style.css">
     <style>
@@ -47,7 +48,7 @@ $conn->close();
         .navbar {
             background: var(--medium-bg, #1E293B);
             padding: 0.8rem 0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
             border-bottom: 1px solid var(--border-light, #334155);
         }
 
@@ -126,7 +127,7 @@ $conn->close();
             padding: 3rem 2rem;
             text-align: center;
             border: 1px solid var(--border-light, #334155);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
         }
 
         .construction-icon {
@@ -136,8 +137,15 @@ $conn->close();
         }
 
         @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
         }
 
         h1 {
@@ -235,16 +243,18 @@ $conn->close();
 
         body.light-theme .navbar {
             background: white;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
         }
 
         @media (max-width: 600px) {
             .under-development-card {
                 padding: 2rem 1rem;
             }
+
             h1 {
                 font-size: 1.3rem;
             }
+
             .info-row {
                 flex-direction: column;
                 gap: 0.8rem;
@@ -252,6 +262,7 @@ $conn->close();
         }
     </style>
 </head>
+
 <body>
     <nav class="navbar">
         <div class="navbar-container">
@@ -259,7 +270,7 @@ $conn->close();
             <div class="navbar-menu">
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
-                    <span class="user-name">👤 <?php echo htmlspecialchars($fullName); ?></span>
+                    <span class="user-name"><?php echo htmlspecialchars($fullName); ?></span>
                     <span class="dept-badge"><?php echo htmlspecialchars($userDept ?: 'Manager'); ?></span>
                     <a href="../logout.php" class="btn">Logout</a>
                 </div>
@@ -278,7 +289,7 @@ $conn->close();
             <div class="message-box">
                 <p>📢 <strong>Dear <?php echo htmlspecialchars($fullName); ?>,</strong></p>
                 <p>Your dedicated Manager Dashboard is currently under development.</p>
-                
+
                 <p>⏳ <strong>Estimated completion:</strong> Coming soon</p>
             </div>
 
@@ -297,7 +308,7 @@ $conn->close();
                 </div>
             </div>
 
-            
+
         </div>
     </div>
 
@@ -353,15 +364,16 @@ $conn->close();
         });
 
         // Keep session alive by sending heartbeat every 5 minutes
-function keepSessionAlive() {
-    fetch('/HRandMDDash/keep_alive.php', {
-        method: 'GET',
-        cache: 'no-cache'
-    }).catch(error => console.log('Session keep-alive failed:', error));
-}
+        function keepSessionAlive() {
+            fetch('/HRandMDDash/keep_alive.php', {
+                method: 'GET',
+                cache: 'no-cache'
+            }).catch(error => console.log('Session keep-alive failed:', error));
+        }
 
-// Send heartbeat every 5 minutes
-setInterval(keepSessionAlive, 5 * 60 * 1000);
+        // Send heartbeat every 5 minutes
+        setInterval(keepSessionAlive, 5 * 60 * 1000);
     </script>
 </body>
+
 </html>

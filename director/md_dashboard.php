@@ -9,15 +9,14 @@ $dataMonth = $currentMonth . '-01';
 
 // Get logged-in user's department from username
 $username = $_SESSION['username'];
-$userDept = '';
+$userDept = 'MD';
 
 // Extract department from username (format: director_BMT, director_LMT, etc.)
 if (preg_match('/director_([A-Z\/\s]+)/', $username, $matches)) {
     $userDept = trim($matches[1]);
 }
-
 // Only Admin Director can access this page
-$isAdminDirector = ($userDept === '' || $userDept === 'admin');
+$isAdminDirector = ($userDept === '' || $userDept === 'MD');
 
 // If not admin director, redirect to department dashboard
 if (!$isAdminDirector) {
@@ -28,35 +27,53 @@ if (!$isAdminDirector) {
 // Define all departments (including PSCM)
 $allDepartments = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'PSCM', 'MRO HR', 'MD/DIV.', 'Remainder'];
 
-// Get dynamic indicators from mro_cpr_report
-$indicatorsQuery = "SELECT DISTINCT report_type FROM mro_cpr_report ORDER BY report_type";
+// Get ALL indicators from performance_indicators table first (as master list)
+$indicatorsQuery = "SELECT DISTINCT TRIM(indicator_name) as indicator_name FROM performance_indicators ORDER BY created_at ASC";
 $indicatorsResult = $conn->query($indicatorsQuery);
 
 $indicators = [];
+$indicatorOrder = []; // To maintain order
+
 if ($indicatorsResult && $indicatorsResult->num_rows > 0) {
     while ($row = $indicatorsResult->fetch_assoc()) {
-        $reportType = $row['report_type'];
-        $indicators[$reportType] = [
-            'display_name' => $reportType,
-            'short_name' => strlen($reportType) > 25 ? substr($reportType, 0, 22) . '...' : $reportType,
-            'id' => 'ind_' . preg_replace('/[^a-zA-Z0-9]/', '_', $reportType)
-        ];
-    }
-} else {
-    // Fallback to performance_indicators table
-    $fallbackQuery = "SELECT DISTINCT TRIM(indicator_name) as indicator_name FROM performance_indicators ORDER BY indicator_name";
-    $fallbackResult = $conn->query($fallbackQuery);
-    while ($row = $fallbackResult->fetch_assoc()) {
-        $indicatorName = $row['indicator_name'];
+        $indicatorName = trim($row['indicator_name']);
         $indicators[$indicatorName] = [
             'display_name' => $indicatorName,
             'short_name' => strlen($indicatorName) > 25 ? substr($indicatorName, 0, 22) . '...' : $indicatorName,
             'id' => 'ind_' . preg_replace('/[^a-zA-Z0-9]/', '_', $indicatorName)
         ];
+        $indicatorOrder[] = $indicatorName;
     }
 }
 
-// Color mapping for departments (added PSCM)
+// Also include any indicators from mro_cpr_report that might not be in performance_indicators
+$mroIndicatorsQuery = "SELECT DISTINCT report_type FROM mro_cpr_report WHERE report_type NOT IN (SELECT indicator_name FROM performance_indicators) ORDER BY report_type";
+$mroIndicatorsResult = $conn->query($mroIndicatorsQuery);
+if ($mroIndicatorsResult && $mroIndicatorsResult->num_rows > 0) {
+    while ($row = $mroIndicatorsResult->fetch_assoc()) {
+        $indicatorName = trim($row['report_type']);
+        if (!isset($indicators[$indicatorName])) {
+            $indicators[$indicatorName] = [
+                'display_name' => $indicatorName,
+                'short_name' => strlen($indicatorName) > 25 ? substr($indicatorName, 0, 22) . '...' : $indicatorName,
+                'id' => 'ind_' . preg_replace('/[^a-zA-Z0-9]/', '_', $indicatorName)
+            ];
+            $indicatorOrder[] = $indicatorName;
+        }
+    }
+}
+
+// If no indicators found at all, create a default message
+if (empty($indicators)) {
+    $indicators['No Indicators Available'] = [
+        'display_name' => 'No Indicators Available',
+        'short_name' => 'No Data',
+        'id' => 'ind_no_data'
+    ];
+    $indicatorOrder = ['No Indicators Available'];
+}
+
+// Color mapping for departments
 $departmentColors = [
     'BMT' => '#00ADB5',
     'LMT' => '#4ECDC4',
@@ -115,7 +132,7 @@ while ($row = $masterResult->fetch_assoc()) {
     $indicator = $row['indicator_name'];
     $dept = $row['department'];
     $percentage = round($row['percentage_achievement'], 1);
-    
+
     if (!isset($dbData[$indicator]) || !isset($dbData[$indicator][$dept])) {
         if (!isset($dbData[$indicator])) {
             $dbData[$indicator] = [];
@@ -130,34 +147,35 @@ while ($row = $masterResult->fetch_assoc()) {
 $masterStmt->close();
 
 // Calculate overall percentages and prepare data for display
+// This will include ALL departments even if they have no data
 $metricsData = [];
 foreach ($indicators as $indicatorKey => $indicatorInfo) {
     $departmentData = [];
     $departmentActuals = [];
     $departmentTargets = [];
+    $validPercentages = [];
 
-    if (isset($dbData[$indicatorKey]) && !empty($dbData[$indicatorKey])) {
-        foreach ($dbData[$indicatorKey] as $dept => $values) {
-            $departmentData[$dept] = $values['percentage'];
-            $departmentActuals[$dept] = $values['actual'];
-            $departmentTargets[$dept] = $values['target'];
-        }
-
-        if (!empty($departmentData)) {
-            $overall = round(array_sum($departmentData) / count($departmentData), 1);
+    // Initialize ALL departments with 0 or null values
+    foreach ($allDepartments as $dept) {
+        if (isset($dbData[$indicatorKey]) && isset($dbData[$indicatorKey][$dept])) {
+            $departmentData[$dept] = $dbData[$indicatorKey][$dept]['percentage'];
+            $departmentActuals[$dept] = $dbData[$indicatorKey][$dept]['actual'];
+            $departmentTargets[$dept] = $dbData[$indicatorKey][$dept]['target'];
+            if ($dbData[$indicatorKey][$dept]['percentage'] > 0) {
+                $validPercentages[] = $dbData[$indicatorKey][$dept]['percentage'];
+            }
         } else {
-            $overall = 0;
-        }
-    } else {
-        $overall = 0;
-        $departmentData = [];
-        $departmentActuals = [];
-        $departmentTargets = [];
-        foreach ($allDepartments as $dept) {
             $departmentData[$dept] = 0;
             $departmentActuals[$dept] = null;
             $departmentTargets[$dept] = null;
         }
+    }
+
+    // Calculate overall percentage (only from departments with data)
+    if (!empty($validPercentages)) {
+        $overall = round(array_sum($validPercentages) / count($validPercentages), 1);
+    } else {
+        $overall = 0;
     }
 
     $metricsData[$indicatorKey] = [
@@ -183,6 +201,7 @@ $conn->close();
     <title>Organizational Performance Dashboard</title>
     <link rel="stylesheet" href="../css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="icon" type="image/png" href="../assets/images/ethiopian_logo.ico">
     <style>
         :root {
             --dark-bg: #0F172A;
@@ -431,27 +450,27 @@ $conn->close();
             font-size: 0.75rem;
             font-weight: bold;
             color: var(--accent);
-            cursor: pointer;
-            transition: color 0.2s;
+            cursor: default;
+            transition: none;
         }
 
         .metric-title:hover {
-            color: var(--accent-hover);
-            text-decoration: underline;
+            color: var(--accent);
+            text-decoration: none;
         }
 
         .overall-score {
             font-size: 1rem;
             font-weight: bold;
-            cursor: pointer;
+            cursor: default;
             padding: 0.2rem 0.5rem;
             border-radius: 20px;
-            transition: all 0.2s;
+            transition: none;
         }
 
         .overall-score:hover {
-            transform: scale(1.05);
-            background: rgba(56, 189, 248, 0.1);
+            transform: none;
+            background: none;
         }
 
         /* Chart Container */
@@ -519,6 +538,14 @@ $conn->close();
             height: 100%;
             border-radius: 4px;
             transition: width 0.3s;
+        }
+
+        .no-data-bar {
+            text-align: center;
+            font-size: 0.55rem;
+            color: var(--text-secondary);
+            padding: 0.25rem;
+            font-style: italic;
         }
 
         .welcome-banner {
@@ -725,10 +752,21 @@ $conn->close();
         <div class="navbar-container">
             <a href="md_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
             <div class="navbar-menu">
-                <a href="md_dashboard.php" style="color: var(--accent);">Dashboard</a>
+
+                <?php if ($_SESSION['user_role'] !== 'director'): ?>
+                    <a href="../admin/master_data.php">Master Data</a>
+                <?php endif; ?>
+
+                <a href="../director/md_dashboard.php" style="color: var(--accent);">Dashboard</a>
+                <?php if ($_SESSION['user_role'] !== 'director'): ?>
+                    <a href="../admin/report_mro_cpr.php">Director Data Entry</a>
+                    <a href="../admin/data_history.php">History</a>
+                <?php endif; ?>
+
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
-                    <span class="user-name">👤 <?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
+                    <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
+                    <span class="department-badge"><?php echo htmlspecialchars($userDept); ?></span>
                     <a href="#" onclick="openPasswordModal(); return false;" style="cursor: pointer;">🔑 Change Password</a>
                     <a href="../logout.php" class="btn">Logout</a>
                 </div>
@@ -738,7 +776,7 @@ $conn->close();
 
     <div class="container">
         <div class="dashboard-header">
-            <h1>📊 Organizational Performance Dashboard</h1>
+            <h1>Organizational Performance Dashboard</h1>
             <div class="month-selector">
                 <button onclick="changeMonth('prev')">← Prev</button>
                 <h3 id="current-month"><?php echo date('F Y', strtotime($dataMonth)); ?></h3>
@@ -747,7 +785,7 @@ $conn->close();
         </div>
 
         <div class="welcome-banner">
-            <strong>Managing Director</strong> - Viewing all departments performance metrics | Click on any department bar for detailed report
+            Viewing all departments performance metrics | Click on any department bar for detailed report
         </div>
 
         <div id="dashboard-content">
@@ -834,118 +872,128 @@ $conn->close();
         }
 
         // Function to show department details modal
+        // Function to show department details modal
         async function showDepartmentDetails(department, indicatorKey, indicatorName) {
             const modal = document.getElementById('deptModal');
             const modalTitle = document.getElementById('deptModalTitle');
             const modalBody = document.getElementById('deptModalBody');
-            
+
             modalTitle.innerHTML = `${department} Department - ${indicatorName} Details`;
             modalBody.innerHTML = '<div class="spinner"></div>';
             modal.style.display = 'flex';
-            
+
             try {
                 // Fetch data for this department and indicator from mro_cpr_report
                 const response = await fetch(`get_dept_indicator_data.php?dept=${encodeURIComponent(department)}&indicator=${encodeURIComponent(indicatorKey)}&month=${currentMonthNum}&year=${currentYear}`);
                 const data = await response.json();
-                
+
                 if (data.success && data.data.length > 0) {
                     let tableHtml = `
-                        <table class="detail-table">
-                            <thead>
-                                <tr>
-                                    <th>Cost Center</th>
-                                    <th>Expected Tasks</th>
-                                    <th>Completed Tasks</th>
-                                    <th>Not Completed</th>
-                                    <th>Completion %</th>
-                                    <th>Progress</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                    `;
-                    
-                    let totalExpected = 0;
-                    let totalCompleted = 0;
+                <table class="detail-table">
+                    <thead>
+                        <tr>
+                            <th>Cost Center</th>
+                            <th>Expected Tasks</th>
+                            <th>Completed Tasks</th>
+                            <th>Not Completed</th>
+                            <th>Completion %</th>
+                            <th>Progress</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
                     let directorData = null;
-                    
+                    let managerRows = [];
+
+                    // Separate director row from manager rows
                     for (const record of data.data) {
+                        if (record.cost_center_code === 'DIR') {
+                            directorData = record;
+                        } else {
+                            managerRows.push(record);
+                        }
+                    }
+
+                    // Display manager rows first
+                    for (const record of managerRows) {
                         const expected = parseInt(record.expected) || 0;
                         const completed = parseInt(record.completed) || 0;
                         const percentage = parseFloat(record.percentage) || 0;
                         const notCompleted = expected - completed;
                         const percentageColor = getScoreColor(percentage);
-                        
-                        if (record.cost_center_code === 'DIR') {
-                            directorData = record;
-                        } else {
-                            totalExpected += expected;
-                            totalCompleted += completed;
-                        }
-                        
+
                         tableHtml += `
-                            <tr>
-                                <td>${record.cost_center_text || record.cost_center_code}</td>
-                                <td>${expected}</td>
-                                <td>${completed}</td>
-                                <td>${notCompleted}</td>
-                                <td style="color: ${percentageColor}; font-weight: bold;">${percentage}%</td>
-                                <td>
-                                    <div class="progress-bar-modal">
-                                        <div class="progress-fill-modal" style="width: ${percentage}%; background: ${percentageColor};"></div>
-                                    </div>
-                                </td>
-                            </tr>
-                        `;
+                    <tr>
+                        <td>${record.cost_center_text || record.cost_center_code}</td>
+                        <td>${expected}</td>
+                        <td>${completed}</td>
+                        <td>${notCompleted}</td>
+                        <td style="color: ${percentageColor}; font-weight: bold;">${percentage}%</td>
+                        <td>
+                            <div class="progress-bar-modal">
+                                <div class="progress-fill-modal" style="width: ${percentage}%; background: ${percentageColor};"></div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
                     }
-                    
-                    // Add director/total row
+
+                    // Display director row only once (from database)
                     if (directorData) {
                         const dirExpected = parseInt(directorData.expected) || 0;
                         const dirCompleted = parseInt(directorData.completed) || 0;
                         const dirPercentage = parseFloat(directorData.percentage) || 0;
                         const dirNotCompleted = dirExpected - dirCompleted;
                         const dirColor = getScoreColor(dirPercentage);
-                        
+
                         tableHtml += `
-                            <tr class="director-row">
-                                <td><strong>${directorData.cost_center_text || 'Director/Total'}</strong></td>
-                                <td><strong>${dirExpected}</strong></td>
-                                <td><strong>${dirCompleted}</strong></td>
-                                <td><strong>${dirNotCompleted}</strong></td>
-                                <td style="color: ${dirColor}; font-weight: bold;"><strong>${dirPercentage}%</strong></td>
-                                <td>
-                                    <div class="progress-bar-modal">
-                                        <div class="progress-fill-modal" style="width: ${dirPercentage}%; background: ${dirColor};"></div>
-                                    </div>
-                                </td>
-                            </tr>
-                        `;
-                    } else if (totalExpected > 0) {
-                        const totalPercentage = (totalCompleted / totalExpected) * 100;
+                    <tr class="director-row">
+                        <td><strong>${directorData.cost_center_text || 'Director/Total'}</strong></td>
+                        <td><strong>${dirExpected}</strong></td>
+                        <td><strong>${dirCompleted}</strong></td>
+                        <td><strong>${dirNotCompleted}</strong></td>
+                        <td style="color: ${dirColor}; font-weight: bold;"><strong>${dirPercentage}%</strong></td>
+                        <td>
+                            <div class="progress-bar-modal">
+                                <div class="progress-fill-modal" style="width: ${dirPercentage}%; background: ${dirColor};"></div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                    } else if (managerRows.length > 0) {
+                        // If no director row in database, calculate totals from manager rows
+                        let totalExpected = 0;
+                        let totalCompleted = 0;
+                        for (const record of managerRows) {
+                            totalExpected += parseInt(record.expected) || 0;
+                            totalCompleted += parseInt(record.completed) || 0;
+                        }
+                        const totalPercentage = totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
                         const totalColor = getScoreColor(totalPercentage);
                         const totalNotCompleted = totalExpected - totalCompleted;
-                        
+
                         tableHtml += `
-                            <tr class="director-row">
-                                <td><strong>TOTAL (Calculated)</strong></td>
-                                <td><strong>${totalExpected}</strong></td>
-                                <td><strong>${totalCompleted}</strong></td>
-                                <td><strong>${totalNotCompleted}</strong></td>
-                                <td style="color: ${totalColor}; font-weight: bold;"><strong>${totalPercentage.toFixed(1)}%</strong></td>
-                                <td>
-                                    <div class="progress-bar-modal">
-                                        <div class="progress-fill-modal" style="width: ${totalPercentage}%; background: ${totalColor};"></div>
-                                    </div>
-                                </td>
-                            </tr>
-                        `;
+                    <tr class="director-row">
+                        <td><strong>TOTAL (Calculated)</strong></td>
+                        <td><strong>${totalExpected}</strong></td>
+                        <td><strong>${totalCompleted}</strong></td>
+                        <td><strong>${totalNotCompleted}</strong></td>
+                        <td style="color: ${totalColor}; font-weight: bold;"><strong>${totalPercentage.toFixed(1)}%</strong></td>
+                        <td>
+                            <div class="progress-bar-modal">
+                                <div class="progress-fill-modal" style="width: ${totalPercentage}%; background: ${totalColor};"></div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
                     }
-                    
+
                     tableHtml += `
-                            </tbody>
-                        </table>
-                    `;
-                    
+                    </tbody>
+                </table>
+            `;
+
                     modalBody.innerHTML = tableHtml;
                 } else {
                     modalBody.innerHTML = '<div class="no-data">No data available for this department and indicator.</div>';
@@ -955,7 +1003,7 @@ $conn->close();
                 modalBody.innerHTML = '<div class="no-data">Error loading data. Please try again.</div>';
             }
         }
-        
+
         function closeDeptModal() {
             document.getElementById('deptModal').style.display = 'none';
         }
@@ -1005,7 +1053,9 @@ $conn->close();
                                 }
                             }
                         }
-                    }
+                    },
+                    // Remove the onClick handler - keep hover only
+                    onClick: null
                 }
             });
         }
@@ -1014,40 +1064,42 @@ $conn->close();
             const container = document.getElementById(containerId);
             if (!container) return;
 
-            if (Object.keys(departments).length === 0) {
-                container.innerHTML = '<div style="text-align: center; padding: 0.5rem; font-size: 0.6rem; color: #888;">No data</div>';
-                return;
-            }
-
+            // ALWAYS show all departments, even with no data
             let html = '';
             for (const [dept, value] of Object.entries(departments)) {
-                const percentageValue = parseFloat(value);
+                const percentageValue = parseFloat(value) || 0;
                 const barWidth = Math.min(percentageValue, 100);
                 const color = departmentColors[dept] || '#38BDF8';
                 const scoreColor = getScoreColor(percentageValue);
                 const isClickable = !nonClickableDepts.includes(dept);
                 const clickableClass = isClickable ? 'clickable' : 'disabled';
                 const onclickAttr = isClickable ? `onclick="onDepartmentClick('${dept}', '${indicatorKey}', '${indicatorName}')"` : '';
-                
+
                 // Get actual and target values
-                const actualVal = actuals[dept] !== undefined && actuals[dept] !== null ? actuals[dept] : '-';
-                const targetVal = targets[dept] !== undefined && targets[dept] !== null ? targets[dept] : '-';
-                
+                const actualVal = (actuals[dept] !== undefined && actuals[dept] !== null && actuals[dept] !== '') ? actuals[dept] : '-';
+                const targetVal = (targets[dept] !== undefined && targets[dept] !== null && targets[dept] !== '') ? targets[dept] : '-';
+
+                // Check if this department has actual data (not just 0)
+                const hasActualData = (actualVal !== '-' && actualVal !== null && parseFloat(actualVal) > 0);
+                const displayPercentage = hasActualData ? percentageValue : 0;
+                const displayBarWidth = hasActualData ? barWidth : 0;
+                const displayScoreColor = hasActualData ? scoreColor : '#666';
+
                 html += `
-                    <div class="dept-bar-item ${clickableClass}" ${onclickAttr}>
-                        <div class="dept-bar-label">
-                            <span class="dept-name" style="color: ${color};">${dept}</span>
-                            <span class="dept-percentage" style="color: ${scoreColor};">${percentageValue}%</span>
-                        </div>
-                        <div class="dept-bar-container">
-                            <div class="dept-bar-fill" style="width: ${barWidth}%; background: ${color};"></div>
-                        </div>
-                        <div style="font-size: 0.55rem; margin-top: 0.2rem; display: flex; justify-content: space-between;">
-                            <span>Actual: ${actualVal}</span>
-                            <span>Target: ${targetVal}</span>
-                        </div>
-                    </div>
-                `;
+            <div class="dept-bar-item ${clickableClass}" ${onclickAttr}>
+                <div class="dept-bar-label">
+                    <span class="dept-name" style="color: ${color};">${dept}</span>
+                    <span class="dept-percentage" style="color: ${displayScoreColor};">${displayPercentage}%</span>
+                </div>
+                <div class="dept-bar-container">
+                    <div class="dept-bar-fill" style="width: ${displayBarWidth}%; background: ${color};"></div>
+                </div>
+                <div style="font-size: 0.55rem; margin-top: 0.2rem; display: flex; justify-content: space-between;">
+                    <span>Actual: ${actualVal}</span>
+                    <span>Target: ${targetVal}</span>
+                </div>
+            </div>
+        `;
             }
             container.innerHTML = html;
         }
@@ -1055,19 +1107,6 @@ $conn->close();
         function renderDashboard() {
             const container = document.getElementById('dashboard-content');
             container.innerHTML = '';
-
-            let hasData = false;
-            for (const [metricKey, metric] of Object.entries(metricsData)) {
-                if (metric.overall > 0 || Object.keys(metric.departments).length > 0) {
-                    hasData = true;
-                    break;
-                }
-            }
-
-            if (!hasData) {
-                container.innerHTML = `<div class="no-data"><h4>📭 No Performance Data Available</h4><p>No data for ${document.getElementById('current-month').innerText}</p></div>`;
-                return;
-            }
 
             const metricsGrid = document.createElement('div');
             metricsGrid.className = 'metrics-grid';
@@ -1080,15 +1119,15 @@ $conn->close();
                 const card = document.createElement('div');
                 card.className = 'metric-card';
                 card.innerHTML = `
-                    <div class="metric-header">
-                        <div class="metric-title">${metric.display_name}</div>
-                        <div class="overall-score" style="color: ${overallColor};">${metric.overall}%</div>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="${chartId}" width="180" height="140"></canvas>
-                    </div>
-                    <div id="${barsId}" class="dept-bars"></div>
-                `;
+            <div class="metric-header">
+                <div class="metric-title" style="cursor: default;">${metric.display_name}</div>
+                <div class="overall-score" style="color: ${overallColor}; cursor: default;">${metric.overall}%</div>
+            </div>
+            <div class="chart-container">
+                <canvas id="${chartId}" width="180" height="140"></canvas>
+            </div>
+            <div id="${barsId}" class="dept-bars"></div>
+        `;
                 metricsGrid.appendChild(card);
 
                 setTimeout(() => {
@@ -1135,7 +1174,7 @@ $conn->close();
             if (document.getElementById('passwordModalOverlay')) {
                 return;
             }
-            
+
             const modalOverlay = document.createElement('div');
             modalOverlay.id = 'passwordModalOverlay';
             modalOverlay.style.cssText = `
@@ -1150,7 +1189,7 @@ $conn->close();
                 align-items: center;
                 justify-content: center;
             `;
-            
+
             const iframe = document.createElement('iframe');
             iframe.src = '../change_password.php';
             iframe.style.cssText = `
@@ -1162,17 +1201,17 @@ $conn->close();
                 border-radius: 16px;
                 background: transparent;
             `;
-            
+
             modalOverlay.appendChild(iframe);
             document.body.appendChild(modalOverlay);
-            
+
             window.closePasswordPopup = function() {
                 if (modalOverlay && modalOverlay.parentNode) {
                     modalOverlay.remove();
                 }
                 delete window.closePasswordPopup;
             };
-            
+
             const escapeHandler = function(e) {
                 if (e.key === 'Escape') {
                     if (modalOverlay && modalOverlay.parentNode) {

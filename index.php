@@ -10,10 +10,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
 
     $conn = getConnection();
-    
+
     // Check if login input is numeric (OID) or text (username)
     $isOID = is_numeric($loginInput);
-    
+
     if ($isOID) {
         // Login using OID
         $stmt = $conn->prepare("SELECT id, username, oid, full_name, password, role, email, costcenter, section, last_login FROM users WHERE oid = ?");
@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $conn->prepare("SELECT id, username, oid, full_name, password, role, email, costcenter, section, last_login FROM users WHERE username = ?");
         $stmt->bind_param("s", $loginInput);
     }
-    
+
     $stmt->execute();
     $result = $stmt->get_result();
 
@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (password_verify($password, $user['password'])) {
             // Regenerate session ID to prevent fixation
             session_regenerate_id(true);
-            
+
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $user['username'];
             $_SESSION['oid'] = $user['oid'];
@@ -83,6 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="assets/images/ethiopian_logo.ico">
     <title>Login - HR & Finance Dashboard</title>
     <style>
         * {
@@ -351,9 +352,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             .login-container {
                 margin: 1rem;
             }
+
             .card-content {
                 padding: 1.5rem;
             }
+
             .title {
                 font-size: 1.125rem;
             }
@@ -364,6 +367,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 opacity: 0;
                 transform: translateY(20px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -429,7 +433,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <div class="login-footer">
-            &copy; <?php echo date('Y'); ?> HR & Finance Dashboard. All rights reserved.
+            &copy; <?php echo date('Y'); ?> Ethiopian Airlines. All rights reserved.
         </div>
     </div>
 
@@ -438,7 +442,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const passwordInput = document.getElementById('password');
             const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
             passwordInput.setAttribute('type', type);
-            
+
             const button = document.querySelector('.toggle-password');
             if (type === 'text') {
                 button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0z"></path><circle cx="12" cy="12" r="3"></circle><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-3.8 0-7.2-2.1-9-5.4a10.07 10.07 0 0 1 3.06-3.06"></path><path d="M7.06 7.06A10.07 10.07 0 0 1 12 4c3.8 0 7.2 2.1 9 5.4a10.07 10.07 0 0 1-3.06 3.06"></path><line x1="2" y1="2" x2="22" y2="22"></line></svg>`;
