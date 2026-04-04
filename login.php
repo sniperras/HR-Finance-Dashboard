@@ -51,6 +51,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Redirect based on role
             if ($user['role'] === 'hr') {
                 header('Location: admin/master_data.php');
+            } // After validating user credentials
+            else if ($user['role'] === 'it_admin') {
+                header('Location: admin/it_admin_dashboard.php');
             } elseif ($user['role'] === 'manager') {
                 header('Location: director/manager_dashboard.php');
             } elseif ($user['role'] === 'director') {

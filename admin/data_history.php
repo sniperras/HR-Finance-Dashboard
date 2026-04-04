@@ -12,6 +12,28 @@ $filterAction = isset($_GET['action']) && $_GET['action'] !== '' ? $_GET['action
 $filterDateFrom = isset($_GET['date_from']) && $_GET['date_from'] !== '' ? $_GET['date_from'] : null;
 $filterDateTo = isset($_GET['date_to']) && $_GET['date_to'] !== '' ? $_GET['date_to'] : null;
 $filterDataType = isset($_GET['data_type']) ? $_GET['data_type'] : 'all';
+$filterDepartment = isset($_GET['department']) && $_GET['department'] !== '' ? $_GET['department'] : null;
+$filterIndicator = isset($_GET['indicator']) && $_GET['indicator'] !== '' ? $_GET['indicator'] : null;
+
+// Get departments for filter dropdown
+$departmentsQuery = "SELECT DISTINCT department FROM master_performance_data UNION SELECT DISTINCT department FROM mro_cpr_report ORDER BY department";
+$departmentsResult = $conn->query($departmentsQuery);
+$departments = [];
+while ($row = $departmentsResult->fetch_assoc()) {
+    if (!empty($row['department'])) {
+        $departments[] = $row['department'];
+    }
+}
+
+// Get indicators for filter dropdown
+$indicatorsQuery = "SELECT DISTINCT indicator_name as name FROM performance_indicators UNION SELECT DISTINCT report_type as name FROM mro_cpr_report ORDER BY name";
+$indicatorsResult = $conn->query($indicatorsQuery);
+$indicators = [];
+while ($row = $indicatorsResult->fetch_assoc()) {
+    if (!empty($row['name'])) {
+        $indicators[] = $row['name'];
+    }
+}
 
 // Build WHERE clause parts
 $whereParts = [];
@@ -63,8 +85,19 @@ if ($filterDataType == 'master') {
               CONCAT(m.department, ' - ', m.indicator_name) as record_info
               FROM data_audit_log al
               LEFT JOIN users u ON al.performed_by = u.id
-              LEFT JOIN master_performance_data m ON al.record_id = m.id
-              $whereClause";
+              LEFT JOIN master_performance_data m ON al.record_id = m.id";
+
+    if ($filterDepartment) {
+        $wherePartsMaster = $whereParts;
+        $wherePartsMaster[] = "m.department = ?";
+        $paramsMaster = $params;
+        $paramsMaster[] = $filterDepartment;
+        $typesMaster = $types . "s";
+        $whereClauseMaster = "WHERE " . implode(" AND ", $wherePartsMaster);
+        $query .= " $whereClauseMaster";
+    } elseif (!empty($whereClause)) {
+        $query .= " $whereClause";
+    }
 } elseif ($filterDataType == 'mro') {
     // Only MRO Data - single query
     $query = "SELECT al.id, al.record_id, al.action, al.old_data, al.new_data, al.performed_at, al.performed_by,
@@ -75,42 +108,117 @@ if ($filterDataType == 'master') {
               CONCAT(m.department, ' - ', m.cost_center_text, ' - ', m.report_type) as record_info
               FROM mro_audit_log al
               LEFT JOIN users u ON al.performed_by = u.id
-              LEFT JOIN mro_cpr_report m ON al.record_id = m.id
-              $whereClause";
+              LEFT JOIN mro_cpr_report m ON al.record_id = m.id";
+
+    if ($filterDepartment) {
+        $wherePartsMro = $whereParts;
+        $wherePartsMro[] = "m.department = ?";
+        $paramsMro = $params;
+        $paramsMro[] = $filterDepartment;
+        $typesMro = $types . "s";
+        $whereClauseMro = "WHERE " . implode(" AND ", $wherePartsMro);
+        $query .= " $whereClauseMro";
+    } elseif (!empty($whereClause)) {
+        $query .= " $whereClause";
+    }
+
+    if ($filterIndicator) {
+        if (strpos($query, "WHERE") !== false) {
+            $query .= " AND m.report_type = ?";
+        } else {
+            $query .= " WHERE m.report_type = ?";
+        }
+        if ($filterDepartment) {
+            $paramsMro[] = $filterIndicator;
+            $typesMro .= "s";
+        } else {
+            $params[] = $filterIndicator;
+            $types .= "s";
+        }
+    }
 } else {
     // All Data Types (UNION) - Need to duplicate parameters for both parts
-    $query = "(SELECT al.id, al.record_id, al.action, al.old_data, al.new_data, al.performed_at, al.performed_by,
-              u.full_name as user_name,
-              'master' as data_type,
-              m.department,
-              m.indicator_name as record_name,
-              CONCAT(m.department, ' - ', m.indicator_name) as record_info
-              FROM data_audit_log al
-              LEFT JOIN users u ON al.performed_by = u.id
-              LEFT JOIN master_performance_data m ON al.record_id = m.id
-              $whereClause)
-              UNION ALL
-              (SELECT al.id, al.record_id, al.action, al.old_data, al.new_data, al.performed_at, al.performed_by,
-              u.full_name as user_name,
-              'mro' as data_type,
-              m.department,
-              m.report_type as record_name,
-              CONCAT(m.department, ' - ', m.cost_center_text, ' - ', m.report_type) as record_info
-              FROM mro_audit_log al
-              LEFT JOIN users u ON al.performed_by = u.id
-              LEFT JOIN mro_cpr_report m ON al.record_id = m.id
-              $whereClause)";
+    $queryMaster = "SELECT al.id, al.record_id, al.action, al.old_data, al.new_data, al.performed_at, al.performed_by,
+                    u.full_name as user_name,
+                    'master' as data_type,
+                    m.department,
+                    m.indicator_name as record_name,
+                    CONCAT(m.department, ' - ', m.indicator_name) as record_info
+                    FROM data_audit_log al
+                    LEFT JOIN users u ON al.performed_by = u.id
+                    LEFT JOIN master_performance_data m ON al.record_id = m.id";
 
-    // CRITICAL FIX: Duplicate parameters for UNION query
-    // Since the WHERE clause appears twice, we need twice the parameters
-    if (!empty($params)) {
-        $originalParams = $params;
-        $params = array_merge($originalParams, $originalParams);
-        $types = str_repeat($types, 2);
+    $queryMro = "SELECT al.id, al.record_id, al.action, al.old_data, al.new_data, al.performed_at, al.performed_by,
+                  u.full_name as user_name,
+                  'mro' as data_type,
+                  m.department,
+                  m.report_type as record_name,
+                  CONCAT(m.department, ' - ', m.cost_center_text, ' - ', m.report_type) as record_info
+                  FROM mro_audit_log al
+                  LEFT JOIN users u ON al.performed_by = u.id
+                  LEFT JOIN mro_cpr_report m ON al.record_id = m.id";
+
+    // Add filters to master query
+    $masterWhereParts = $whereParts;
+    $mroWhereParts = $whereParts;
+
+    if ($filterDepartment) {
+        $masterWhereParts[] = "m.department = ?";
+        $mroWhereParts[] = "m.department = ?";
     }
+
+    if ($filterIndicator && $filterDataType == 'all') {
+        // For master data, filter by indicator_name
+        $masterWhereParts[] = "m.indicator_name = ?";
+        // For mro data, filter by report_type
+        $mroWhereParts[] = "m.report_type = ?";
+    }
+
+    $masterWhereClause = !empty($masterWhereParts) ? "WHERE " . implode(" AND ", $masterWhereParts) : "";
+    $mroWhereClause = !empty($mroWhereParts) ? "WHERE " . implode(" AND ", $mroWhereParts) : "";
+
+    $queryMaster .= " $masterWhereClause";
+    $queryMro .= " $mroWhereClause";
+
+    $query = "($queryMaster) UNION ALL ($queryMro)";
+
+    // Build parameters for UNION query
+    $unionParams = [];
+    $unionTypes = "";
+
+    // Master query parameters
+    foreach ($params as $p) {
+        $unionParams[] = $p;
+        $unionTypes .= $types[strlen($unionTypes)];
+    }
+    if ($filterDepartment) {
+        $unionParams[] = $filterDepartment;
+        $unionTypes .= "s";
+    }
+    if ($filterIndicator && $filterDataType == 'all') {
+        $unionParams[] = $filterIndicator;
+        $unionTypes .= "s";
+    }
+
+    // Mro query parameters (duplicate)
+    foreach ($params as $p) {
+        $unionParams[] = $p;
+        $unionTypes .= $types[strlen($unionTypes) - strlen($types) + (strlen($unionTypes) % strlen($types))];
+    }
+    if ($filterDepartment) {
+        $unionParams[] = $filterDepartment;
+        $unionTypes .= "s";
+    }
+    if ($filterIndicator && $filterDataType == 'all') {
+        $unionParams[] = $filterIndicator;
+        $unionTypes .= "s";
+    }
+
+    $params = $unionParams;
+    $types = $unionTypes;
 }
 
-// Changed from 500 to 100 records
+// Add ORDER BY and LIMIT
 $query .= " ORDER BY performed_at DESC LIMIT 100";
 
 // Prepare and execute the query
@@ -122,6 +230,7 @@ $stmt->execute();
 $logs = $stmt->get_result();
 
 // Get users for filter dropdown
+// Get users for filter dropdown - HR only
 $usersQuery = "SELECT id, full_name FROM users WHERE role = 'hr' ORDER BY full_name";
 $users = $conn->query($usersQuery);
 
@@ -168,7 +277,7 @@ function formatChangeData($oldData, $newData)
     $html = '<table style="width:100%; font-size:0.7rem; border-collapse:collapse;">';
 
     if ($old) {
-        $html .= ' tr><td style="padding:2px; color:#dc3545;"><strong>OLD:</strong></td><td style="padding:2px;">';
+        $html .= '<tr><td style="padding:2px; color:#dc3545;"><strong>OLD:</strong></td><td style="padding:2px;">';
         foreach ($old as $key => $value) {
             $displayValue = is_array($value) ? json_encode($value) : $value;
             $html .= "<span style='color:#dc3545;'>$key:</span> " . htmlspecialchars($displayValue) . "<br>";
@@ -177,7 +286,7 @@ function formatChangeData($oldData, $newData)
     }
 
     if ($new) {
-        $html .= ' tr><td style="padding:2px; color:#28a745;"><strong>NEW:</strong></td><td style="padding:2px;">';
+        $html .= '<tr><td style="padding:2px; color:#28a745;"><strong>NEW:</strong></td><td style="padding:2px;">';
         foreach ($new as $key => $value) {
             $displayValue = is_array($value) ? json_encode($value) : $value;
             $html .= "<span style='color:#28a745;'>$key:</span> " . htmlspecialchars($displayValue) . "<br>";
@@ -210,7 +319,7 @@ function getActionBadge($action)
 function getDataTypeBadge($dataType)
 {
     if ($dataType == 'master') {
-        return '<span class="badge badge-master">Master Data</span>';
+        return '<span class="badge badge-master">📊 Master Data</span>';
     } else {
         return '<span class="badge badge-mro">🔧 MRO Report</span>';
     }
@@ -497,12 +606,6 @@ unset($_SESSION['error']);
             transition: background-color 0.3s;
         }
 
-        .navbar {
-            background: var(--medium-bg);
-            padding: 0.5rem 0;
-            transition: background-color 0.3s;
-        }
-
         .navbar-container {
             max-width: 100%;
             margin: 0 auto;
@@ -655,7 +758,6 @@ unset($_SESSION['error']);
                 <a href="master_data.php">Master Data</a>
                 <a href="../director/md_dashboard.php">Dashboard</a>
                 <a href="../admin/report_mro_cpr.php">Director Data Entry</a>
-                <!-- <a href="verify_data.php" >Verify Data</a> -->
                 <a href="data_history.php" style="color: var(--accent);">History</a>
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
@@ -686,7 +788,10 @@ unset($_SESSION['error']);
                     <div class="stat-label">Total Records Affected</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number"><?php echo date('M d, Y', strtotime(min($statsMaster['first_action'], $statsMro['first_action']))); ?></div>
+                    <div class="stat-number"><?php
+                                                $firstAction = min($statsMaster['first_action'], $statsMro['first_action']);
+                                                echo date('M d, Y', strtotime($firstAction));
+                                                ?></div>
                     <div class="stat-label">First Action</div>
                 </div>
             </div>
@@ -698,8 +803,32 @@ unset($_SESSION['error']);
                     <label>Data Type</label>
                     <select name="data_type" onchange="this.form.submit()">
                         <option value="all" <?php echo $filterDataType == 'all' ? 'selected' : ''; ?>>All Data Types</option>
-                        <option value="master" <?php echo $filterDataType == 'master' ? 'selected' : ''; ?>>Master Data</option>
+                        <option value="master" <?php echo $filterDataType == 'master' ? 'selected' : ''; ?>>📊 Master Data</option>
                         <option value="mro" <?php echo $filterDataType == 'mro' ? 'selected' : ''; ?>>🔧 MRO Reports</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Department</label>
+                    <select name="department">
+                        <option value="">All Departments</option>
+                        <?php foreach ($departments as $dept): ?>
+                            <option value="<?php echo htmlspecialchars($dept); ?>" <?php echo $filterDepartment == $dept ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($dept); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Indicator / Report Type</label>
+                    <select name="indicator">
+                        <option value="">All Indicators</option>
+                        <?php foreach ($indicators as $indicator): ?>
+                            <option value="<?php echo htmlspecialchars($indicator); ?>" <?php echo $filterIndicator == $indicator ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars(strlen($indicator) > 40 ? substr($indicator, 0, 37) . '...' : $indicator); ?>
+                            </option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
 
@@ -757,6 +886,7 @@ unset($_SESSION['error']);
                         <th>User</th>
                         <th>Action</th>
                         <th>Data Type</th>
+                        <th>Department</th>
                         <th>Record</th>
                         <th>Changes</th>
                 </thead>
@@ -770,21 +900,28 @@ unset($_SESSION['error']);
                                 <td><?php echo getActionBadge($log['action']); ?></td>
                                 <td><?php echo getDataTypeBadge($log['data_type']); ?></td>
                                 <td>
+                                    <?php if ($log['department']): ?>
+                                        <span class="badge" style="background: var(--accent); color: var(--dark-bg);">
+                                            <?php echo htmlspecialchars($log['department']); ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span style="color: #888;">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
                                     <?php if ($log['record_id']): ?>
                                         <?php if ($log['data_type'] == 'master'): ?>
-                                            <a href="master_data.php?record_id=<?php echo $log['record_id']; ?>" class="record-link">
-                                                #<?php echo $log['record_id']; ?>
+                                            <a href="master_data.php?month=<?php echo date('Y-m'); ?>" class="record-link">
+                                                <?php echo htmlspecialchars($log['record_name'] ?? 'Record #' . $log['record_id']); ?>
                                             </a>
                                         <?php else: ?>
-                                            <a href="../admin/report_mro_cpr.php?record_id=<?php echo $log['record_id']; ?>" class="record-link">
-                                                #<?php echo $log['record_id']; ?>
+                                            <a href="../admin/report_mro_cpr.php?report=<?php echo urlencode($log['record_name'] ?? ''); ?>&month=<?php echo date('m'); ?>&year=<?php echo date('Y'); ?>&department=<?php echo urlencode($log['department'] ?? ''); ?>" class="record-link">
+                                                <?php echo htmlspecialchars($log['record_name'] ?? 'Record #' . $log['record_id']); ?>
                                             </a>
                                         <?php endif; ?>
-                                        <?php if ($log['record_info']): ?>
-                                            <div style="font-size: 0.65rem; color: #888; margin-top: 3px;">
-                                                <?php echo htmlspecialchars(substr($log['record_info'], 0, 50)); ?>
-                                            </div>
-                                        <?php endif; ?>
+                                        <div style="font-size: 0.6rem; color: #888; margin-top: 3px;">
+                                            ID: <?php echo $log['record_id']; ?>
+                                        </div>
                                     <?php else: ?>
                                         <span style="color: #888;">Record Deleted</span>
                                     <?php endif; ?>
@@ -796,7 +933,7 @@ unset($_SESSION['error']);
                         <?php endwhile; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="7" style="text-align: center; padding: 2rem;">
+                            <td colspan="8" style="text-align: center; padding: 2rem;">
                                 <div style="color: #888;">No history records found</div>
                             </td>
                         </tr>
@@ -882,44 +1019,40 @@ unset($_SESSION['error']);
 
         // Function to open password change modal
         function openPasswordModal() {
-            // Check if modal already exists
             if (document.getElementById('passwordModalOverlay')) {
                 return;
             }
 
-            // Create modal container
             const modalOverlay = document.createElement('div');
             modalOverlay.id = 'passwordModalOverlay';
             modalOverlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        z-index: 10001;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                z-index: 10001;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
 
-            // Create iframe to load the password change page
             const iframe = document.createElement('iframe');
             iframe.src = '../change_password.php';
             iframe.style.cssText = `
-        width: 100%;
-        max-width: 450px;
-        height: auto;
-        min-height: 450px;
-        border: none;
-        border-radius: 16px;
-        background: transparent;
-    `;
+                width: 100%;
+                max-width: 450px;
+                height: auto;
+                min-height: 450px;
+                border: none;
+                border-radius: 16px;
+                background: transparent;
+            `;
 
             modalOverlay.appendChild(iframe);
             document.body.appendChild(modalOverlay);
 
-            // Store reference to close function
             window.closePasswordPopup = function() {
                 if (modalOverlay && modalOverlay.parentNode) {
                     modalOverlay.remove();
@@ -927,7 +1060,6 @@ unset($_SESSION['error']);
                 delete window.closePasswordPopup;
             };
 
-            // Close on Escape key
             const escapeHandler = function(e) {
                 if (e.key === 'Escape') {
                     if (modalOverlay && modalOverlay.parentNode) {
@@ -948,7 +1080,6 @@ unset($_SESSION['error']);
             }).catch(error => console.log('Session keep-alive failed:', error));
         }
 
-        // Send heartbeat every 5 minutes
         setInterval(keepSessionAlive, 5 * 60 * 1000);
     </script>
 </body>
