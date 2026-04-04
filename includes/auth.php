@@ -1,6 +1,6 @@
 <?php
 // IMPORTANT: Include session config FIRST
-require_once '../session_config.php';
+require_once(__DIR__ . '/auth.php');
 
 require_once __DIR__ . '/../config/database.php';
 
@@ -23,15 +23,9 @@ function requireRole($role)
 {
     requireLogin();
 
-    // IT Admin role - special handling
+    // IT Admin can access ANY page (super admin)
     if ($_SESSION['user_role'] === 'it_admin') {
-        // IT Admin can access IT admin pages
-        if ($role === 'it_admin') {
-            return true;
-        }
-        // IT Admin cannot access other role pages (redirect to their dashboard)
-        header('Location: ../admin/it_admin_dashboard.php');
-        exit();
+        return true;
     }
 
     // HR role can access everything except IT Admin pages
@@ -83,13 +77,9 @@ function checkAccess($allowedRoles = [])
 {
     requireLogin();
 
-    // IT Admin role
+    // IT Admin can access ANY page (super admin)
     if ($_SESSION['user_role'] === 'it_admin') {
-        if (in_array('it_admin', $allowedRoles)) {
-            return true;
-        }
-        header('Location: ../admin/it_admin_dashboard.php');
-        exit();
+        return true;
     }
 
     // HR role can access everything except IT Admin pages
@@ -239,10 +229,9 @@ function hasPageAccess($pageType)
         return false;
     }
 
-    // IT Admin access
+    // IT Admin can access EVERY page (full system access)
     if ($_SESSION['user_role'] === 'it_admin') {
-        $allowedPages = ['it_admin_dashboard', 'master_data', 'data_history', 'manage_indicators'];
-        return in_array($pageType, $allowedPages);
+        return true;
     }
 
     // HR has access to everything except IT Admin pages

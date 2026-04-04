@@ -49,11 +49,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $updateStmt->close();
 
             // Redirect based on role
-            if ($user['role'] === 'hr') {
+            if ($user['role'] === 'it_admin') {
+                header('Location: it_admin_dashboard.php');
+            } elseif ($user['role'] === 'hr') {
                 header('Location: admin/master_data.php');
-            } // After validating user credentials
-            else if ($user['role'] === 'it_admin') {
-                header('Location: admin/it_admin_dashboard.php');
             } elseif ($user['role'] === 'manager') {
                 header('Location: director/manager_dashboard.php');
             } elseif ($user['role'] === 'director') {
@@ -399,10 +398,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ⚠️ <?php echo htmlspecialchars($error); ?>
                     </div>
                 <?php endif; ?>
-
-                <!-- <div class="info-message">
-                    💡 Tip: You can login using either your <strong>Username</strong> or your <strong>Organizational ID (OID)</strong>
-                </div> -->
 
                 <form method="POST" action="">
                     <div class="form-group">

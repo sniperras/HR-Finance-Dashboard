@@ -1,6 +1,6 @@
 <?php
 require_once 'session_config.php';
-require_once '../HR-Finance-Dashboard/includes/auth.php';
+require_once './includes/auth.php';
 requireRole('it_admin');
 
 $conn = getConnection();
@@ -23,7 +23,9 @@ $stats = [];
 $totalUsersQuery = "SELECT COUNT(*) as total, 
                     SUM(CASE WHEN role = 'hr' THEN 1 ELSE 0 END) as hr_count,
                     SUM(CASE WHEN role = 'director' THEN 1 ELSE 0 END) as director_count,
-                    SUM(CASE WHEN role = 'it_admin' THEN 1 ELSE 0 END) as admin_count
+                    SUM(CASE WHEN role = 'it_admin' THEN 1 ELSE 0 END) as admin_count,
+                    SUM(CASE WHEN role = 'md' THEN 1 ELSE 0 END) as md_count,
+                    SUM(CASE WHEN role = 'manager' THEN 1 ELSE 0 END) as manager_count
                     FROM users";
 $totalUsersResult = $conn->query($totalUsersQuery);
 $stats['users'] = $totalUsersResult->fetch_assoc();
@@ -65,41 +67,73 @@ $dbSizeQuery = "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) a
 $dbSizeResult = $conn->query($dbSizeQuery);
 $stats['db_size'] = $dbSizeResult->fetch_assoc()['size_mb'] ?? 0;
 
-// Handle password reset
+// Get server resource usage (simulated - replace with actual monitoring)
+$serverStats = [
+    'cpu_usage' => rand(15, 85),
+    'ram_usage' => rand(30, 90),
+    'disk_usage' => rand(40, 95),
+    'bandwidth_usage' => rand(20, 80),
+    'latency' => rand(10, 200),
+    'packet_loss' => rand(0, 5)
+];
+
+// Security metrics
+$securityMetrics = [
+    'mttr' => rand(2, 48), // Mean Time To Repair in hours
+    'vulnerabilities_critical' => rand(0, 5),
+    'vulnerabilities_high' => rand(1, 12),
+    'vulnerabilities_medium' => rand(5, 25),
+    'vulnerabilities_low' => rand(10, 40),
+    'patches_pending' => rand(0, 15),
+    'patches_completed' => rand(5, 30)
+];
+
+// Threat activity by type
+$threatActivity = [
+    'malware' => rand(0, 50),
+    'phishing' => rand(0, 100),
+    'brute_force' => rand(0, 200),
+    'ddos' => rand(0, 10),
+    'unauthorized_access' => rand(0, 30)
+];
+
+// Handle password reset with POST-Redirect-GET pattern to prevent resubmission
 $resetMessage = '';
 $resetError = '';
 $resetType = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    $redirect = false;
+
     if ($_POST['action'] === 'reset_password') {
         $userId = intval($_POST['user_id']);
         $newPassword = $_POST['new_password'];
 
-        // Hash the new password
         $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
 
         $updateStmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
         $updateStmt->bind_param("si", $hashedPassword, $userId);
 
         if ($updateStmt->execute()) {
-            $resetMessage = "Password reset successfully for user ID: " . $userId;
-            $resetType = "success";
+            $_SESSION['reset_message'] = "Password reset successfully for user ID: " . $userId;
+            $_SESSION['reset_type'] = "success";
+            $redirect = true;
 
             // Log the action
             $logStmt = $conn->prepare("INSERT INTO data_audit_log (record_id, action, old_data, new_data, performed_by, performed_at) 
                                        VALUES (?, 'password_reset', ?, ?, ?, NOW())");
             $oldData = json_encode(['password' => '********']);
             $newData = json_encode(['password' => 'reset_by_admin']);
-            $logStmt->bind_param("isssi", $userId, $oldData, $newData, $_SESSION['user_id']);
+            $logStmt->bind_param("issi", $userId, $oldData, $newData, $_SESSION['user_id']);
             $logStmt->execute();
             $logStmt->close();
         } else {
-            $resetError = "Failed to reset password. Please try again.";
-            $resetType = "error";
+            $_SESSION['reset_error'] = "Failed to reset password. Please try again.";
+            $_SESSION['reset_type'] = "error";
+            $redirect = true;
         }
         $updateStmt->close();
     } elseif ($_POST['action'] === 'reset_all_hr') {
-        // Reset all HR users to default password
         $defaultPassword = 'password123';
         $hashedPassword = password_hash($defaultPassword, PASSWORD_DEFAULT);
 
@@ -108,49 +142,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         if ($updateStmt->execute()) {
             $affectedRows = $updateStmt->affected_rows;
-            $resetMessage = "Reset password for $affectedRows HR user(s) to: password123";
-            $resetType = "success";
+            $_SESSION['reset_message'] = "Reset password for $affectedRows HR user(s) to: password123";
+            $_SESSION['reset_type'] = "success";
+            $redirect = true;
         } else {
-            $resetError = "Failed to reset HR passwords.";
-            $resetType = "error";
+            $_SESSION['reset_error'] = "Failed to reset HR passwords.";
+            $_SESSION['reset_type'] = "error";
+            $redirect = true;
         }
         $updateStmt->close();
+    } elseif ($_POST['action'] === 'delete_user') {
+        $userId = intval($_POST['user_id']);
+
+        if ($userId == $_SESSION['user_id']) {
+            $_SESSION['reset_error'] = "You cannot delete your own account.";
+            $_SESSION['reset_type'] = "error";
+            $redirect = true;
+        } else {
+            $checkStmt = $conn->prepare("SELECT COUNT(*) as cnt FROM master_performance_data WHERE created_by = ? OR updated_by = ?");
+            $checkStmt->bind_param("ii", $userId, $userId);
+            $checkStmt->execute();
+            $checkResult = $checkStmt->get_result();
+            $recordCount = $checkResult->fetch_assoc()['cnt'];
+            $checkStmt->close();
+
+            if ($recordCount > 0) {
+                $_SESSION['reset_error'] = "Cannot delete user. User has $recordCount record(s) in the system.";
+                $_SESSION['reset_type'] = "error";
+                $redirect = true;
+            } else {
+                $deleteStmt = $conn->prepare("DELETE FROM users WHERE id = ?");
+                $deleteStmt->bind_param("i", $userId);
+                if ($deleteStmt->execute()) {
+                    $_SESSION['reset_message'] = "User deleted successfully.";
+                    $_SESSION['reset_type'] = "success";
+                    $redirect = true;
+                } else {
+                    $_SESSION['reset_error'] = "Failed to delete user.";
+                    $_SESSION['reset_type'] = "error";
+                    $redirect = true;
+                }
+                $deleteStmt->close();
+            }
+        }
+    }
+
+    if ($redirect) {
+        header('Location: it_admin_dashboard.php');
+        exit();
     }
 }
 
-// Handle user deletion
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_user') {
-    $userId = intval($_POST['user_id']);
-
-    // Don't allow deleting own account
-    if ($userId == $_SESSION['user_id']) {
-        $resetError = "You cannot delete your own account.";
-        $resetType = "error";
-    } else {
-        // Check if user has any records
-        $checkStmt = $conn->prepare("SELECT COUNT(*) as cnt FROM master_performance_data WHERE created_by = ? OR updated_by = ?");
-        $checkStmt->bind_param("ii", $userId, $userId);
-        $checkStmt->execute();
-        $checkResult = $checkStmt->get_result();
-        $recordCount = $checkResult->fetch_assoc()['cnt'];
-        $checkStmt->close();
-
-        if ($recordCount > 0) {
-            $resetError = "Cannot delete user. User has $recordCount record(s) in the system. Reassign or delete records first.";
-            $resetType = "error";
-        } else {
-            $deleteStmt = $conn->prepare("DELETE FROM users WHERE id = ?");
-            $deleteStmt->bind_param("i", $userId);
-            if ($deleteStmt->execute()) {
-                $resetMessage = "User deleted successfully.";
-                $resetType = "success";
-            } else {
-                $resetError = "Failed to delete user.";
-                $resetType = "error";
-            }
-            $deleteStmt->close();
-        }
-    }
+// Check for session messages after redirect
+if (isset($_SESSION['reset_message'])) {
+    $resetMessage = $_SESSION['reset_message'];
+    $resetType = $_SESSION['reset_type'] ?? 'success';
+    unset($_SESSION['reset_message']);
+    unset($_SESSION['reset_type']);
+}
+if (isset($_SESSION['reset_error'])) {
+    $resetError = $_SESSION['reset_error'];
+    unset($_SESSION['reset_error']);
 }
 
 $conn->close();
@@ -367,6 +419,87 @@ $conn->close();
             color: var(--accent);
         }
 
+        /* Monitoring Grid */
+        .monitoring-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .monitor-card {
+            background: var(--dark-bg);
+            border-radius: 10px;
+            padding: 1rem;
+            border: 1px solid var(--border-light);
+        }
+
+        .monitor-title {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: var(--accent);
+            margin-bottom: 0.75rem;
+        }
+
+        .gauge-container {
+            position: relative;
+            width: 100%;
+            height: 100px;
+            margin: 0.5rem 0;
+        }
+
+        .gauge-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .progress-bar-custom {
+            height: 8px;
+            background: var(--border-light);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 0.5rem 0;
+        }
+
+        .progress-fill-custom {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s;
+        }
+
+        .severity-critical {
+            background: #dc3545;
+        }
+
+        .severity-high {
+            background: #fd7e14;
+        }
+
+        .severity-medium {
+            background: #ffc107;
+        }
+
+        .severity-low {
+            background: #28a745;
+        }
+
+        .threat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.4rem 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .threat-name {
+            font-weight: bold;
+        }
+
+        .threat-count {
+            font-family: monospace;
+            font-size: 1.1rem;
+        }
+
         /* Table Styles */
         .user-table {
             width: 100%;
@@ -411,8 +544,18 @@ $conn->close();
             color: white;
         }
 
-        .role-admin {
+        .role-it_admin {
             background: #10b981;
+            color: white;
+        }
+
+        .role-md {
+            background: #8b5cf6;
+            color: white;
+        }
+
+        .role-manager {
+            background: #ec489a;
             color: white;
         }
 
@@ -480,6 +623,11 @@ $conn->close();
             background: rgba(56, 189, 248, 0.1);
         }
 
+        .password-option.selected {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid var(--success);
+        }
+
         .alert {
             padding: 0.75rem;
             border-radius: 8px;
@@ -518,7 +666,8 @@ $conn->close();
 
         body.light-theme .navbar,
         body.light-theme .section,
-        body.light-theme .stat-card {
+        body.light-theme .stat-card,
+        body.light-theme .monitor-card {
             background: white !important;
             border-color: #E2E8F0 !important;
         }
@@ -554,6 +703,30 @@ $conn->close();
             background: var(--accent);
             border-radius: 3px;
         }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
     </style>
 </head>
 
@@ -563,13 +736,13 @@ $conn->close();
             <a href="it_admin_dashboard.php" class="navbar-brand">IT Admin Dashboard</a>
             <div class="navbar-menu">
                 <a href="it_admin_dashboard.php" style="color: var(--accent);">Dashboard</a>
-                <a href="master_data.php">Master Data</a>
-                <a href="../director/md_dashboard.php">Dashboard</a>
+                <a href="admin/master_data.php">Master Data</a>
+                <a href="director/md_dashboard.php">Dashboard</a>
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
                     <span class="user-name">👤 <?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
                     <a href="#" onclick="openPasswordModal(); return false;" style="cursor: pointer;">🔑 Change Password</a>
-                    <a href="../logout.php" class="btn">Logout</a>
+                    <a href="logout.php" class="btn">Logout</a>
                 </div>
             </div>
         </div>
@@ -628,6 +801,144 @@ $conn->close();
             </div>
         </div>
 
+        <!-- Security & Infrastructure Monitoring -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-title">🛡️ Security & Infrastructure Monitoring</div>
+            </div>
+
+            <div class="monitoring-grid">
+                <!-- Incident Response - MTTR -->
+                <div class="monitor-card">
+                    <div class="monitor-title">🚨 Mean Time to Repair (MTTR)</div>
+                    <div class="gauge-value" style="color: <?php echo $securityMetrics['mttr'] > 24 ? 'var(--danger)' : ($securityMetrics['mttr'] > 12 ? 'var(--warning)' : 'var(--success)'); ?>">
+                        <?php echo $securityMetrics['mttr']; ?> hours
+                    </div>
+                    <div class="progress-bar-custom">
+                        <div class="progress-fill-custom" style="width: <?php echo min(100, ($securityMetrics['mttr'] / 48) * 100); ?>%; background: <?php echo $securityMetrics['mttr'] > 24 ? '#dc3545' : ($securityMetrics['mttr'] > 12 ? '#ffc107' : '#28a745'); ?>;"></div>
+                    </div>
+                    <div style="font-size: 0.65rem; margin-top: 0.5rem;">Target: &lt; 24 hours</div>
+                </div>
+
+                <!-- Vulnerability Management -->
+                <div class="monitor-card">
+                    <div class="monitor-title">🔓 Vulnerability Status</div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span>Critical</span>
+                        <span style="color: #dc3545; font-weight: bold;"><?php echo $securityMetrics['vulnerabilities_critical']; ?></span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span>High</span>
+                        <span style="color: #fd7e14; font-weight: bold;"><?php echo $securityMetrics['vulnerabilities_high']; ?></span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span>Medium</span>
+                        <span style="color: #ffc107; font-weight: bold;"><?php echo $securityMetrics['vulnerabilities_medium']; ?></span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Low</span>
+                        <span style="color: #28a745; font-weight: bold;"><?php echo $securityMetrics['vulnerabilities_low']; ?></span>
+                    </div>
+                    <div class="progress-bar-custom mt-2">
+                        <div class="progress-fill-custom" style="width: <?php echo $securityMetrics['patches_completed'] > 0 ? round(($securityMetrics['patches_completed'] / ($securityMetrics['patches_completed'] + $securityMetrics['patches_pending'])) * 100) : 0; ?>%; background: var(--success);"></div>
+                    </div>
+                    <div style="font-size: 0.65rem; margin-top: 0.5rem;">Patches: <?php echo $securityMetrics['patches_completed']; ?> completed / <?php echo $securityMetrics['patches_pending']; ?> pending</div>
+                </div>
+
+                <!-- Resource Consumption -->
+                <div class="monitor-card">
+                    <div class="monitor-title">💻 Resource Consumption</div>
+                    <div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                            <span>CPU Usage</span>
+                            <span><?php echo $serverStats['cpu_usage']; ?>%</span>
+                        </div>
+                        <div class="progress-bar-custom">
+                            <div class="progress-fill-custom" style="width: <?php echo $serverStats['cpu_usage']; ?>%; background: <?php echo $serverStats['cpu_usage'] > 80 ? '#dc3545' : ($serverStats['cpu_usage'] > 60 ? '#ffc107' : '#28a745'); ?>;"></div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 0.5rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                            <span>RAM Usage</span>
+                            <span><?php echo $serverStats['ram_usage']; ?>%</span>
+                        </div>
+                        <div class="progress-bar-custom">
+                            <div class="progress-fill-custom" style="width: <?php echo $serverStats['ram_usage']; ?>%; background: <?php echo $serverStats['ram_usage'] > 80 ? '#dc3545' : ($serverStats['ram_usage'] > 60 ? '#ffc107' : '#28a745'); ?>;"></div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 0.5rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                            <span>Storage Usage</span>
+                            <span><?php echo $serverStats['disk_usage']; ?>%</span>
+                        </div>
+                        <div class="progress-bar-custom">
+                            <div class="progress-fill-custom" style="width: <?php echo $serverStats['disk_usage']; ?>%; background: <?php echo $serverStats['disk_usage'] > 85 ? '#dc3545' : ($serverStats['disk_usage'] > 70 ? '#ffc107' : '#28a745'); ?>;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Threat Activity -->
+                <div class="monitor-card">
+                    <div class="monitor-title">⚠️ Threat Activity (Last 24h)</div>
+                    <div class="threat-item">
+                        <span class="threat-name">Malware Detections</span>
+                        <span class="threat-count"><?php echo $threatActivity['malware']; ?></span>
+                    </div>
+                    <div class="threat-item">
+                        <span class="threat-name">Phishing Attempts</span>
+                        <span class="threat-count"><?php echo $threatActivity['phishing']; ?></span>
+                    </div>
+                    <div class="threat-item">
+                        <span class="threat-name">Brute Force Attacks</span>
+                        <span class="threat-count"><?php echo $threatActivity['brute_force']; ?></span>
+                    </div>
+                    <div class="threat-item">
+                        <span class="threat-name">DDoS Attempts</span>
+                        <span class="threat-count"><?php echo $threatActivity['ddos']; ?></span>
+                    </div>
+                    <div class="threat-item">
+                        <span class="threat-name">Unauthorized Access</span>
+                        <span class="threat-count"><?php echo $threatActivity['unauthorized_access']; ?></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Performance -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-title">🌐 Network Performance</div>
+            </div>
+            <div class="monitoring-grid">
+                <div class="monitor-card">
+                    <div class="monitor-title">Bandwidth Usage</div>
+                    <div class="gauge-value"><?php echo $serverStats['bandwidth_usage']; ?>%</div>
+                    <div class="progress-bar-custom">
+                        <div class="progress-fill-custom" style="width: <?php echo $serverStats['bandwidth_usage']; ?>%; background: <?php echo $serverStats['bandwidth_usage'] > 80 ? '#dc3545' : ($serverStats['bandwidth_usage'] > 60 ? '#ffc107' : '#28a745'); ?>;"></div>
+                    </div>
+                </div>
+                <div class="monitor-card">
+                    <div class="monitor-title">Latency</div>
+                    <div class="gauge-value" style="color: <?php echo $serverStats['latency'] > 100 ? 'var(--danger)' : ($serverStats['latency'] > 50 ? 'var(--warning)' : 'var(--success)'); ?>">
+                        <?php echo $serverStats['latency']; ?> ms
+                    </div>
+                    <div class="progress-bar-custom">
+                        <div class="progress-fill-custom" style="width: <?php echo min(100, ($serverStats['latency'] / 200) * 100); ?>%; background: <?php echo $serverStats['latency'] > 100 ? '#dc3545' : ($serverStats['latency'] > 50 ? '#ffc107' : '#28a745'); ?>;"></div>
+                    </div>
+                </div>
+                <div class="monitor-card">
+                    <div class="monitor-title">Packet Loss</div>
+                    <div class="gauge-value" style="color: <?php echo $serverStats['packet_loss'] > 2 ? 'var(--danger)' : ($serverStats['packet_loss'] > 1 ? 'var(--warning)' : 'var(--success)'); ?>">
+                        <?php echo $serverStats['packet_loss']; ?>%
+                    </div>
+                    <div class="progress-bar-custom">
+                        <div class="progress-fill-custom" style="width: <?php echo min(100, $serverStats['packet_loss'] * 10); ?>%; background: <?php echo $serverStats['packet_loss'] > 2 ? '#dc3545' : ($serverStats['packet_loss'] > 1 ? '#ffc107' : '#28a745'); ?>;"></div>
+                    </div>
+                    <div style="font-size: 0.65rem; margin-top: 0.5rem;">Target: &lt; 1%</div>
+                </div>
+            </div>
+        </div>
+
         <!-- User Management Section -->
         <div class="section">
             <div class="section-header">
@@ -660,7 +971,7 @@ $conn->close();
                                     <span class="role-badge role-<?php echo $user['role']; ?>">
                                         <?php echo strtoupper($user['role']); ?>
                                     </span>
-                                </td>
+                                    </span>
                                 <td><?php echo htmlspecialchars($user['email'] ?? '-'); ?></td>
                                 <td><?php echo date('Y-m-d', strtotime($user['created_at'])); ?></td>
                                 <td><?php echo $user['last_login'] ? date('Y-m-d H:i', strtotime($user['last_login'])) : 'Never'; ?></td>
@@ -709,9 +1020,29 @@ $conn->close();
                 <div class="section-title">⚡ Quick Actions</div>
             </div>
             <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-                <a href="manage_indicators.php" class="btn">📊 Manage Indicators</a>
-                <a href="data_history.php" class="btn">📜 View Audit Log</a>
-                <button class="btn btn-warning" onclick="clearCache()">🗑️ Clear System Cache</button>
+                <a href="admin/data_history.php" class="btn">📜 View Audit Log</a>
+                <button class="btn btn-warning" onclick="openClearCacheModal()">🗑️ Clear System Cache</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clear Cache Confirmation Modal -->
+    <div id="clearCacheModal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3>🗑️ Clear System Cache</h3>
+                <button class="close-modal" onclick="closeClearCacheModal()">&times;</button>
+            </div>
+            <div style="padding: 1rem 0;">
+                <p>⚠️ <strong>Warning:</strong> This action will clear the system cache.</p>
+                <p style="font-size: 0.8rem; margin-top: 0.5rem; color: var(--warning);">
+                    This may temporarily slow down the system while caches rebuild.
+                </p>
+                <p style="font-size: 0.8rem; margin-top: 0.5rem;">Are you sure you want to continue?</p>
+            </div>
+            <div class="modal-buttons" style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem;">
+                <button class="btn" onclick="closeClearCacheModal()">Cancel</button>
+                <button class="btn btn-warning" onclick="confirmClearCache()">Yes, Clear Cache</button>
             </div>
         </div>
     </div>
@@ -727,24 +1058,27 @@ $conn->close();
                 <p>User: <strong id="resetUsername"></strong></p>
                 <p>Select a default password:</p>
                 <div class="password-options">
-                    <div class="password-option" onclick="selectPassword('password123')">
+                    <div class="password-option" data-password="password123" onclick="selectPassword(this, 'password123')">
                         <span>🔑 password123</span>
                         <span>Select →</span>
                     </div>
-                    <div class="password-option" onclick="selectPassword('Qwer@1234')">
+                    <div class="password-option" data-password="Qwer@1234" onclick="selectPassword(this, 'Qwer@1234')">
                         <span>🔒 Qwer@1234</span>
                         <span>Select →</span>
                     </div>
-                    <div class="password-option" onclick="selectPassword('Zxcv@1234')">
+                    <div class="password-option" data-password="Zxcv@1234" onclick="selectPassword(this, 'Zxcv@1234')">
                         <span>🔐 Zxcv@1234</span>
                         <span>Select →</span>
                     </div>
+                </div>
+                <div id="selectedPasswordDisplay" style="margin: 0.5rem 0; padding: 0.5rem; background: var(--dark-bg); border-radius: 5px; text-align: center; display: none;">
+                    Selected: <strong id="selectedPasswordText"></strong>
                 </div>
                 <form id="resetForm" method="POST" style="margin-top: 1rem;">
                     <input type="hidden" name="action" value="reset_password">
                     <input type="hidden" name="user_id" id="resetUserId">
                     <input type="hidden" name="new_password" id="resetPassword">
-                    <button type="submit" class="btn btn-warning" style="width: 100%;">Confirm Reset</button>
+                    <button type="submit" class="btn btn-warning" style="width: 100%;" id="confirmResetBtn" disabled>Confirm Reset</button>
                 </form>
             </div>
         </div>
@@ -752,21 +1086,43 @@ $conn->close();
 
     <script>
         let currentUserId = null;
+        let selectedPasswordValue = null;
 
         function openResetModal(userId, username) {
             currentUserId = userId;
             document.getElementById('resetUserId').value = userId;
             document.getElementById('resetUsername').textContent = username;
             document.getElementById('resetModal').style.display = 'flex';
+            // Reset selection
+            selectedPasswordValue = null;
+            document.getElementById('resetPassword').value = '';
+            document.getElementById('selectedPasswordDisplay').style.display = 'none';
+            document.getElementById('confirmResetBtn').disabled = true;
+            // Remove selected class from all options
+            document.querySelectorAll('.password-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
         }
 
         function closeResetModal() {
             document.getElementById('resetModal').style.display = 'none';
         }
 
-        function selectPassword(password) {
+        function selectPassword(element, password) {
+            // Remove selected class from all options
+            document.querySelectorAll('.password-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+
+            // Add selected class to clicked option
+            element.classList.add('selected');
+
+            // Set the selected password
+            selectedPasswordValue = password;
             document.getElementById('resetPassword').value = password;
-            alert('Selected password: ' + password + '\nClick Confirm Reset to apply.');
+            document.getElementById('selectedPasswordText').textContent = password;
+            document.getElementById('selectedPasswordDisplay').style.display = 'block';
+            document.getElementById('confirmResetBtn').disabled = false;
         }
 
         function resetAllHrPasswords() {
@@ -784,39 +1140,72 @@ $conn->close();
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.innerHTML = `
-                    <input type="hidden" name="action" value="delete_user">
-                    <input type="hidden" name="user_id" value="${userId}">
-                `;
+                <input type="hidden" name="action" value="delete_user">
+                <input type="hidden" name="user_id" value="${userId}">
+            `;
                 document.body.appendChild(form);
                 form.submit();
             }
         }
 
-        function clearCache() {
-            if (confirm('Clear system cache? This may temporarily slow down the system while caches rebuild.')) {
-                const btn = event.target;
-                const originalText = btn.textContent;
-                btn.textContent = '⏳ Clearing...';
-                btn.disabled = true;
+        // Clear Cache Modal Functions
+        function openClearCacheModal() {
+            document.getElementById('clearCacheModal').style.display = 'flex';
+        }
 
-                fetch('clear_cache.php', {
-                        method: 'POST'
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            alert('✓ ' + data.message);
-                        } else {
-                            alert('⚠ ' + data.message + (data.warnings ? '\nWarnings: ' + data.warnings : ''));
-                        }
-                        location.reload();
-                    })
-                    .catch(error => {
-                        alert('Error clearing cache: ' + error);
-                        btn.textContent = originalText;
-                        btn.disabled = false;
-                    });
+        function closeClearCacheModal() {
+            document.getElementById('clearCacheModal').style.display = 'none';
+        }
+
+        function confirmClearCache() {
+            closeClearCacheModal();
+
+            // Create a div for message display
+            let messageDiv = document.getElementById('cacheMessage');
+            if (!messageDiv) {
+                messageDiv = document.createElement('div');
+                messageDiv.id = 'cacheMessage';
+                messageDiv.style.cssText = 'position: fixed; top: 80px; right: 20px; z-index: 9999; min-width: 300px;';
+                document.body.appendChild(messageDiv);
             }
+
+            // Show loading message
+            messageDiv.innerHTML = `<div class="alert alert-info" style="animation: slideIn 0.3s ease-out; background: rgba(56, 189, 248, 0.2); border-color: var(--accent);">⏳ Clearing cache, please wait...</div>`;
+
+            fetch('clear_cache.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    }
+                })
+                .then(response => response.text())
+                .then(text => {
+                    try {
+                        // Try to parse as JSON
+                        const data = JSON.parse(text);
+                        if (data.success) {
+                            messageDiv.innerHTML = `<div class="alert alert-success" style="animation: slideIn 0.3s ease-out;">✓ ${data.message}</div>`;
+                        } else {
+                            messageDiv.innerHTML = `<div class="alert alert-error" style="animation: slideIn 0.3s ease-out;">⚠ ${data.message}${data.warnings ? '<br>' + data.warnings : ''}</div>`;
+                        }
+                        setTimeout(() => {
+                            if (messageDiv) messageDiv.innerHTML = '';
+                        }, 5000);
+                    } catch (e) {
+                        console.error('Parse error:', e);
+                        messageDiv.innerHTML = `<div class="alert alert-error" style="animation: slideIn 0.3s ease-out;">⚠ Error clearing cache. Please check server logs.</div>`;
+                        setTimeout(() => {
+                            if (messageDiv) messageDiv.innerHTML = '';
+                        }, 5000);
+                    }
+                })
+                .catch(error => {
+                    console.error('Fetch error:', error);
+                    messageDiv.innerHTML = `<div class="alert alert-error" style="animation: slideIn 0.3s ease-out;">⚠ Network error: ${error.message}</div>`;
+                    setTimeout(() => {
+                        if (messageDiv) messageDiv.innerHTML = '';
+                    }, 5000);
+                });
         }
 
         // Theme Manager
@@ -871,6 +1260,10 @@ $conn->close();
             if (event.target === modal) {
                 closeResetModal();
             }
+            const clearCacheModal = document.getElementById('clearCacheModal');
+            if (event.target === clearCacheModal) {
+                closeClearCacheModal();
+            }
         }
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -879,40 +1272,44 @@ $conn->close();
 
         // Function to open password change modal
         function openPasswordModal() {
+            // Check if modal already exists
             if (document.getElementById('passwordModalOverlay')) {
                 return;
             }
 
+            // Create modal container
             const modalOverlay = document.createElement('div');
             modalOverlay.id = 'passwordModalOverlay';
             modalOverlay.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.8);
-                z-index: 10001;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            `;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 10001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `;
 
+            // Create iframe to load the password change page
             const iframe = document.createElement('iframe');
-            iframe.src = '../change_password.php';
+            iframe.src = 'change_password.php';
             iframe.style.cssText = `
-                width: 100%;
-                max-width: 450px;
-                height: auto;
-                min-height: 450px;
-                border: none;
-                border-radius: 16px;
-                background: transparent;
-            `;
+            width: 100%;
+            max-width: 450px;
+            height: auto;
+            min-height: 450px;
+            border: none;
+            border-radius: 16px;
+            background: transparent;
+        `;
 
             modalOverlay.appendChild(iframe);
             document.body.appendChild(modalOverlay);
 
+            // Store reference to close function
             window.closePasswordPopup = function() {
                 if (modalOverlay && modalOverlay.parentNode) {
                     modalOverlay.remove();
@@ -920,6 +1317,7 @@ $conn->close();
                 delete window.closePasswordPopup;
             };
 
+            // Close on Escape key
             const escapeHandler = function(e) {
                 if (e.key === 'Escape') {
                     if (modalOverlay && modalOverlay.parentNode) {
@@ -932,9 +1330,9 @@ $conn->close();
             document.addEventListener('keydown', escapeHandler);
         }
 
-        // Keep session alive
+        // Keep session alive by sending heartbeat every 5 minutes
         function keepSessionAlive() {
-            fetch('../keep_alive.php', {
+            fetch('keep_alive.php', {
                 method: 'GET',
                 cache: 'no-cache'
             }).catch(error => console.log('Session keep-alive failed:', error));
