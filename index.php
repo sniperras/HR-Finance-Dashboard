@@ -16,11 +16,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($isOID) {
         // Login using OID
-        $stmt = $conn->prepare("SELECT id, username, oid, full_name, password, role, email, costcenter, section, last_login FROM users WHERE oid = ?");
+        $stmt = $conn->prepare("SELECT id, username, oid, full_name, password, temp_password, temp_password_expiry, role, email, costcenter, section, last_login FROM users WHERE oid = ?");
         $stmt->bind_param("s", $loginInput);
     } else {
         // Login using username
-        $stmt = $conn->prepare("SELECT id, username, oid, full_name, password, role, email, costcenter, section, last_login FROM users WHERE username = ?");
+        $stmt = $conn->prepare("SELECT id, username, oid, full_name, password, temp_password, temp_password_expiry, role, email, costcenter, section, last_login FROM users WHERE username = ?");
         $stmt->bind_param("s", $loginInput);
     }
 
@@ -28,8 +28,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $result = $stmt->get_result();
 
     if ($user = $result->fetch_assoc()) {
+        // Check normal password first
         if (password_verify($password, $user['password'])) {
-            // Regenerate session ID to prevent fixation
+            // Normal login - successful
             session_regenerate_id(true);
 
             $_SESSION['user_id'] = $user['id'];
@@ -67,6 +68,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: index.php');
             }
             exit();
+        } elseif (!empty($user['temp_password']) && password_verify($password, $user['temp_password'])) {
+            // Check if temp password is still valid
+            $tempExpiry = strtotime($user['temp_password_expiry']);
+            $now = time();
+
+            if ($now <= $tempExpiry) {
+                // Temp password is valid - redirect to reset password page
+                $_SESSION['temp_user_id'] = $user['id'];
+                $_SESSION['temp_username'] = $user['username'];
+                $_SESSION['temp_full_name'] = $user['full_name'];
+
+                header('Location: reset_password.php');
+                exit();
+            } else {
+                // Temp password expired
+                $error = 'Your temporary password has expired. Please request a new one using "Forgot Password".';
+
+                // Clear expired temp password
+                $clearStmt = $conn->prepare("UPDATE users SET temp_password = NULL, temp_password_expiry = NULL WHERE id = ?");
+                $clearStmt->bind_param("i", $user['id']);
+                $clearStmt->execute();
+                $clearStmt->close();
+            }
         } else {
             $error = 'Invalid password';
         }
@@ -425,7 +449,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </form>
 
                 <div class="reset-link">
-                    <a href="#">Forgot password?</a>
+                    <a href="forgot_password.php">Forgot password?</a>
                 </div>
             </div>
         </div>
