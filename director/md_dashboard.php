@@ -27,6 +27,82 @@ if (!$isAdminDirector) {
 // Define all departments (including PSCM)
 $allDepartments = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'PSCM', 'MRO HR', 'MD/DIV.', 'Remainder'];
 
+// Define main departments for MD/DIV calculation (exclude MD/DIV and Remainder)
+$mainDepartments = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'PSCM', 'MRO HR'];
+
+// Define cost center mapping for ALL departments (for displaying manager names)
+$costCenterMapping = [
+    'BMT' => [
+        'ACS' => 'Mgr. A/C Structure Maint',
+        'AVS' => 'Mgr. Avionics Sys Maint',
+        'B787' => 'Mgr. B787/767 Mainten',
+        'B737' => 'Mgr. B737 Maintenance',
+        'CAB' => 'Mgr. Cabin Maint',
+        'B777' => 'Mgr. B777/A350 Mainten',
+        'APS' => 'Mgr. A/C Patch Svs.',
+        'TEC' => 'Mgr. Technical Supp.',
+        'DIR' => 'Dir. BMT'
+    ],
+    'LMT' => [
+        'DMM' => 'Duty Manager MCC',
+        'ADM' => 'MGR. Admin & Outstation Maint',
+        'ALM' => 'Mgr. A/C Line Maint.',
+        'GAM' => 'Mgr. General Ava. A/C Maint.',
+        'TPL' => 'MGR. Turbo Prop & Light A/C Maint',
+        'ACM' => 'Mgr. A/C Cabin Maint',
+        'DIR' => 'Dir. LMT'
+    ],
+    'CMT' => [
+        'WKH' => 'Mgr. Wire Kit & Harness Prod.',
+        'CES' => 'Mgr. Computerized Equipment Shop',
+        'NDT' => 'Mgr. NDT, Stand. & Part Recv. Insp.',
+        'MES' => 'Comp. Maint. Engineering Support',
+        'MCS' => 'Mgr. Mechanical Comp Shops',
+        'ACS' => 'Mgr. Avionics Comp Shops',
+        'DIR' => 'Dir. CMT'
+    ],
+    'EMT' => [
+        'EMI' => 'Mgr. Engine Maint. Inspection',
+        'ETS' => 'Mgr. Technical Support',
+        'RNP' => 'Mgr. RNP PW4000/LEAP/APU Eng. Maint.',
+        'CFM' => 'Mgr. CFM56/GE90/GENX & Turbo Prop. Engines',
+        'RSH' => 'Mgr. Repair Shops',
+        'DIR' => 'Dir. EMT'
+    ],
+    'AEP' => [
+        'ALE' => 'MGR. A/C Lease, EIS & Special Projects',
+        'AMP' => 'MGR. A/C Maint. Prog. & Task Card Engineer',
+        'MPR' => 'MGR. Maint. Plng. & Record Control',
+        'EQA' => 'MGR. Engineering Quality Assurance',
+        'ASE' => 'Mgr. A/C Systems Eng',
+        'ADO' => 'MGR. A/C Design Organization',
+        'DIR' => 'Dir. AEP'
+    ],
+    'MSM' => [
+        'MSM' => 'Mgr. MRO Sales and Marketing',
+        'MCS' => 'Mgr. MRO Customer Support',
+        'DIR' => 'Dir. MSM'
+    ],
+    'QA' => [
+        'QAS' => 'Mgr. MRO Qty Ass & S/a',
+        'DIR' => 'Dir. QA'
+    ],
+    'PSCM' => [
+        'GWC' => 'Mgr. Grp Warp Cont Mgt',
+        'TPU' => 'Mgr. Tactical Purchase',
+        'MMP' => 'Mgr. MRO Material Planning',
+        'EMP' => 'Mgr. Engine Maint/Tactical Pur',
+        'WAP' => 'Mgr. Warehouse A/C Part',
+        'EXT' => 'Extra Sourcing',
+        'PLC' => 'Mgr. Purchase-LMT&CMT Maint.',
+        'DIR' => 'Dir. Prop. & Supp. Chain Mgt'
+    ],
+    'MRO HR' => [
+        'HR' => 'Mgr. Human Resources',
+        'DIR' => 'Dir. MRO HR'
+    ]
+];
+
 // Get ALL indicators from performance_indicators table first (as master list)
 $indicatorsQuery = "SELECT DISTINCT TRIM(indicator_name) as indicator_name FROM performance_indicators ORDER BY created_at ASC";
 $indicatorsResult = $conn->query($indicatorsQuery);
@@ -88,7 +164,7 @@ $departmentColors = [
     'Remainder' => '#95A5A6'
 ];
 
-// Fetch actual data from mro_cpr_report for the selected month
+// Fetch actual data from mro_cpr_report for the selected month (only DIR level)
 $dbData = [];
 $query = "SELECT report_type as indicator_name, department, percentage, expected, completed 
           FROM mro_cpr_report 
@@ -146,14 +222,14 @@ while ($row = $masterResult->fetch_assoc()) {
 }
 $masterStmt->close();
 
-// Calculate overall percentages and prepare data for display
-// This will include ALL departments even if they have no data
+/// Calculate overall percentages and prepare data for display
 $metricsData = [];
 foreach ($indicators as $indicatorKey => $indicatorInfo) {
     $departmentData = [];
     $departmentActuals = [];
     $departmentTargets = [];
     $validPercentages = [];
+    $hasAnyActualData = false;
 
     // Initialize ALL departments with 0 or null values
     foreach ($allDepartments as $dept) {
@@ -163,19 +239,62 @@ foreach ($indicators as $indicatorKey => $indicatorInfo) {
             $departmentTargets[$dept] = $dbData[$indicatorKey][$dept]['target'];
             if ($dbData[$indicatorKey][$dept]['percentage'] > 0) {
                 $validPercentages[] = $dbData[$indicatorKey][$dept]['percentage'];
+                $hasAnyActualData = true;
             }
         } else {
+            // For departments with no data, set percentage to 0 but keep them visible
             $departmentData[$dept] = 0;
             $departmentActuals[$dept] = null;
             $departmentTargets[$dept] = null;
         }
     }
 
-    // Calculate overall percentage (only from departments with data)
-    if (!empty($validPercentages)) {
-        $overall = round(array_sum($validPercentages) / count($validPercentages), 1);
+    // Calculate MD/DIV. as average of ALL main departments (including those with 0%)
+    $mainDeptPercentages = [];
+    foreach ($mainDepartments as $mainDept) {
+        // Include ALL main departments, even if they have 0%
+        $percentage = isset($departmentData[$mainDept]) ? $departmentData[$mainDept] : 0;
+        $mainDeptPercentages[] = $percentage;
+
+        // Track if ANY main department has actual data
+        if ($percentage > 0) {
+            $hasAnyActualData = true;
+        }
+    }
+
+    // Calculate MD/DIV. as average of ALL main departments (including zeros)
+    if (!empty($mainDeptPercentages)) {
+        $mdDivPercentage = round(array_sum($mainDeptPercentages) / count($mainDeptPercentages), 1);
     } else {
+        $mdDivPercentage = 0;
+    }
+
+    // Calculate Remainder (what's left to reach 100% from MD/DIV.)
+    $remainderPercentage = round(max(0, 100 - $mdDivPercentage), 1);
+
+    // Update department data with calculated values (always show them)
+    $departmentData['MD/DIV.'] = $mdDivPercentage;
+    $departmentData['Remainder'] = $remainderPercentage;
+
+    // Calculate overall percentage - ONLY if there is actual data
+    if ($hasAnyActualData) {
+        // Include all main departments plus MD/DIV. and Remainder in average
+        $allPercentagesForOverall = [];
+        foreach ($mainDepartments as $mainDept) {
+            $allPercentagesForOverall[] = $departmentData[$mainDept];
+        }
+        $allPercentagesForOverall[] = $mdDivPercentage;
+        $allPercentagesForOverall[] = $remainderPercentage;
+        
+        $overall = round(array_sum($allPercentagesForOverall) / count($allPercentagesForOverall), 1);
+    } else {
+        // No data at all - overall should be 0
         $overall = 0;
+        // Also set MD/DIV. and Remainder to 0 when no data
+        $departmentData['MD/DIV.'] = 0;
+        $departmentData['Remainder'] = 0;
+        $mdDivPercentage = 0;
+        $remainderPercentage = 0;
     }
 
     $metricsData[$indicatorKey] = [
@@ -183,6 +302,7 @@ foreach ($indicators as $indicatorKey => $indicatorInfo) {
         'short_name' => $indicatorInfo['short_name'],
         'id' => $indicatorInfo['id'],
         'overall' => $overall,
+        'has_data' => $hasAnyActualData,
         'departments' => $departmentData,
         'actuals' => $departmentActuals,
         'targets' => $departmentTargets
@@ -191,12 +311,15 @@ foreach ($indicators as $indicatorKey => $indicatorInfo) {
 
 $conn->close();
 
-// Calculate average overall percentage
+// Calculate average overall percentage (only for indicators that have data)
 $totalOverall = 0;
 $countOverall = 0;
 foreach ($metricsData as $metric) {
-    $totalOverall += $metric['overall'];
-    $countOverall++;
+    // Only include in average if there is actual data
+    if ($metric['has_data']) {
+        $totalOverall += $metric['overall'];
+        $countOverall++;
+    }
 }
 $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 0;
 ?>
@@ -1163,6 +1286,7 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
         const currentMonthNum = '<?php echo date('m', strtotime($dataMonth)); ?>';
         const allDepartments = <?php echo json_encode($allDepartments); ?>;
         const averageOverall = <?php echo $averageOverall; ?>;
+        const costCenterMapping = <?php echo json_encode($costCenterMapping); ?>;
 
         // Departments that are NOT clickable (MD/DIV. and Remainder)
         const nonClickableDepts = ['MD/DIV.', 'Remainder'];
@@ -1191,19 +1315,19 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
 
                 if (data.success && data.data.length > 0) {
                     let tableHtml = `
-                <table class="detail-table">
-                    <thead>
-                        <tr>
-                            <th>Cost Center</th>
-                            <th>Expected Tasks</th>
-                            <th>Completed Tasks</th>
-                            <th>Not Completed</th>
-                            <th>Completion %</th>
-                            <th>Progress</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
+                        <table class="detail-table">
+                            <thead>
+                                <tr>
+                                    <th>Cost Center</th>
+                                    <th>Expected Tasks</th>
+                                    <th>Completed Tasks</th>
+                                    <th>Not Completed</th>
+                                    <th>Completion %</th>
+                                    <th>Progress</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
 
                     let directorData = null;
                     let managerRows = [];
@@ -1226,19 +1350,19 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                         const percentageColor = getScoreColor(percentage);
 
                         tableHtml += `
-                    <tr>
-                        <td>${record.cost_center_text || record.cost_center_code}</td>
-                        <td>${expected}</td>
-                        <td>${completed}</td>
-                        <td>${notCompleted}</td>
-                        <td style="color: ${percentageColor}; font-weight: bold;">${percentage}%</td>
-                        <td>
-                            <div class="progress-bar-modal">
-                                <div class="progress-fill-modal" style="width: ${percentage}%; background: ${percentageColor};"></div>
-                            </div>
-                        </td>
-                    </tr>
-                `;
+                            <tr>
+                                <td>${record.cost_center_text || record.cost_center_code}</td>
+                                <td>${expected}</td>
+                                <td>${completed}</td>
+                                <td>${notCompleted}</td>
+                                <td style="color: ${percentageColor}; font-weight: bold;">${percentage}%</td>
+                                <td>
+                                    <div class="progress-bar-modal">
+                                        <div class="progress-fill-modal" style="width: ${percentage}%; background: ${percentageColor};"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
                     }
 
                     // Display director row only once (from database)
@@ -1250,19 +1374,19 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                         const dirColor = getScoreColor(dirPercentage);
 
                         tableHtml += `
-                    <tr class="director-row">
-                        <td><strong>${directorData.cost_center_text || 'Director/Total'}</strong></td>
-                        <td><strong>${dirExpected}</strong></td>
-                        <td><strong>${dirCompleted}</strong></td>
-                        <td><strong>${dirNotCompleted}</strong></td>
-                        <td style="color: ${dirColor}; font-weight: bold;"><strong>${dirPercentage}%</strong></td>
-                        <td>
-                            <div class="progress-bar-modal">
-                                <div class="progress-fill-modal" style="width: ${dirPercentage}%; background: ${dirColor};"></div>
-                            </div>
-                        </td>
-                    </tr>
-                `;
+                            <tr class="director-row">
+                                <td><strong>${directorData.cost_center_text || 'Director/Total'}</strong></td>
+                                <td><strong>${dirExpected}</strong></td>
+                                <td><strong>${dirCompleted}</strong></td>
+                                <td><strong>${dirNotCompleted}</strong></td>
+                                <td style="color: ${dirColor}; font-weight: bold;"><strong>${dirPercentage}%</strong></td>
+                                <td>
+                                    <div class="progress-bar-modal">
+                                        <div class="progress-fill-modal" style="width: ${dirPercentage}%; background: ${dirColor};"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
                     } else if (managerRows.length > 0) {
                         // If no director row in database, calculate totals from manager rows
                         let totalExpected = 0;
@@ -1276,25 +1400,25 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                         const totalNotCompleted = totalExpected - totalCompleted;
 
                         tableHtml += `
-                    <tr class="director-row">
-                        <td><strong>TOTAL (Calculated)</strong></td>
-                        <td><strong>${totalExpected}</strong></td>
-                        <td><strong>${totalCompleted}</strong></td>
-                        <td><strong>${totalNotCompleted}</strong></td>
-                        <td style="color: ${totalColor}; font-weight: bold;"><strong>${totalPercentage.toFixed(1)}%</strong></td>
-                        <td>
-                            <div class="progress-bar-modal">
-                                <div class="progress-fill-modal" style="width: ${totalPercentage}%; background: ${totalColor};"></div>
-                            </div>
-                        </td>
-                    </tr>
-                `;
+                            <tr class="director-row">
+                                <td><strong>TOTAL (Calculated)</strong></td>
+                                <td><strong>${totalExpected}</strong></td>
+                                <td><strong>${totalCompleted}</strong></td>
+                                <td><strong>${totalNotCompleted}</strong></td>
+                                <td style="color: ${totalColor}; font-weight: bold;"><strong>${totalPercentage.toFixed(1)}%</strong></td>
+                                <td>
+                                    <div class="progress-bar-modal">
+                                        <div class="progress-fill-modal" style="width: ${totalPercentage}%; background: ${totalColor};"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
                     }
 
                     tableHtml += `
-                    </tbody>
-                </table>
-            `;
+                            </tbody>
+                        </table>
+                    `;
 
                     modalBody.innerHTML = tableHtml;
                 } else {
@@ -1361,13 +1485,21 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             });
         }
 
-        function renderDepartmentBars(containerId, departments, indicatorKey, indicatorName, actuals, targets) {
+        function renderDepartmentBars(containerId, departments, indicatorKey, indicatorName, actuals, targets, hasData) {
             const container = document.getElementById(containerId);
             if (!container) return;
 
             let html = '';
-            for (const [dept, value] of Object.entries(departments)) {
-                const percentageValue = parseFloat(value) || 0;
+            let hasAnyDepartmentData = false;
+
+            // Define the order of departments to display
+            const displayOrder = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'PSCM', 'MRO HR', 'MD/DIV.', 'Remainder'];
+
+            for (const dept of displayOrder) {
+                // Skip if department doesn't exist in the data
+                if (!departments.hasOwnProperty(dept)) continue;
+
+                const percentageValue = parseFloat(departments[dept]) || 0;
                 const barWidth = Math.min(percentageValue, 100);
                 const color = departmentColors[dept] || '#38BDF8';
                 const scoreColor = getScoreColor(percentageValue);
@@ -1378,28 +1510,56 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                 const actualVal = (actuals[dept] !== undefined && actuals[dept] !== null && actuals[dept] !== '') ? actuals[dept] : '-';
                 const targetVal = (targets[dept] !== undefined && targets[dept] !== null && targets[dept] !== '') ? targets[dept] : '-';
 
-                const hasActualData = (actualVal !== '-' && actualVal !== null && parseFloat(actualVal) > 0);
-                const displayPercentage = hasActualData ? percentageValue : 0;
-                const displayBarWidth = hasActualData ? barWidth : 0;
-                const displayScoreColor = hasActualData ? scoreColor : '#666';
+                // For calculated departments (MD/DIV., Remainder), always show with calculated values
+                // For regular departments, show even with 0%
+                const isCalculatedDept = (dept === 'MD/DIV.' || dept === 'Remainder');
+                const showDept = true; // Show ALL departments always
 
-                html += `
-            <div class="dept-bar-item ${clickableClass}" ${onclickAttr}>
-                <div class="dept-bar-label">
-                    <span class="dept-name" style="color: ${color};">${dept}</span>
-                    <span class="dept-percentage" style="color: ${displayScoreColor};">${displayPercentage}%</span>
+                if (showDept) {
+                    hasAnyDepartmentData = true;
+                    const displayPercentage = percentageValue;
+                    const displayBarWidth = Math.min(barWidth, 100);
+                    const displayScoreColor = scoreColor;
+
+                    // Format actual and target for display (handle decimals properly)
+                    let displayActual = actualVal;
+                    let displayTarget = targetVal;
+
+                    // For calculated departments, show dash
+                    if (isCalculatedDept) {
+                        displayActual = '-';
+                        displayTarget = '-';
+                    } else if (actualVal !== '-' && actualVal !== null && !isNaN(parseFloat(actualVal))) {
+                        // Format numbers nicely (remove .00 if it's a whole number)
+                        const numActual = parseFloat(actualVal);
+                        const numTarget = parseFloat(targetVal);
+                        displayActual = Number.isInteger(numActual) ? numActual : numActual.toFixed(1);
+                        displayTarget = Number.isInteger(numTarget) ? numTarget : numTarget.toFixed(1);
+                    }
+
+                    html += `
+                <div class="dept-bar-item ${clickableClass}" ${onclickAttr}>
+                    <div class="dept-bar-label">
+                        <span class="dept-name" style="color: ${color};">${dept}</span>
+                        <span class="dept-percentage" style="color: ${displayScoreColor};">${displayPercentage}%</span>
+                    </div>
+                    <div class="dept-bar-container">
+                        <div class="dept-bar-fill" style="width: ${displayBarWidth}%; background: ${color};"></div>
+                    </div>
+                    <div style="font-size: 0.55rem; margin-top: 0.2rem; display: flex; justify-content: space-between;">
+                        <span>Actual: ${displayActual}</span>
+                        <span>Target: ${displayTarget}</span>
+                    </div>
                 </div>
-                <div class="dept-bar-container">
-                    <div class="dept-bar-fill" style="width: ${displayBarWidth}%; background: ${color};"></div>
-                </div>
-                <div style="font-size: 0.55rem; margin-top: 0.2rem; display: flex; justify-content: space-between;">
-                    <span>Actual: ${actualVal}</span>
-                    <span>Target: ${targetVal}</span>
-                </div>
-            </div>
-        `;
+            `;
+                }
             }
-            container.innerHTML = html;
+
+            if (!hasAnyDepartmentData) {
+                container.innerHTML = '<div class="no-data-bar">No data available for this period</div>';
+            } else {
+                container.innerHTML = html;
+            }
         }
 
         function renderDashboard() {
@@ -1414,12 +1574,16 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                 const barsId = `bars-${metric.id}`;
                 const overallColor = getScoreColor(metric.overall);
 
+                // Always show the overall percentage, even if 0
+                const displayOverall = metric.overall;
+                const displayOverallColor = overallColor;
+
                 const card = document.createElement('div');
                 card.className = 'metric-card';
                 card.innerHTML = `
             <div class="metric-header">
                 <div class="metric-title" style="cursor: default;">${metric.display_name}</div>
-                <div class="overall-score" style="color: ${overallColor}; cursor: default;">${metric.overall}%</div>
+                <div class="overall-score" style="color: ${displayOverallColor}; cursor: default;">${displayOverall}%</div>
             </div>
             <div class="chart-container">
                 <canvas id="${chartId}" width="180" height="140"></canvas>
@@ -1429,9 +1593,9 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                 metricsGrid.appendChild(card);
 
                 setTimeout(() => {
-                    const chart = createPieChart(chartId, metric.overall, metric.display_name, metricKey);
+                    const chart = createPieChart(chartId, displayOverall, metric.display_name, metricKey);
                     if (chart) chartInstances[chartId] = chart;
-                    renderDepartmentBars(barsId, metric.departments, metricKey, metric.display_name, metric.actuals || {}, metric.targets || {});
+                    renderDepartmentBars(barsId, metric.departments, metricKey, metric.display_name, metric.actuals || {}, metric.targets || {}, metric.has_data);
                 }, 10);
             }
             container.appendChild(metricsGrid);
