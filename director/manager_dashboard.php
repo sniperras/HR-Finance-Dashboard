@@ -234,6 +234,8 @@ $conn->close();
             margin: 0;
             padding: 20px;
             padding-top: 70px;
+            max-width: 100%;
+            width: 100%;
         }
 
         /* Floating controls for fullscreen mode */
@@ -283,6 +285,14 @@ $conn->close();
             font-weight: bold;
             font-size: 0.8rem;
             transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .floating-controls .exit-fullscreen-btn img {
+            width: 16px;
+            height: 16px;
         }
 
         .floating-controls .exit-fullscreen-btn:hover {
@@ -298,7 +308,8 @@ $conn->close();
 
         .navbar-container {
             max-width: 100%;
-            margin: 0 auto;
+            width: 100%;
+            margin: 0;
             padding: 0 1.5rem;
             display: flex;
             justify-content: space-between;
@@ -371,23 +382,6 @@ $conn->close();
             opacity: 0.9;
         }
 
-        .fullscreen-btn {
-            background: var(--accent);
-            color: var(--dark-bg);
-            border: none;
-            padding: 0.3rem 0.8rem;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 0.7rem;
-            transition: all 0.3s;
-        }
-
-        .fullscreen-btn:hover {
-            transform: translateY(-1px);
-            opacity: 0.9;
-        }
-
         .theme-toggle {
             background: transparent;
             border: 1px solid var(--accent);
@@ -399,9 +393,10 @@ $conn->close();
         }
 
         .container {
-            max-width: 1400px;
-            margin: 1rem auto;
-            padding: 0 1rem;
+            width: 100%;
+            max-width: 100%;
+            margin: 0;
+            padding: 0.75rem 1rem;
         }
 
         .dashboard-header {
@@ -415,6 +410,7 @@ $conn->close();
             align-items: center;
             flex-wrap: wrap;
             gap: 1rem;
+            width: 100%;
         }
 
         .dashboard-header .header-left h1 {
@@ -454,36 +450,74 @@ $conn->close();
         }
 
         .fullscreen-header-btn {
-            background: var(--accent);
-            color: var(--dark-bg);
-            border: none;
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
             padding: 0.3rem 0.8rem;
             border-radius: 5px;
             cursor: pointer;
             font-weight: bold;
             font-size: 0.7rem;
             transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .fullscreen-header-btn img {
+            width: 14px;
+            height: 14px;
         }
 
         .fullscreen-header-btn:hover {
-            transform: translateY(-1px);
-            opacity: 0.9;
+            background: var(--accent);
+            color: var(--dark-bg);
         }
 
-        .welcome-banner {
-            background: rgba(56, 189, 248, 0.1);
-            border-left: 3px solid var(--accent);
-            padding: 0.5rem 0.75rem;
-            border-radius: 6px;
-            margin-bottom: 1rem;
-            font-size: 0.75rem;
+        .fullscreen-header-btn:hover img {
+            filter: brightness(0);
         }
 
         .metrics-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 1rem;
             margin-bottom: 1rem;
+        }
+
+        @media (min-width: 1920px) {
+            .metrics-grid {
+                grid-template-columns: repeat(5, 1fr);
+                gap: 1.2rem;
+            }
+        }
+
+        @media (min-width: 1600px) and (max-width: 1919px) {
+            .metrics-grid {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 1.2rem;
+            }
+        }
+
+        @media (min-width: 1200px) and (max-width: 1599px) {
+            .metrics-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 1rem;
+            }
+        }
+
+        @media (min-width: 768px) and (max-width: 1199px) {
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.9rem;
+            }
+        }
+
+        @media (max-width: 767px) {
+            .metrics-grid {
+                grid-template-columns: 1fr;
+                gap: 0.8rem;
+            }
         }
 
         .metric-card {
@@ -493,6 +527,10 @@ $conn->close();
             border: 1px solid var(--border-light);
             transition: all 0.2s;
             text-align: center;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
         }
 
         .metric-card:hover {
@@ -513,14 +551,15 @@ $conn->close();
 
         .chart-container {
             position: relative;
-            width: 120px;
-            height: 120px;
+            width: 100%;
+            max-width: 140px;
             margin: 0.5rem auto;
         }
 
         .chart-container canvas {
             width: 100% !important;
-            height: 100% !important;
+            height: auto !important;
+            max-height: 140px;
         }
 
         .percentage-display {
@@ -605,8 +644,22 @@ $conn->close();
             color: white;
         }
 
-        body.light-theme .fullscreen-btn,
         body.light-theme .fullscreen-header-btn {
+            border-color: #0284C7;
+            color: #0284C7;
+        }
+
+        body.light-theme .fullscreen-header-btn:hover {
+            background: #0284C7;
+            color: white;
+        }
+
+        body.light-theme .btn {
+            background: #0284C7;
+            color: white;
+        }
+
+        body.light-theme .dept-badge {
             background: #0284C7;
             color: white;
         }
@@ -660,7 +713,9 @@ $conn->close();
         <div class="overall-mini">
             Overall: <span id="floatingOverall"><?php echo $overallPercentage; ?>%</span>
         </div>
-        <button class="exit-fullscreen-btn" id="exitFullscreenBtn">Exit Full Screen</button>
+        <button class="exit-fullscreen-btn" id="exitFullscreenBtn">
+            <img src="../assets/images/expand.png" alt="exit" style="transform: rotate(180deg);"> Exit Full Screen
+        </button>
     </div>
 
     <nav class="navbar">
@@ -669,7 +724,6 @@ $conn->close();
             <div class="navbar-menu">
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
-
                     <span class="user-name">👤 <?php echo htmlspecialchars($userFullName); ?></span>
                     <span class="dept-badge"><?php echo htmlspecialchars($userDept); ?></span>
                     <a href="#" onclick="openPasswordModal(); return false;" style="cursor: pointer;">🔑 Change Password</a>
@@ -690,7 +744,9 @@ $conn->close();
                 </div>
             </div>
             <div class="header-right">
-                <button id="fullscreenHeaderBtn2" class="fullscreen-header-btn">🖥️ Full Screen</button>
+                <button id="fullscreenHeaderBtn" class="fullscreen-header-btn">
+                    <img src="../assets/images/expand.png" alt="expand"> Full Screen
+                </button>
             </div>
         </div>
 
@@ -1007,14 +1063,12 @@ $conn->close();
             initializeCharts();
 
             // Initialize fullscreen buttons
-            const fullscreenBtns = document.querySelectorAll('#fullscreenHeaderBtn, #fullscreenHeaderBtn2');
+            const fullscreenBtn = document.getElementById('fullscreenHeaderBtn');
             const exitFullscreenBtn = document.getElementById('exitFullscreenBtn');
 
-            fullscreenBtns.forEach(btn => {
-                if (btn) {
-                    btn.addEventListener('click', toggleFullscreen);
-                }
-            });
+            if (fullscreenBtn) {
+                fullscreenBtn.addEventListener('click', toggleFullscreen);
+            }
 
             if (exitFullscreenBtn) {
                 exitFullscreenBtn.addEventListener('click', exitFullscreen);

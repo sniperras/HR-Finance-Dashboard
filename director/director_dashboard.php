@@ -291,6 +291,8 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             margin: 0;
             padding: 20px;
             padding-top: 70px;
+            max-width: 100%;
+            width: 100%;
         }
 
         /* Floating controls for fullscreen mode */
@@ -340,6 +342,14 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             font-weight: bold;
             font-size: 0.8rem;
             transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .floating-controls .exit-fullscreen-btn img {
+            width: 16px;
+            height: 16px;
         }
 
         .floating-controls .exit-fullscreen-btn:hover {
@@ -359,7 +369,8 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
 
         .navbar-container {
             max-width: 100%;
-            margin: 0 auto;
+            width: 100%;
+            margin: 0;
             padding: 0 1.5rem;
             display: flex;
             justify-content: space-between;
@@ -454,20 +465,32 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
         }
 
         .fullscreen-header-btn {
-            background: var(--accent);
-            color: var(--dark-bg);
-            border: none;
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
             padding: 0.25rem 0.7rem;
             border-radius: 5px;
             cursor: pointer;
             font-weight: bold;
             font-size: 0.65rem;
             transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .fullscreen-header-btn img {
+            width: 14px;
+            height: 14px;
         }
 
         .fullscreen-header-btn:hover {
-            transform: translateY(-1px);
-            opacity: 0.9;
+            background: var(--accent);
+            color: var(--dark-bg);
+        }
+
+        .fullscreen-header-btn:hover img {
+            filter: brightness(0);
         }
 
         .container {
@@ -488,6 +511,7 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             align-items: center;
             flex-wrap: wrap;
             gap: 1rem;
+            width: 100%;
         }
 
         .dashboard-header .header-left h1 {
@@ -538,9 +562,44 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
 
         .metrics-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 1rem;
             margin-bottom: 1rem;
+        }
+
+        @media (min-width: 1920px) {
+            .metrics-grid {
+                grid-template-columns: repeat(5, 1fr);
+                gap: 1.2rem;
+            }
+        }
+
+        @media (min-width: 1600px) and (max-width: 1919px) {
+            .metrics-grid {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 1.2rem;
+            }
+        }
+
+        @media (min-width: 1200px) and (max-width: 1599px) {
+            .metrics-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 1rem;
+            }
+        }
+
+        @media (min-width: 768px) and (max-width: 1199px) {
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.9rem;
+            }
+        }
+
+        @media (max-width: 767px) {
+            .metrics-grid {
+                grid-template-columns: 1fr;
+                gap: 0.8rem;
+            }
         }
 
         .metric-card {
@@ -551,6 +610,10 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             transition: all 0.2s;
             text-align: center;
             cursor: pointer;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
         }
 
         .metric-card:hover {
@@ -571,14 +634,15 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
 
         .chart-container {
             position: relative;
-            width: 120px;
-            height: 120px;
+            width: 100%;
+            max-width: 140px;
             margin: 0.5rem auto;
         }
 
         .chart-container canvas {
             width: 100% !important;
-            height: 100% !important;
+            height: auto !important;
+            max-height: 140px;
         }
 
         .percentage-display {
@@ -782,7 +846,9 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
         <div class="overall-mini">
             Overall: <span id="floatingOverall"><?php echo $averagePercentage; ?>%</span>
         </div>
-        <button class="exit-fullscreen-btn" id="exitFullscreenBtn">Exit Full Screen</button>
+        <button class="exit-fullscreen-btn" id="exitFullscreenBtn">
+            <img src="../assets/images/expand.png" alt="exit" style="transform: rotate(180deg);"> Exit Full Screen
+        </button>
     </div>
 
     <nav class="navbar">
@@ -792,7 +858,6 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
                 <a href="director_dashboard.php" style="color: var(--accent);">Dashboard</a>
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
-
                     <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
                     <span class="department-badge"><?php echo htmlspecialchars($userDept); ?></span>
                     <a href="#" onclick="openPasswordModal(); return false;" style="cursor: pointer;">🔑 Change Password</a>
@@ -815,7 +880,9 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             </div>
 
             <div class="header-right">
-                <button id="fullscreenHeaderBtn2" class="fullscreen-header-btn">🖥️ Full Screen</button>
+                <button id="fullscreenHeaderBtn" class="fullscreen-header-btn">
+                    <img src="../assets/images/expand.png" alt="expand"> Full Screen
+                </button>
             </div>
         </div>
 
@@ -1284,14 +1351,12 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             initializeCharts();
 
             // Initialize fullscreen buttons
-            const fullscreenBtns = document.querySelectorAll('#fullscreenHeaderBtn, #fullscreenHeaderBtn2');
+            const fullscreenBtn = document.getElementById('fullscreenHeaderBtn');
             const exitFullscreenBtn = document.getElementById('exitFullscreenBtn');
 
-            fullscreenBtns.forEach(btn => {
-                if (btn) {
-                    btn.addEventListener('click', toggleFullscreen);
-                }
-            });
+            if (fullscreenBtn) {
+                fullscreenBtn.addEventListener('click', toggleFullscreen);
+            }
 
             if (exitFullscreenBtn) {
                 exitFullscreenBtn.addEventListener('click', exitFullscreen);
