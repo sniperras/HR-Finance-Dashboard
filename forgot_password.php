@@ -13,6 +13,52 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
+// Function to mask email address
+function maskEmail($email)
+{
+    $parts = explode('@', $email);
+    $username = $parts[0];
+    $domain = $parts[1];
+
+    // Mask username - keep first 3 chars and last 1 char
+    $usernameLength = strlen($username);
+    if ($usernameLength <= 4) {
+        // For very short usernames, keep first 2 chars
+        $visibleStart = 2;
+        $visibleEnd = 0;
+    } else {
+        $visibleStart = 3;
+        $visibleEnd = 1;
+    }
+
+    $maskedUsername = substr($username, 0, $visibleStart) .
+        str_repeat('*', $usernameLength - $visibleStart - $visibleEnd) .
+        ($visibleEnd > 0 ? substr($username, -$visibleEnd) : '');
+
+    // Mask domain - keep first 3 chars and last 2 chars
+    $domainParts = explode('.', $domain);
+    $tld = array_pop($domainParts); // Get TLD (com, org, etc.)
+    $domainName = implode('.', $domainParts); // Get domain name without TLD
+
+    $domainNameLength = strlen($domainName);
+    if ($domainNameLength <= 5) {
+        // For short domain names
+        $visibleStart = 2;
+        $visibleEnd = 1;
+    } else {
+        $visibleStart = 3;
+        $visibleEnd = 2;
+    }
+
+    $maskedDomainName = substr($domainName, 0, $visibleStart) .
+        str_repeat('*', $domainNameLength - $visibleStart - $visibleEnd) .
+        ($visibleEnd > 0 ? substr($domainName, -$visibleEnd) : '');
+
+    $maskedDomain = $maskedDomainName . '.' . $tld;
+
+    return $maskedUsername . '@' . $maskedDomain;
+}
+
 // Handle POST request with redirect to prevent resubmission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $loginInput = trim($_POST['login_input'] ?? '');
@@ -137,7 +183,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $mail->AltBody = strip_tags($message);
 
                     $mail->send();
-                    $_SESSION['fp_success'] = "A temporary password has been sent to your email address: " . htmlspecialchars($user['email']) . ". The password is valid for 24 hours.<br><br>
+
+                    // Mask the email address for display
+                    $maskedEmail = maskEmail($user['email']);
+
+                    $_SESSION['fp_success'] = "A temporary password has been sent to your email address: " . htmlspecialchars($maskedEmail) . ". The password is valid for 24 hours.<br><br>
                     <span style='color: #ff9800; font-weight: bold;'>⚠️ SECURITY NOTICE:</span> Please ensure the email is sent from <strong>nathanaelbizuneh@gmail.com</strong>. If you receive a password reset email from any other email address, DO NOT click any links inside and report it immediately to the IT Team.";
                 } catch (Exception $e) {
                     $_SESSION['fp_error'] = "Failed to send email. Mailer Error: " . $mail->ErrorInfo;
