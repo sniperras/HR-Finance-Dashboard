@@ -35,7 +35,7 @@ while ($row = $indicatorsResult->fetch_assoc()) {
     }
 }
 
-// Build WHERE clause parts
+// Build WHERE clause parts for individual queries
 $whereParts = [];
 $params = [];
 $types = "";
@@ -70,11 +70,10 @@ if ($filterDateTo !== null) {
     $types .= "s";
 }
 
-$whereClause = !empty($whereParts) ? "WHERE " . implode(" AND ", $whereParts) : "";
+// Initialize logs as empty array
+$logs = [];
 
 // Build query based on data type filter
-$query = "";
-
 if ($filterDataType == 'master') {
     // Only Master Data - single query
     $query = "SELECT al.id, al.record_id, al.action, al.old_data, al.new_data, al.performed_at, al.performed_by,
@@ -86,18 +85,43 @@ if ($filterDataType == 'master') {
               FROM data_audit_log al
               LEFT JOIN users u ON al.performed_by = u.id
               LEFT JOIN master_performance_data m ON al.record_id = m.id";
-
+    
+    $whereClause = "";
+    $queryParams = $params;
+    $queryTypes = $types;
+    
     if ($filterDepartment) {
-        $wherePartsMaster = $whereParts;
-        $wherePartsMaster[] = "m.department = ?";
-        $paramsMaster = $params;
-        $paramsMaster[] = $filterDepartment;
-        $typesMaster = $types . "s";
-        $whereClauseMaster = "WHERE " . implode(" AND ", $wherePartsMaster);
-        $query .= " $whereClauseMaster";
-    } elseif (!empty($whereClause)) {
-        $query .= " $whereClause";
+        $whereClause = "WHERE " . (!empty($whereParts) ? implode(" AND ", $whereParts) . " AND " : "") . "m.department = ?";
+        $queryParams[] = $filterDepartment;
+        $queryTypes .= "s";
+    } elseif (!empty($whereParts)) {
+        $whereClause = "WHERE " . implode(" AND ", $whereParts);
     }
+    
+    $query .= " " . $whereClause;
+    $query .= " ORDER BY performed_at DESC LIMIT 100";
+    
+    // Execute query
+    if (!empty($queryParams)) {
+        $stmt = $conn->prepare($query);
+        if ($stmt) {
+            $stmt->bind_param($queryTypes, ...$queryParams);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $logs[] = $row;
+            }
+            $stmt->close();
+        }
+    } else {
+        $result = $conn->query($query);
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $logs[] = $row;
+            }
+        }
+    }
+    
 } elseif ($filterDataType == 'mro') {
     // Only MRO Data - single query
     $query = "SELECT al.id, al.record_id, al.action, al.old_data, al.new_data, al.performed_at, al.performed_by,
@@ -109,36 +133,62 @@ if ($filterDataType == 'master') {
               FROM mro_audit_log al
               LEFT JOIN users u ON al.performed_by = u.id
               LEFT JOIN mro_cpr_report m ON al.record_id = m.id";
-
+    
+    $whereClause = "";
+    $queryParams = $params;
+    $queryTypes = $types;
+    
     if ($filterDepartment) {
-        $wherePartsMro = $whereParts;
-        $wherePartsMro[] = "m.department = ?";
-        $paramsMro = $params;
-        $paramsMro[] = $filterDepartment;
-        $typesMro = $types . "s";
-        $whereClauseMro = "WHERE " . implode(" AND ", $wherePartsMro);
-        $query .= " $whereClauseMro";
-    } elseif (!empty($whereClause)) {
-        $query .= " $whereClause";
+        $whereClause = "WHERE " . (!empty($whereParts) ? implode(" AND ", $whereParts) . " AND " : "") . "m.department = ?";
+        $queryParams[] = $filterDepartment;
+        $queryTypes .= "s";
+    } elseif (!empty($whereParts)) {
+        $whereClause = "WHERE " . implode(" AND ", $whereParts);
     }
-
+    
+    $query .= " " . $whereClause;
+    
     if ($filterIndicator) {
         if (strpos($query, "WHERE") !== false) {
             $query .= " AND m.report_type = ?";
         } else {
             $query .= " WHERE m.report_type = ?";
         }
-        if ($filterDepartment) {
-            $paramsMro[] = $filterIndicator;
-            $typesMro .= "s";
-        } else {
-            $params[] = $filterIndicator;
-            $types .= "s";
+        $queryParams[] = $filterIndicator;
+        $queryTypes .= "s";
+    }
+    
+    $query .= " ORDER BY performed_at DESC LIMIT 100";
+    
+    // Execute query
+    if (!empty($queryParams)) {
+        $stmt = $conn->prepare($query);
+        if ($stmt) {
+            $stmt->bind_param($queryTypes, ...$queryParams);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $logs[] = $row;
+            }
+            $stmt->close();
+        }
+    } else {
+        $result = $conn->query($query);
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $logs[] = $row;
+            }
         }
     }
+    
 } else {
-    // All Data Types (UNION) - Need to duplicate parameters for both parts
-    $queryMaster = "SELECT al.id, al.record_id, al.action, al.old_data, al.new_data, al.performed_at, al.performed_by,
+    // All Data Types - execute two separate queries and combine results
+    // Master query
+    $masterWhereParts = $whereParts;
+    $masterParams = $params;
+    $masterTypes = $types;
+    
+    $masterQuery = "SELECT al.id, al.record_id, al.action, al.old_data, al.new_data, al.performed_at, al.performed_by,
                     u.full_name as user_name,
                     'master' as data_type,
                     m.department,
@@ -147,8 +197,34 @@ if ($filterDataType == 'master') {
                     FROM data_audit_log al
                     LEFT JOIN users u ON al.performed_by = u.id
                     LEFT JOIN master_performance_data m ON al.record_id = m.id";
-
-    $queryMro = "SELECT al.id, al.record_id, al.action, al.old_data, al.new_data, al.performed_at, al.performed_by,
+    
+    $masterWhereClause = "";
+    if ($filterDepartment) {
+        $masterWhereClause = "WHERE " . (!empty($masterWhereParts) ? implode(" AND ", $masterWhereParts) . " AND " : "") . "m.department = ?";
+        $masterParams[] = $filterDepartment;
+        $masterTypes .= "s";
+    } elseif (!empty($masterWhereParts)) {
+        $masterWhereClause = "WHERE " . implode(" AND ", $masterWhereParts);
+    }
+    
+    if ($filterIndicator) {
+        if (!empty($masterWhereClause)) {
+            $masterWhereClause .= " AND m.indicator_name = ?";
+        } else {
+            $masterWhereClause = "WHERE m.indicator_name = ?";
+        }
+        $masterParams[] = $filterIndicator;
+        $masterTypes .= "s";
+    }
+    
+    $masterQuery .= " " . $masterWhereClause;
+    
+    // MRO query
+    $mroWhereParts = $whereParts;
+    $mroParams = $params;
+    $mroTypes = $types;
+    
+    $mroQuery = "SELECT al.id, al.record_id, al.action, al.old_data, al.new_data, al.performed_at, al.performed_by,
                   u.full_name as user_name,
                   'mro' as data_type,
                   m.department,
@@ -157,79 +233,79 @@ if ($filterDataType == 'master') {
                   FROM mro_audit_log al
                   LEFT JOIN users u ON al.performed_by = u.id
                   LEFT JOIN mro_cpr_report m ON al.record_id = m.id";
-
-    // Add filters to master query
-    $masterWhereParts = $whereParts;
-    $mroWhereParts = $whereParts;
-
+    
+    $mroWhereClause = "";
     if ($filterDepartment) {
-        $masterWhereParts[] = "m.department = ?";
-        $mroWhereParts[] = "m.department = ?";
+        $mroWhereClause = "WHERE " . (!empty($mroWhereParts) ? implode(" AND ", $mroWhereParts) . " AND " : "") . "m.department = ?";
+        $mroParams[] = $filterDepartment;
+        $mroTypes .= "s";
+    } elseif (!empty($mroWhereParts)) {
+        $mroWhereClause = "WHERE " . implode(" AND ", $mroWhereParts);
     }
-
-    if ($filterIndicator && $filterDataType == 'all') {
-        // For master data, filter by indicator_name
-        $masterWhereParts[] = "m.indicator_name = ?";
-        // For mro data, filter by report_type
-        $mroWhereParts[] = "m.report_type = ?";
+    
+    if ($filterIndicator) {
+        if (!empty($mroWhereClause)) {
+            $mroWhereClause .= " AND m.report_type = ?";
+        } else {
+            $mroWhereClause = "WHERE m.report_type = ?";
+        }
+        $mroParams[] = $filterIndicator;
+        $mroTypes .= "s";
     }
-
-    $masterWhereClause = !empty($masterWhereParts) ? "WHERE " . implode(" AND ", $masterWhereParts) : "";
-    $mroWhereClause = !empty($mroWhereParts) ? "WHERE " . implode(" AND ", $mroWhereParts) : "";
-
-    $queryMaster .= " $masterWhereClause";
-    $queryMro .= " $mroWhereClause";
-
-    $query = "($queryMaster) UNION ALL ($queryMro)";
-
-    // Build parameters for UNION query
-    $unionParams = [];
-    $unionTypes = "";
-
-    // Master query parameters
-    foreach ($params as $p) {
-        $unionParams[] = $p;
-        $unionTypes .= $types[strlen($unionTypes)];
+    
+    $mroQuery .= " " . $mroWhereClause;
+    
+    // Execute master query
+    if (!empty($masterParams)) {
+        $masterStmt = $conn->prepare($masterQuery);
+        if ($masterStmt) {
+            $masterStmt->bind_param($masterTypes, ...$masterParams);
+            $masterStmt->execute();
+            $masterResult = $masterStmt->get_result();
+            while ($row = $masterResult->fetch_assoc()) {
+                $logs[] = $row;
+            }
+            $masterStmt->close();
+        }
+    } else {
+        $masterResult = $conn->query($masterQuery);
+        if ($masterResult) {
+            while ($row = $masterResult->fetch_assoc()) {
+                $logs[] = $row;
+            }
+        }
     }
-    if ($filterDepartment) {
-        $unionParams[] = $filterDepartment;
-        $unionTypes .= "s";
+    
+    // Execute mro query
+    if (!empty($mroParams)) {
+        $mroStmt = $conn->prepare($mroQuery);
+        if ($mroStmt) {
+            $mroStmt->bind_param($mroTypes, ...$mroParams);
+            $mroStmt->execute();
+            $mroResult = $mroStmt->get_result();
+            while ($row = $mroResult->fetch_assoc()) {
+                $logs[] = $row;
+            }
+            $mroStmt->close();
+        }
+    } else {
+        $mroResult = $conn->query($mroQuery);
+        if ($mroResult) {
+            while ($row = $mroResult->fetch_assoc()) {
+                $logs[] = $row;
+            }
+        }
     }
-    if ($filterIndicator && $filterDataType == 'all') {
-        $unionParams[] = $filterIndicator;
-        $unionTypes .= "s";
-    }
-
-    // Mro query parameters (duplicate)
-    foreach ($params as $p) {
-        $unionParams[] = $p;
-        $unionTypes .= $types[strlen($unionTypes) - strlen($types) + (strlen($unionTypes) % strlen($types))];
-    }
-    if ($filterDepartment) {
-        $unionParams[] = $filterDepartment;
-        $unionTypes .= "s";
-    }
-    if ($filterIndicator && $filterDataType == 'all') {
-        $unionParams[] = $filterIndicator;
-        $unionTypes .= "s";
-    }
-
-    $params = $unionParams;
-    $types = $unionTypes;
+    
+    // Sort combined results by performed_at descending
+    usort($logs, function($a, $b) {
+        return strtotime($b['performed_at']) - strtotime($a['performed_at']);
+    });
+    
+    // Limit to 100 records
+    $logs = array_slice($logs, 0, 100);
 }
 
-// Add ORDER BY and LIMIT
-$query .= " ORDER BY performed_at DESC LIMIT 100";
-
-// Prepare and execute the query
-$stmt = $conn->prepare($query);
-if (!empty($params)) {
-    $stmt->bind_param($types, ...$params);
-}
-$stmt->execute();
-$logs = $stmt->get_result();
-
-// Get users for filter dropdown
 // Get users for filter dropdown - HR only
 $usersQuery = "SELECT id, full_name FROM users WHERE role = 'hr' ORDER BY full_name";
 $users = $conn->query($usersQuery);
@@ -272,29 +348,45 @@ function formatChangeData($oldData, $newData)
     $old = json_decode($oldData, true);
     $new = json_decode($newData, true);
 
-    if (!$old && !$new) return '<span style="color: #888;">No data</span>';
+    if (!$old && !$new) return '<span style="color: #888;">No changes recorded</span>';
 
-    $html = '<table style="width:100%; font-size:0.7rem; border-collapse:collapse;">';
-
-    if ($old) {
-        $html .= '<tr><td style="padding:2px; color:#dc3545;"><strong>OLD:</strong></td><td style="padding:2px;">';
+    $html = '<div class="change-container">';
+    
+    if ($old && $new) {
+        // Update action - show both
+        $html .= '<div class="change-columns">';
+        $html .= '<div class="change-old">';
+        $html .= '<div class="change-header old">❌ OLD VALUES</div>';
         foreach ($old as $key => $value) {
             $displayValue = is_array($value) ? json_encode($value) : $value;
-            $html .= "<span style='color:#dc3545;'>$key:</span> " . htmlspecialchars($displayValue) . "<br>";
+            $html .= '<div class="change-field"><span class="field-name">' . htmlspecialchars($key) . ':</span> <span class="field-value old-value">' . htmlspecialchars($displayValue) . '</span></div>';
         }
-        $html .= '</td></tr>';
-    }
-
-    if ($new) {
-        $html .= '<tr><td style="padding:2px; color:#28a745;"><strong>NEW:</strong></td><td style="padding:2px;">';
+        $html .= '</div>';
+        $html .= '<div class="change-new">';
+        $html .= '<div class="change-header new">✅ NEW VALUES</div>';
         foreach ($new as $key => $value) {
             $displayValue = is_array($value) ? json_encode($value) : $value;
-            $html .= "<span style='color:#28a745;'>$key:</span> " . htmlspecialchars($displayValue) . "<br>";
+            $html .= '<div class="change-field"><span class="field-name">' . htmlspecialchars($key) . ':</span> <span class="field-value new-value">' . htmlspecialchars($displayValue) . '</span></div>';
         }
-        $html .= '</td></tr>';
+        $html .= '</div>';
+        $html .= '</div>';
+    } elseif ($old) {
+        // Delete action - only old values
+        $html .= '<div class="change-header old">❌ DELETED VALUES</div>';
+        foreach ($old as $key => $value) {
+            $displayValue = is_array($value) ? json_encode($value) : $value;
+            $html .= '<div class="change-field"><span class="field-name">' . htmlspecialchars($key) . ':</span> <span class="field-value old-value">' . htmlspecialchars($displayValue) . '</span></div>';
+        }
+    } elseif ($new) {
+        // Insert action - only new values
+        $html .= '<div class="change-header new">✅ NEW VALUES</div>';
+        foreach ($new as $key => $value) {
+            $displayValue = is_array($value) ? json_encode($value) : $value;
+            $html .= '<div class="change-field"><span class="field-name">' . htmlspecialchars($key) . ':</span> <span class="field-value new-value">' . htmlspecialchars($displayValue) . '</span></div>';
+        }
     }
-
-    $html .= '</table>';
+    
+    $html .= '</div>';
     return $html;
 }
 
@@ -352,6 +444,8 @@ unset($_SESSION['error']);
             --danger: #EF4444;
             --border-light: #334155;
             --card-bg: #1E293B;
+            --text-primary: #F1F5F9;
+            --text-secondary: #94A3B8;
         }
 
         * {
@@ -363,22 +457,28 @@ unset($_SESSION['error']);
         body {
             font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
             background: var(--dark-bg);
-            color: var(--light-bg);
+            color: var(--text-primary);
             transition: background-color 0.3s, color 0.3s;
         }
 
         .container {
-            max-width: 1400px;
-            margin: 2rem auto;
-            padding: 0 2rem;
+            width: 100%;
+            max-width: 100%;
+            margin: 0;
+            padding: 1rem;
         }
 
         .history-header {
             background: linear-gradient(135deg, var(--medium-bg) 0%, var(--dark-bg) 100%);
             padding: 1.5rem;
             border-radius: 15px;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
             transition: background 0.3s;
+        }
+
+        .history-header h2 {
+            color: var(--accent);
+            margin-bottom: 0.5rem;
         }
 
         .stats-grid {
@@ -404,7 +504,7 @@ unset($_SESSION['error']);
 
         .stat-label {
             font-size: 0.75rem;
-            color: var(--light-bg);
+            color: var(--text-primary);
             opacity: 0.8;
             margin-top: 0.25rem;
         }
@@ -442,7 +542,7 @@ unset($_SESSION['error']);
             border-radius: 5px;
             border: 1px solid var(--border-light);
             background: var(--dark-bg);
-            color: var(--light-bg);
+            color: var(--text-primary);
             font-size: 0.8rem;
             transition: all 0.3s;
         }
@@ -473,6 +573,49 @@ unset($_SESSION['error']);
             text-align: left;
             border-bottom: 1px solid var(--border-light);
             vertical-align: top;
+        }
+
+        /* Column width optimization */
+        .history-table th:nth-child(1),
+        .history-table td:nth-child(1) {
+            width: 60px;
+            text-align: center;
+        }
+
+        .history-table th:nth-child(2),
+        .history-table td:nth-child(2) {
+            width: 140px;
+            white-space: nowrap;
+        }
+
+        .history-table th:nth-child(3),
+        .history-table td:nth-child(3) {
+            width: 150px;
+        }
+
+        .history-table th:nth-child(4),
+        .history-table td:nth-child(4) {
+            width: 90px;
+        }
+
+        .history-table th:nth-child(5),
+        .history-table td:nth-child(5) {
+            width: 110px;
+        }
+
+        .history-table th:nth-child(6),
+        .history-table td:nth-child(6) {
+            width: 120px;
+        }
+
+        .history-table th:nth-child(7),
+        .history-table td:nth-child(7) {
+            width: 200px;
+        }
+
+        .history-table th:nth-child(8),
+        .history-table td:nth-child(8) {
+            min-width: 350px;
         }
 
         .history-table th {
@@ -554,32 +697,69 @@ unset($_SESSION['error']);
             transform: translateY(-1px);
         }
 
-        @media (max-width: 768px) {
-            .container {
-                padding: 0 1rem;
-            }
+        /* Change display styles */
+        .change-container {
+            font-size: 0.7rem;
+            line-height: 1.4;
+        }
 
-            .filter-form {
-                grid-template-columns: 1fr;
-            }
+        .change-columns {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
 
-            .history-table {
-                font-size: 0.65rem;
-            }
+        .change-old,
+        .change-new {
+            flex: 1;
+            min-width: 150px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.5rem;
+            border-radius: 6px;
+        }
 
-            .history-table th,
-            .history-table td {
-                padding: 0.5rem;
-            }
+        .change-header {
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid;
+        }
+
+        .change-header.old {
+            color: #dc3545;
+            border-bottom-color: #dc3545;
+        }
+
+        .change-header.new {
+            color: #28a745;
+            border-bottom-color: #28a745;
+        }
+
+        .change-field {
+            margin-bottom: 0.25rem;
+            word-break: break-word;
+        }
+
+        .field-name {
+            font-weight: bold;
+            color: var(--accent);
+        }
+
+        .field-value {
+            color: var(--text-primary);
+        }
+
+        .old-value {
+            color: #dc3545;
+        }
+
+        .new-value {
+            color: #28a745;
         }
 
         .timestamp {
             font-family: monospace;
             font-size: 0.7rem;
-        }
-
-        .change-details {
-            max-width: 300px;
         }
 
         /* Theme Toggle Button */
@@ -608,7 +788,8 @@ unset($_SESSION['error']);
 
         .navbar-container {
             max-width: 100%;
-            margin: 0 auto;
+            width: 100%;
+            margin: 0;
             padding: 0 1.5rem;
             display: flex;
             justify-content: space-between;
@@ -676,8 +857,15 @@ unset($_SESSION['error']);
 
         /* Light Theme */
         body.light-theme {
-            background: #F8FAFC;
-            color: #0F172A;
+            --dark-bg: #F8FAFC;
+            --medium-bg: #FFFFFF;
+            --accent: #0284C7;
+            --accent-hover: #0EA5E9;
+            --light-bg: #0F172A;
+            --card-bg: #FFFFFF;
+            --border-light: #E2E8F0;
+            --text-primary: #0F172A;
+            --text-secondary: #475569;
         }
 
         body.light-theme .navbar,
@@ -746,6 +934,41 @@ unset($_SESSION['error']);
         body.light-theme .clear-filter {
             background: #0284C7;
             color: white;
+        }
+
+        body.light-theme .change-old,
+        body.light-theme .change-new {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        @media (max-width: 1200px) {
+            .history-table th:nth-child(8),
+            .history-table td:nth-child(8) {
+                min-width: 300px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 0.5rem;
+            }
+
+            .filter-form {
+                grid-template-columns: 1fr;
+            }
+
+            .history-table {
+                font-size: 0.65rem;
+            }
+
+            .history-table th,
+            .history-table td {
+                padding: 0.5rem;
+            }
+
+            .change-columns {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
@@ -891,8 +1114,8 @@ unset($_SESSION['error']);
                         <th>Changes</th>
                 </thead>
                 <tbody>
-                    <?php if ($logs && $logs->num_rows > 0): ?>
-                        <?php while ($log = $logs->fetch_assoc()): ?>
+                    <?php if (!empty($logs)): ?>
+                        <?php foreach ($logs as $log): ?>
                             <tr>
                                 <td><?php echo $log['id']; ?></td>
                                 <td class="timestamp"><?php echo date('Y-m-d H:i:s', strtotime($log['performed_at'])); ?></td>
@@ -900,7 +1123,7 @@ unset($_SESSION['error']);
                                 <td><?php echo getActionBadge($log['action']); ?></td>
                                 <td><?php echo getDataTypeBadge($log['data_type']); ?></td>
                                 <td>
-                                    <?php if ($log['department']): ?>
+                                    <?php if (!empty($log['department'])): ?>
                                         <span class="badge" style="background: var(--accent); color: var(--dark-bg);">
                                             <?php echo htmlspecialchars($log['department']); ?>
                                         </span>
@@ -909,7 +1132,7 @@ unset($_SESSION['error']);
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <?php if ($log['record_id']): ?>
+                                    <?php if (!empty($log['record_id'])): ?>
                                         <?php if ($log['data_type'] == 'master'): ?>
                                             <a href="master_data.php?month=<?php echo date('Y-m'); ?>" class="record-link">
                                                 <?php echo htmlspecialchars($log['record_name'] ?? 'Record #' . $log['record_id']); ?>
@@ -926,11 +1149,11 @@ unset($_SESSION['error']);
                                         <span style="color: #888;">Record Deleted</span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="change-details">
+                                <td>
                                     <?php echo formatChangeData($log['old_data'], $log['new_data']); ?>
                                 </td>
                             </tr>
-                        <?php endwhile; ?>
+                        <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
                             <td colspan="8" style="text-align: center; padding: 2rem;">
