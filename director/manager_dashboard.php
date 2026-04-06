@@ -206,6 +206,90 @@ $conn->close();
             transition: background-color 0.3s, color 0.3s;
         }
 
+        /* Fullscreen mode styles */
+        body.fullscreen-mode {
+            overflow: hidden;
+        }
+
+        body.fullscreen-mode .navbar {
+            display: none !important;
+        }
+
+        body.fullscreen-mode .floating-controls {
+            display: flex !important;
+        }
+
+        body.fullscreen-mode .dashboard-header {
+            display: none !important;
+        }
+
+        body.fullscreen-mode .overall-card {
+            display: none !important;
+        }
+
+        body.fullscreen-mode .container {
+            height: 100vh;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+            margin: 0;
+            padding: 20px;
+            padding-top: 70px;
+        }
+
+        /* Floating controls for fullscreen mode */
+        .floating-controls {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 10px 20px;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            border-bottom: 1px solid var(--border-light);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .floating-controls .dashboard-title {
+            font-size: 1rem;
+            font-weight: bold;
+            color: var(--accent);
+        }
+
+        .floating-controls .overall-mini {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+            color: var(--dark-bg);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .floating-controls .overall-mini span {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .floating-controls .exit-fullscreen-btn {
+            background: var(--accent);
+            color: var(--dark-bg);
+            border: none;
+            padding: 5px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.8rem;
+            transition: all 0.3s;
+        }
+
+        .floating-controls .exit-fullscreen-btn:hover {
+            transform: translateY(-1px);
+            opacity: 0.9;
+        }
+
         .navbar {
             background: var(--medium-bg);
             padding: 0.5rem 0;
@@ -287,6 +371,23 @@ $conn->close();
             opacity: 0.9;
         }
 
+        .fullscreen-btn {
+            background: var(--accent);
+            color: var(--dark-bg);
+            border: none;
+            padding: 0.3rem 0.8rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.7rem;
+            transition: all 0.3s;
+        }
+
+        .fullscreen-btn:hover {
+            transform: translateY(-1px);
+            opacity: 0.9;
+        }
+
         .theme-toggle {
             background: transparent;
             border: 1px solid var(--accent);
@@ -309,22 +410,27 @@ $conn->close();
             border-radius: 12px;
             margin-bottom: 1rem;
             border: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
 
-        .dashboard-header h1 {
+        .dashboard-header .header-left h1 {
             color: var(--accent);
             margin-bottom: 0.2rem;
             font-size: 1rem;
         }
 
-        .month-selector {
+        .dashboard-header .month-selector {
             display: flex;
             gap: 0.5rem;
             align-items: center;
             margin-top: 0.3rem;
         }
 
-        .month-selector button {
+        .dashboard-header .month-selector button {
             background: var(--accent);
             color: var(--dark-bg);
             border: none;
@@ -335,10 +441,33 @@ $conn->close();
             font-size: 0.7rem;
         }
 
-        .month-selector h3 {
+        .dashboard-header .month-selector h3 {
             color: var(--text-primary);
             margin: 0;
             font-size: 0.85rem;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .fullscreen-header-btn {
+            background: var(--accent);
+            color: var(--dark-bg);
+            border: none;
+            padding: 0.3rem 0.8rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.7rem;
+            transition: all 0.3s;
+        }
+
+        .fullscreen-header-btn:hover {
+            transform: translateY(-1px);
+            opacity: 0.9;
         }
 
         .welcome-banner {
@@ -476,6 +605,17 @@ $conn->close();
             color: white;
         }
 
+        body.light-theme .fullscreen-btn,
+        body.light-theme .fullscreen-header-btn {
+            background: #0284C7;
+            color: white;
+        }
+
+        body.light-theme .floating-controls {
+            background: rgba(255, 255, 255, 0.95);
+            border-bottom-color: #E2E8F0;
+        }
+
         ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
@@ -494,17 +634,42 @@ $conn->close();
             .metrics-grid {
                 grid-template-columns: 1fr;
             }
+
+            .dashboard-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .header-right {
+                justify-content: flex-end;
+            }
+
+            .floating-controls {
+                flex-wrap: wrap;
+                gap: 10px;
+                justify-content: center;
+            }
         }
     </style>
 </head>
 
 <body>
+    <!-- Floating controls for fullscreen mode -->
+    <div class="floating-controls" id="floatingControls">
+        <div class="dashboard-title">Performance Dashboard</div>
+        <div class="overall-mini">
+            Overall: <span id="floatingOverall"><?php echo $overallPercentage; ?>%</span>
+        </div>
+        <button class="exit-fullscreen-btn" id="exitFullscreenBtn">Exit Full Screen</button>
+    </div>
+
     <nav class="navbar">
         <div class="navbar-container">
             <a href="manager_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
             <div class="navbar-menu">
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
+
                     <span class="user-name">👤 <?php echo htmlspecialchars($userFullName); ?></span>
                     <span class="dept-badge"><?php echo htmlspecialchars($userDept); ?></span>
                     <a href="#" onclick="openPasswordModal(); return false;" style="cursor: pointer;">🔑 Change Password</a>
@@ -514,20 +679,23 @@ $conn->close();
         </div>
     </nav>
 
-    <div class="container">
+    <div class="container" id="mainContainer">
         <div class="dashboard-header">
-            <h1>Performance Dashboard</h1>
-            <div class="month-selector">
-                <button onclick="changeMonth('prev')">← Prev</button>
-                <h3>📅 <?php echo date('F Y', strtotime($dataMonth)); ?></h3>
-                <button onclick="changeMonth('next')">Next →</button>
+            <div class="header-left">
+                <h1>Performance Dashboard</h1>
+                <div class="month-selector" id="monthSelector">
+                    <button onclick="changeMonth('prev')">← Prev</button>
+                    <h3>📅 <?php echo date('F Y', strtotime($dataMonth)); ?></h3>
+                    <button onclick="changeMonth('next')">Next →</button>
+                </div>
+            </div>
+            <div class="header-right">
+                <button id="fullscreenHeaderBtn2" class="fullscreen-header-btn">🖥️ Full Screen</button>
             </div>
         </div>
 
-
-
         <!-- Overall Performance Card -->
-        <div class="overall-card">
+        <div class="overall-card" id="overallCard">
             <h3>Overall Performance Score</h3>
             <div class="overall-percentage"><?php echo $overallPercentage; ?>%</div>
             <div style="font-size: 0.75rem;">Target: 100%</div>
@@ -573,8 +741,11 @@ $conn->close();
         // Data passed from PHP
         const indicators = <?php echo json_encode($indicators); ?>;
         const reportData = <?php echo json_encode($reportData); ?>;
+        const overallPercentage = <?php echo $overallPercentage; ?>;
 
         let chartInstances = {};
+        let autoScrollInterval = null;
+        let isScrolling = false;
 
         function getColor(percentage) {
             if (percentage >= 90) return '#10B981';
@@ -630,6 +801,130 @@ $conn->close();
                 chartIndex++;
             }
         }
+
+        // Fullscreen functionality with enhanced auto-scroll and pauses
+        function toggleFullscreen() {
+            const body = document.body;
+            const container = document.getElementById('mainContainer');
+
+            if (!body.classList.contains('fullscreen-mode')) {
+                // Enter fullscreen mode
+                body.classList.add('fullscreen-mode');
+
+                // Start auto-scrolling
+                startAutoScroll();
+
+                // Request actual browser fullscreen if available
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen().catch(err => {
+                        console.log(`Fullscreen error: ${err.message}`);
+                    });
+                }
+            } else {
+                exitFullscreen();
+            }
+        }
+
+        function exitFullscreen() {
+            const body = document.body;
+
+            body.classList.remove('fullscreen-mode');
+
+            // Stop auto-scrolling
+            stopAutoScroll();
+
+            // Exit browser fullscreen
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+
+        function startAutoScroll() {
+            const container = document.getElementById('mainContainer');
+            if (!container) return;
+
+            stopAutoScroll(); // Clear any existing interval
+
+            let isPaused = false;
+            let scrollTimeout = null;
+
+            function performScroll() {
+                if (isScrolling || isPaused) return;
+
+                isScrolling = true;
+
+                const maxScroll = container.scrollHeight - container.clientHeight;
+                const currentScroll = container.scrollTop;
+
+                // Check if we're at the bottom
+                const isAtBottom = currentScroll >= maxScroll - 10;
+
+                if (isAtBottom && maxScroll > 0) {
+                    // Pause at bottom for 2 seconds
+                    isPaused = true;
+                    isScrolling = false;
+
+                    // Clear any existing timeout
+                    if (scrollTimeout) clearTimeout(scrollTimeout);
+
+                    scrollTimeout = setTimeout(() => {
+                        // Smooth scroll to top
+                        container.scrollTo({
+                            top: 0,
+                            behavior: 'smooth'
+                        });
+
+                        // Pause at top for 2 seconds after reaching top
+                        setTimeout(() => {
+                            isPaused = false;
+                            isScrolling = false;
+                        }, 2000);
+                    }, 2000);
+
+                    return;
+                }
+
+                // Check if we're at the top and just finished scrolling (handled by the pause flag)
+                if (currentScroll <= 10 && isPaused) {
+                    isScrolling = false;
+                    return;
+                }
+
+                // Normal scroll down
+                let targetScroll = currentScroll + 2;
+
+                container.scrollTo({
+                    top: targetScroll,
+                    behavior: 'smooth'
+                });
+
+                setTimeout(() => {
+                    isScrolling = false;
+                }, 50);
+            }
+
+            autoScrollInterval = setInterval(performScroll, 50);
+        }
+
+        function stopAutoScroll() {
+            if (autoScrollInterval) {
+                clearInterval(autoScrollInterval);
+                autoScrollInterval = null;
+            }
+        }
+
+        // Listen for fullscreen change events
+        document.addEventListener('fullscreenchange', function() {
+            if (!document.fullscreenElement) {
+                // User exited fullscreen via ESC key
+                const body = document.body;
+
+                if (body.classList.contains('fullscreen-mode')) {
+                    body.classList.remove('fullscreen-mode');
+                    stopAutoScroll();
+                }
+            }
+        });
 
         // Theme Manager
         class ThemeManager {
@@ -710,6 +1005,58 @@ $conn->close();
         document.addEventListener('DOMContentLoaded', function() {
             new ThemeManager();
             initializeCharts();
+
+            // Initialize fullscreen buttons
+            const fullscreenBtns = document.querySelectorAll('#fullscreenHeaderBtn, #fullscreenHeaderBtn2');
+            const exitFullscreenBtn = document.getElementById('exitFullscreenBtn');
+
+            fullscreenBtns.forEach(btn => {
+                if (btn) {
+                    btn.addEventListener('click', toggleFullscreen);
+                }
+            });
+
+            if (exitFullscreenBtn) {
+                exitFullscreenBtn.addEventListener('click', exitFullscreen);
+            }
+
+            // Update floating overall percentage
+            const floatingOverall = document.getElementById('floatingOverall');
+            if (floatingOverall) {
+                floatingOverall.textContent = overallPercentage + '%';
+            }
+
+            // Pause auto-scroll on user interaction
+            const container = document.getElementById('mainContainer');
+            if (container) {
+                let userScrollTimeout = null;
+
+                container.addEventListener('wheel', function() {
+                    if (document.body.classList.contains('fullscreen-mode')) {
+                        // Temporarily pause auto-scroll on user scroll
+                        stopAutoScroll();
+                        // Restart after 5 seconds of inactivity
+                        if (userScrollTimeout) clearTimeout(userScrollTimeout);
+                        userScrollTimeout = setTimeout(() => {
+                            if (document.body.classList.contains('fullscreen-mode')) {
+                                startAutoScroll();
+                            }
+                        }, 5000);
+                    }
+                });
+
+                container.addEventListener('touchmove', function() {
+                    if (document.body.classList.contains('fullscreen-mode')) {
+                        stopAutoScroll();
+                        if (userScrollTimeout) clearTimeout(userScrollTimeout);
+                        userScrollTimeout = setTimeout(() => {
+                            if (document.body.classList.contains('fullscreen-mode')) {
+                                startAutoScroll();
+                            }
+                        }, 5000);
+                    }
+                });
+            }
         });
 
         // Function to open password change modal

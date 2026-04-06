@@ -190,6 +190,15 @@ foreach ($indicators as $indicatorKey => $indicatorInfo) {
 }
 
 $conn->close();
+
+// Calculate average overall percentage
+$totalOverall = 0;
+$countOverall = 0;
+foreach ($metricsData as $metric) {
+    $totalOverall += $metric['overall'];
+    $countOverall++;
+}
+$averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 0;
 ?>
 
 <!DOCTYPE html>
@@ -229,6 +238,98 @@ $conn->close();
             background: var(--dark-bg);
             color: var(--text-primary);
             transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* Fullscreen mode styles */
+        body.fullscreen-mode {
+            overflow: hidden;
+        }
+
+        body.fullscreen-mode .navbar {
+            display: none !important;
+        }
+
+        body.fullscreen-mode .floating-controls {
+            display: flex !important;
+        }
+
+        body.fullscreen-mode .dashboard-header {
+            display: none !important;
+        }
+
+        body.fullscreen-mode .welcome-banner {
+            display: none !important;
+        }
+
+        body.fullscreen-mode .container {
+            height: 100vh;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+            margin: 0;
+            padding: 20px;
+            padding-top: 70px;
+        }
+
+        /* Floating controls for fullscreen mode */
+        .floating-controls {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 10px 20px;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            border-bottom: 1px solid var(--border-light);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .floating-controls .dashboard-title {
+            font-size: 1rem;
+            font-weight: bold;
+            color: var(--accent);
+        }
+
+        .floating-controls .overall-mini {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+            color: var(--dark-bg);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .floating-controls .overall-mini span {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .floating-controls .exit-fullscreen-btn {
+            background: var(--accent);
+            color: var(--dark-bg);
+            border: none;
+            padding: 5px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.8rem;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .floating-controls .exit-fullscreen-btn img {
+            width: 16px;
+            height: 16px;
+        }
+
+        .floating-controls .exit-fullscreen-btn:hover {
+            transform: translateY(-1px);
+            opacity: 0.9;
         }
 
         /* Navigation */
@@ -337,6 +438,35 @@ $conn->close();
             color: var(--dark-bg);
         }
 
+        /* Fullscreen Button */
+        .fullscreen-header-btn {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 0.35rem 0.9rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .fullscreen-header-btn img {
+            width: 14px;
+            height: 14px;
+        }
+
+        .fullscreen-header-btn:hover {
+            background: var(--accent);
+            color: var(--dark-bg);
+        }
+
+        .fullscreen-header-btn:hover img {
+            filter: brightness(0);
+        }
+
         /* Main Container */
         .container {
             width: 100%;
@@ -353,22 +483,27 @@ $conn->close();
             margin-bottom: 1rem;
             border: 1px solid var(--border-light);
             transition: background 0.3s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
 
-        .dashboard-header h1 {
+        .dashboard-header .header-left h1 {
             color: var(--accent);
             margin-bottom: 0.2rem;
             font-size: 1rem;
         }
 
-        .month-selector {
+        .dashboard-header .month-selector {
             display: flex;
             gap: 0.5rem;
             align-items: center;
             margin-top: 0.3rem;
         }
 
-        .month-selector button {
+        .dashboard-header .month-selector button {
             background: var(--accent);
             color: var(--dark-bg);
             border: none;
@@ -379,10 +514,16 @@ $conn->close();
             font-size: 0.7rem;
         }
 
-        .month-selector h3 {
+        .dashboard-header .month-selector h3 {
             color: var(--text-primary);
             margin: 0;
             font-size: 0.85rem;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
         }
 
         /* Responsive Grid Layout */
@@ -735,6 +876,16 @@ $conn->close();
             color: white;
         }
 
+        body.light-theme .fullscreen-header-btn {
+            border-color: #0284C7;
+            color: #0284C7;
+        }
+
+        body.light-theme .fullscreen-header-btn:hover {
+            background: #0284C7;
+            color: white;
+        }
+
         body.light-theme .btn {
             background: #0284C7;
             color: white;
@@ -744,10 +895,26 @@ $conn->close();
             background: #0284C7;
             color: white;
         }
+
+        body.light-theme .floating-controls {
+            background: rgba(255, 255, 255, 0.95);
+            border-bottom-color: #E2E8F0;
+        }
     </style>
 </head>
 
 <body>
+    <!-- Floating controls for fullscreen mode -->
+    <div class="floating-controls" id="floatingControls">
+        <div class="dashboard-title">Organizational Performance Dashboard</div>
+        <div class="overall-mini">
+            Overall: <span id="floatingOverall"><?php echo $averageOverall; ?>%</span>
+        </div>
+        <button class="exit-fullscreen-btn" id="exitFullscreenBtn">
+            <img src="../assets/images/expand_black.png" alt="exit" style="transform: rotate(180deg);"> Exit Full Screen
+        </button>
+    </div>
+
     <nav class="navbar">
         <div class="navbar-container">
             <a href="md_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
@@ -765,6 +932,7 @@ $conn->close();
 
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
+
                     <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
                     <span class="department-badge"><?php echo htmlspecialchars($userDept); ?></span>
                     <a href="#" onclick="openPasswordModal(); return false;" style="cursor: pointer;">🔑 Change Password</a>
@@ -774,13 +942,20 @@ $conn->close();
         </div>
     </nav>
 
-    <div class="container">
+    <div class="container" id="mainContainer">
         <div class="dashboard-header">
-            <h1>Organizational Performance Dashboard</h1>
-            <div class="month-selector">
-                <button onclick="changeMonth('prev')">← Prev</button>
-                <h3 id="current-month"><?php echo date('F Y', strtotime($dataMonth)); ?></h3>
-                <button onclick="changeMonth('next')">Next →</button>
+            <div class="header-left">
+                <h1>Organizational Performance Dashboard</h1>
+                <div class="month-selector">
+                    <button onclick="changeMonth('prev')">← Prev</button>
+                    <h3 id="current-month"><?php echo date('F Y', strtotime($dataMonth)); ?></h3>
+                    <button onclick="changeMonth('next')">Next →</button>
+                </div>
+            </div>
+            <div class="header-right">
+                <button id="fullscreenHeaderBtn2" class="fullscreen-header-btn">
+                    <img src="../assets/images/expand.png" alt="expand"> Full Screen
+                </button>
             </div>
         </div>
 
@@ -853,6 +1028,133 @@ $conn->close();
             }
         }
 
+        // Fullscreen functionality with auto-scroll and pauses
+        let autoScrollInterval = null;
+        let isScrolling = false;
+
+        function toggleFullscreen() {
+            const body = document.body;
+            const container = document.getElementById('mainContainer');
+
+            if (!body.classList.contains('fullscreen-mode')) {
+                // Enter fullscreen mode
+                body.classList.add('fullscreen-mode');
+
+                // Start auto-scrolling
+                startAutoScroll();
+
+                // Request actual browser fullscreen if available
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen().catch(err => {
+                        console.log(`Fullscreen error: ${err.message}`);
+                    });
+                }
+            } else {
+                exitFullscreen();
+            }
+        }
+
+        function exitFullscreen() {
+            const body = document.body;
+
+            body.classList.remove('fullscreen-mode');
+
+            // Stop auto-scrolling
+            stopAutoScroll();
+
+            // Exit browser fullscreen
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+
+        function startAutoScroll() {
+            const container = document.getElementById('mainContainer');
+            if (!container) return;
+
+            stopAutoScroll(); // Clear any existing interval
+
+            let isPaused = false;
+            let scrollTimeout = null;
+
+            function performScroll() {
+                if (isScrolling || isPaused) return;
+
+                isScrolling = true;
+
+                const maxScroll = container.scrollHeight - container.clientHeight;
+                const currentScroll = container.scrollTop;
+
+                // Check if we're at the bottom
+                const isAtBottom = currentScroll >= maxScroll - 10;
+
+                if (isAtBottom && maxScroll > 0) {
+                    // Pause at bottom for 2 seconds
+                    isPaused = true;
+                    isScrolling = false;
+
+                    // Clear any existing timeout
+                    if (scrollTimeout) clearTimeout(scrollTimeout);
+
+                    scrollTimeout = setTimeout(() => {
+                        // Smooth scroll to top
+                        container.scrollTo({
+                            top: 0,
+                            behavior: 'smooth'
+                        });
+
+                        // Pause at top for 2 seconds after reaching top
+                        setTimeout(() => {
+                            isPaused = false;
+                            isScrolling = false;
+                        }, 2000);
+                    }, 2000);
+
+                    return;
+                }
+
+                // Check if we're at the top and just finished scrolling (handled by the pause flag)
+                if (currentScroll <= 10 && isPaused) {
+                    isScrolling = false;
+                    return;
+                }
+
+                // Normal scroll down
+                let targetScroll = currentScroll + 2;
+
+                container.scrollTo({
+                    top: targetScroll,
+                    behavior: 'smooth'
+                });
+
+                setTimeout(() => {
+                    isScrolling = false;
+                }, 50);
+            }
+
+            autoScrollInterval = setInterval(performScroll, 50);
+        }
+
+        function stopAutoScroll() {
+            if (autoScrollInterval) {
+                clearInterval(autoScrollInterval);
+                autoScrollInterval = null;
+            }
+        }
+
+        // Listen for fullscreen change events
+        document.addEventListener('fullscreenchange', function() {
+            if (!document.fullscreenElement) {
+                // User exited fullscreen via ESC key
+                const body = document.body;
+
+                if (body.classList.contains('fullscreen-mode')) {
+                    body.classList.remove('fullscreen-mode');
+                    stopAutoScroll();
+                }
+            }
+        });
+
         // Data passed from PHP
         const metricsData = <?php echo json_encode($metricsData); ?>;
         const departmentColors = <?php echo json_encode($departmentColors); ?>;
@@ -860,6 +1162,7 @@ $conn->close();
         const currentYear = '<?php echo date('Y', strtotime($dataMonth)); ?>';
         const currentMonthNum = '<?php echo date('m', strtotime($dataMonth)); ?>';
         const allDepartments = <?php echo json_encode($allDepartments); ?>;
+        const averageOverall = <?php echo $averageOverall; ?>;
 
         // Departments that are NOT clickable (MD/DIV. and Remainder)
         const nonClickableDepts = ['MD/DIV.', 'Remainder'];
@@ -871,7 +1174,6 @@ $conn->close();
             return '#EF4444';
         }
 
-        // Function to show department details modal
         // Function to show department details modal
         async function showDepartmentDetails(department, indicatorKey, indicatorName) {
             const modal = document.getElementById('deptModal');
@@ -1054,7 +1356,6 @@ $conn->close();
                             }
                         }
                     },
-                    // Remove the onClick handler - keep hover only
                     onClick: null
                 }
             });
@@ -1064,7 +1365,6 @@ $conn->close();
             const container = document.getElementById(containerId);
             if (!container) return;
 
-            // ALWAYS show all departments, even with no data
             let html = '';
             for (const [dept, value] of Object.entries(departments)) {
                 const percentageValue = parseFloat(value) || 0;
@@ -1075,11 +1375,9 @@ $conn->close();
                 const clickableClass = isClickable ? 'clickable' : 'disabled';
                 const onclickAttr = isClickable ? `onclick="onDepartmentClick('${dept}', '${indicatorKey}', '${indicatorName}')"` : '';
 
-                // Get actual and target values
                 const actualVal = (actuals[dept] !== undefined && actuals[dept] !== null && actuals[dept] !== '') ? actuals[dept] : '-';
                 const targetVal = (targets[dept] !== undefined && targets[dept] !== null && targets[dept] !== '') ? targets[dept] : '-';
 
-                // Check if this department has actual data (not just 0)
                 const hasActualData = (actualVal !== '-' && actualVal !== null && parseFloat(actualVal) > 0);
                 const displayPercentage = hasActualData ? percentageValue : 0;
                 const displayBarWidth = hasActualData ? barWidth : 0;
@@ -1159,6 +1457,56 @@ $conn->close();
         document.addEventListener('DOMContentLoaded', function() {
             new ThemeManager();
             renderDashboard();
+
+            // Initialize fullscreen buttons
+            const fullscreenBtns = document.querySelectorAll('#fullscreenHeaderBtn, #fullscreenHeaderBtn2');
+            const exitFullscreenBtn = document.getElementById('exitFullscreenBtn');
+
+            fullscreenBtns.forEach(btn => {
+                if (btn) {
+                    btn.addEventListener('click', toggleFullscreen);
+                }
+            });
+
+            if (exitFullscreenBtn) {
+                exitFullscreenBtn.addEventListener('click', exitFullscreen);
+            }
+
+            // Update floating overall percentage
+            const floatingOverall = document.getElementById('floatingOverall');
+            if (floatingOverall) {
+                floatingOverall.textContent = averageOverall + '%';
+            }
+
+            // Pause auto-scroll on user interaction
+            const container = document.getElementById('mainContainer');
+            if (container) {
+                let userScrollTimeout = null;
+
+                container.addEventListener('wheel', function() {
+                    if (document.body.classList.contains('fullscreen-mode')) {
+                        stopAutoScroll();
+                        if (userScrollTimeout) clearTimeout(userScrollTimeout);
+                        userScrollTimeout = setTimeout(() => {
+                            if (document.body.classList.contains('fullscreen-mode')) {
+                                startAutoScroll();
+                            }
+                        }, 5000);
+                    }
+                });
+
+                container.addEventListener('touchmove', function() {
+                    if (document.body.classList.contains('fullscreen-mode')) {
+                        stopAutoScroll();
+                        if (userScrollTimeout) clearTimeout(userScrollTimeout);
+                        userScrollTimeout = setTimeout(() => {
+                            if (document.body.classList.contains('fullscreen-mode')) {
+                                startAutoScroll();
+                            }
+                        }, 5000);
+                    }
+                });
+            }
         });
 
         // Close modal when clicking outside
