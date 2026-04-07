@@ -285,7 +285,7 @@ foreach ($indicators as $indicatorKey => $indicatorInfo) {
         }
         $allPercentagesForOverall[] = $mdDivPercentage;
         $allPercentagesForOverall[] = $remainderPercentage;
-        
+
         $overall = round(array_sum($allPercentagesForOverall) / count($allPercentagesForOverall), 1);
     } else {
         // No data at all - overall should be 0
@@ -329,8 +329,8 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Organizational Performance Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover, shrink-to-fit=no">
+    <title>MRO Performance Dashboard</title>
     <link rel="stylesheet" href="../css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="icon" type="image/png" href="../assets/images/ethiopian_logo.ico">
@@ -695,10 +695,17 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             flex-direction: column;
         }
 
-        .metric-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-            border-color: var(--accent);
+        /* Disable hover effects on mobile to prevent jitter */
+        @media (max-width: 768px) {
+            .metric-card:hover {
+                transform: none;
+                box-shadow: none;
+            }
+
+            .dept-bar-item.clickable:hover {
+                background: none;
+                transform: none;
+            }
         }
 
         .metric-header {
@@ -737,19 +744,24 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             background: none;
         }
 
-        /* Chart Container */
+        /* Chart Container - FIXED for mobile stability */
         .chart-container {
             position: relative;
             width: 100%;
             max-width: 180px;
+            height: 140px;
+            /* FIXED HEIGHT - critical for stopping wiggle */
             margin: 0 auto 0.6rem;
             cursor: pointer;
+            touch-action: manipulation;
         }
 
         .chart-container canvas {
             width: 100% !important;
-            height: auto !important;
-            max-height: 140px;
+            height: 100% !important;
+            display: block;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: none;
         }
 
         /* Department Bars */
@@ -766,9 +778,9 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             border-radius: 6px;
         }
 
-        .dept-bar-item.clickable:hover {
-            background: rgba(56, 189, 248, 0.1);
-            transform: translateX(3px);
+        .dept-bar-item.clickable:active {
+            background: rgba(56, 189, 248, 0.2);
+            transform: scale(0.98);
         }
 
         .dept-bar-item.disabled {
@@ -1023,13 +1035,19 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             background: rgba(255, 255, 255, 0.95);
             border-bottom-color: #E2E8F0;
         }
+
+        /* Global canvas stability */
+        canvas {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: none;
+        }
     </style>
 </head>
 
 <body>
     <!-- Floating controls for fullscreen mode -->
     <div class="floating-controls" id="floatingControls">
-        <div class="dashboard-title">Organizational Performance Dashboard</div>
+        <div class="dashboard-title">MRO Performance Dashboard</div>
         <div class="overall-mini">
             Overall: <span id="floatingOverall"><?php echo $averageOverall; ?>%</span>
         </div>
@@ -1057,7 +1075,10 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
 
                     <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
-                    <span class="department-badge"><?php echo htmlspecialchars($userDept); ?></span>
+                    <?php if ($_SESSION['user_role'] == 'director'): ?>
+                        <span class="department-badge"><?php echo htmlspecialchars($userDept); ?></span>
+                    <?php endif; ?>
+
                     <a href="#" onclick="openPasswordModal(); return false;" style="cursor: pointer;">🔑 Change Password</a>
                     <a href="../logout.php" class="btn">Logout</a>
                 </div>
@@ -1068,7 +1089,7 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
     <div class="container" id="mainContainer">
         <div class="dashboard-header">
             <div class="header-left">
-                <h1>Organizational Performance Dashboard</h1>
+                <h1>MRO Performance Dashboard</h1>
                 <div class="month-selector">
                     <button onclick="changeMonth('prev')">← Prev</button>
                     <h3 id="current-month"><?php echo date('F Y', strtotime($dataMonth)); ?></h3>
@@ -1160,13 +1181,8 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             const container = document.getElementById('mainContainer');
 
             if (!body.classList.contains('fullscreen-mode')) {
-                // Enter fullscreen mode
                 body.classList.add('fullscreen-mode');
-
-                // Start auto-scrolling
                 startAutoScroll();
-
-                // Request actual browser fullscreen if available
                 if (document.documentElement.requestFullscreen) {
                     document.documentElement.requestFullscreen().catch(err => {
                         console.log(`Fullscreen error: ${err.message}`);
@@ -1179,13 +1195,8 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
 
         function exitFullscreen() {
             const body = document.body;
-
             body.classList.remove('fullscreen-mode');
-
-            // Stop auto-scrolling
             stopAutoScroll();
-
-            // Exit browser fullscreen
             if (document.exitFullscreen) {
                 document.exitFullscreen();
             }
@@ -1194,67 +1205,46 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
         function startAutoScroll() {
             const container = document.getElementById('mainContainer');
             if (!container) return;
-
-            stopAutoScroll(); // Clear any existing interval
-
+            stopAutoScroll();
             let isPaused = false;
             let scrollTimeout = null;
 
             function performScroll() {
                 if (isScrolling || isPaused) return;
-
                 isScrolling = true;
-
                 const maxScroll = container.scrollHeight - container.clientHeight;
                 const currentScroll = container.scrollTop;
-
-                // Check if we're at the bottom
                 const isAtBottom = currentScroll >= maxScroll - 10;
 
                 if (isAtBottom && maxScroll > 0) {
-                    // Pause at bottom for 2 seconds
                     isPaused = true;
                     isScrolling = false;
-
-                    // Clear any existing timeout
                     if (scrollTimeout) clearTimeout(scrollTimeout);
-
                     scrollTimeout = setTimeout(() => {
-                        // Smooth scroll to top
                         container.scrollTo({
                             top: 0,
                             behavior: 'smooth'
                         });
-
-                        // Pause at top for 2 seconds after reaching top
                         setTimeout(() => {
                             isPaused = false;
                             isScrolling = false;
                         }, 2000);
                     }, 2000);
-
                     return;
                 }
-
-                // Check if we're at the top and just finished scrolling (handled by the pause flag)
                 if (currentScroll <= 10 && isPaused) {
                     isScrolling = false;
                     return;
                 }
-
-                // Normal scroll down
                 let targetScroll = currentScroll + 2;
-
                 container.scrollTo({
                     top: targetScroll,
                     behavior: 'smooth'
                 });
-
                 setTimeout(() => {
                     isScrolling = false;
                 }, 50);
             }
-
             autoScrollInterval = setInterval(performScroll, 50);
         }
 
@@ -1265,12 +1255,9 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             }
         }
 
-        // Listen for fullscreen change events
         document.addEventListener('fullscreenchange', function() {
             if (!document.fullscreenElement) {
-                // User exited fullscreen via ESC key
                 const body = document.body;
-
                 if (body.classList.contains('fullscreen-mode')) {
                     body.classList.remove('fullscreen-mode');
                     stopAutoScroll();
@@ -1288,17 +1275,14 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
         const averageOverall = <?php echo $averageOverall; ?>;
         const costCenterMapping = <?php echo json_encode($costCenterMapping); ?>;
 
-        // Departments that are NOT clickable (MD/DIV. and Remainder)
         const nonClickableDepts = ['MD/DIV.', 'Remainder'];
 
-        // Function to get color based on percentage
         function getScoreColor(percentage) {
             if (percentage >= 90) return '#10B981';
             if (percentage >= 70) return '#F59E0B';
             return '#EF4444';
         }
 
-        // Function to show department details modal
         async function showDepartmentDetails(department, indicatorKey, indicatorName) {
             const modal = document.getElementById('deptModal');
             const modalTitle = document.getElementById('deptModalTitle');
@@ -1309,7 +1293,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             modal.style.display = 'flex';
 
             try {
-                // Fetch data for this department and indicator from mro_cpr_report
                 const response = await fetch(`get_dept_indicator_data.php?dept=${encodeURIComponent(department)}&indicator=${encodeURIComponent(indicatorKey)}&month=${currentMonthNum}&year=${currentYear}`);
                 const data = await response.json();
 
@@ -1317,22 +1300,11 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                     let tableHtml = `
                         <table class="detail-table">
                             <thead>
-                                <tr>
-                                    <th>Cost Center</th>
-                                    <th>Expected Tasks</th>
-                                    <th>Completed Tasks</th>
-                                    <th>Not Completed</th>
-                                    <th>Completion %</th>
-                                    <th>Progress</th>
-                                </tr>
+                                <tr><th>Cost Center</th><th>Expected Tasks</th><th>Completed Tasks</th><th>Not Completed</th><th>Completion %</th><th>Progress</th></tr>
                             </thead>
-                            <tbody>
-                    `;
-
+                            <tbody>`;
                     let directorData = null;
                     let managerRows = [];
-
-                    // Separate director row from manager rows
                     for (const record of data.data) {
                         if (record.cost_center_code === 'DIR') {
                             directorData = record;
@@ -1340,57 +1312,24 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                             managerRows.push(record);
                         }
                     }
-
-                    // Display manager rows first
                     for (const record of managerRows) {
                         const expected = parseInt(record.expected) || 0;
                         const completed = parseInt(record.completed) || 0;
                         const percentage = parseFloat(record.percentage) || 0;
                         const notCompleted = expected - completed;
                         const percentageColor = getScoreColor(percentage);
-
-                        tableHtml += `
-                            <tr>
-                                <td>${record.cost_center_text || record.cost_center_code}</td>
-                                <td>${expected}</td>
-                                <td>${completed}</td>
-                                <td>${notCompleted}</td>
-                                <td style="color: ${percentageColor}; font-weight: bold;">${percentage}%</td>
-                                <td>
-                                    <div class="progress-bar-modal">
-                                        <div class="progress-fill-modal" style="width: ${percentage}%; background: ${percentageColor};"></div>
-                                    </div>
-                                </td>
-                            </tr>
-                        `;
+                        tableHtml += `<tr><td>${record.cost_center_text || record.cost_center_code}</td><td>${expected}</td><td>${completed}</td><td>${notCompleted}</td><td style="color: ${percentageColor}; font-weight: bold;">${percentage}%</td><td><div class="progress-bar-modal"><div class="progress-fill-modal" style="width: ${percentage}%; background: ${percentageColor};"></div></div></td></tr>`;
                     }
-
-                    // Display director row only once (from database)
                     if (directorData) {
                         const dirExpected = parseInt(directorData.expected) || 0;
                         const dirCompleted = parseInt(directorData.completed) || 0;
                         const dirPercentage = parseFloat(directorData.percentage) || 0;
                         const dirNotCompleted = dirExpected - dirCompleted;
                         const dirColor = getScoreColor(dirPercentage);
-
-                        tableHtml += `
-                            <tr class="director-row">
-                                <td><strong>${directorData.cost_center_text || 'Director/Total'}</strong></td>
-                                <td><strong>${dirExpected}</strong></td>
-                                <td><strong>${dirCompleted}</strong></td>
-                                <td><strong>${dirNotCompleted}</strong></td>
-                                <td style="color: ${dirColor}; font-weight: bold;"><strong>${dirPercentage}%</strong></td>
-                                <td>
-                                    <div class="progress-bar-modal">
-                                        <div class="progress-fill-modal" style="width: ${dirPercentage}%; background: ${dirColor};"></div>
-                                    </div>
-                                </td>
-                            </tr>
-                        `;
+                        tableHtml += `<tr class="director-row"><td><strong>${directorData.cost_center_text || 'Director/Total'}</strong></td><td><strong>${dirExpected}</strong></td><td><strong>${dirCompleted}</strong></td><td><strong>${dirNotCompleted}</strong></td><td style="color: ${dirColor}; font-weight: bold;"><strong>${dirPercentage}%</strong></td><td><div class="progress-bar-modal"><div class="progress-fill-modal" style="width: ${dirPercentage}%; background: ${dirColor};"></div></div></td></tr>`;
                     } else if (managerRows.length > 0) {
-                        // If no director row in database, calculate totals from manager rows
-                        let totalExpected = 0;
-                        let totalCompleted = 0;
+                        let totalExpected = 0,
+                            totalCompleted = 0;
                         for (const record of managerRows) {
                             totalExpected += parseInt(record.expected) || 0;
                             totalCompleted += parseInt(record.completed) || 0;
@@ -1398,28 +1337,9 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                         const totalPercentage = totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
                         const totalColor = getScoreColor(totalPercentage);
                         const totalNotCompleted = totalExpected - totalCompleted;
-
-                        tableHtml += `
-                            <tr class="director-row">
-                                <td><strong>TOTAL (Calculated)</strong></td>
-                                <td><strong>${totalExpected}</strong></td>
-                                <td><strong>${totalCompleted}</strong></td>
-                                <td><strong>${totalNotCompleted}</strong></td>
-                                <td style="color: ${totalColor}; font-weight: bold;"><strong>${totalPercentage.toFixed(1)}%</strong></td>
-                                <td>
-                                    <div class="progress-bar-modal">
-                                        <div class="progress-fill-modal" style="width: ${totalPercentage}%; background: ${totalColor};"></div>
-                                    </div>
-                                </td>
-                            </tr>
-                        `;
+                        tableHtml += `<tr class="director-row"><td><strong>TOTAL (Calculated)</strong></td><td><strong>${totalExpected}</strong></td><td><strong>${totalCompleted}</strong></td><td><strong>${totalNotCompleted}</strong></td><td style="color: ${totalColor}; font-weight: bold;"><strong>${totalPercentage.toFixed(1)}%</strong></td><td><div class="progress-bar-modal"><div class="progress-fill-modal" style="width: ${totalPercentage}%; background: ${totalColor};"></div></div></td></tr>`;
                     }
-
-                    tableHtml += `
-                            </tbody>
-                        </table>
-                    `;
-
+                    tableHtml += `</tbody><tr>`;
                     modalBody.innerHTML = tableHtml;
                 } else {
                     modalBody.innerHTML = '<div class="no-data">No data available for this department and indicator.</div>';
@@ -1434,17 +1354,14 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             document.getElementById('deptModal').style.display = 'none';
         }
 
-        // Function to handle click on department
         function onDepartmentClick(department, indicatorKey, indicatorName) {
-            // Check if department is clickable (exclude MD/DIV. and Remainder)
-            if (nonClickableDepts.includes(department)) {
-                return;
-            }
+            if (nonClickableDepts.includes(department)) return;
             showDepartmentDetails(department, indicatorKey, indicatorName);
         }
 
         let chartInstances = {};
 
+        // FIXED: Anti-wiggle pie chart configuration
         function createPieChart(canvasId, percentage, metricName, indicatorKey) {
             const ctx = document.getElementById(canvasId);
             if (!ctx) return null;
@@ -1461,26 +1378,29 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                         data: [achieved, remaining],
                         backgroundColor: [color, 'rgba(51, 65, 85, 0.6)'],
                         borderWidth: 0,
-                        hoverOffset: 10
+                        hoverOffset: 0 // Prevents movement on touch/hover
                     }]
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: true,
+                    maintainAspectRatio: false, // Critical: prevents constant resize recalc
                     cutout: '65%',
+                    animation: {
+                        duration: 0, // NO animation = NO wiggle
+                        animateRotate: false,
+                        animateScale: false
+                    },
                     plugins: {
                         legend: {
                             display: false
                         },
                         tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return `${context.label}: ${context.raw}%`;
-                                }
-                            }
-                        }
+                            enabled: false
+                        } // Disable tooltips on mobile
                     },
-                    onClick: null
+                    events: [], // Disable all chart events completely
+                    onClick: null,
+                    onHover: null
                 }
             });
         }
@@ -1491,14 +1411,10 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
 
             let html = '';
             let hasAnyDepartmentData = false;
-
-            // Define the order of departments to display
             const displayOrder = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'PSCM', 'MRO HR', 'MD/DIV.', 'Remainder'];
 
             for (const dept of displayOrder) {
-                // Skip if department doesn't exist in the data
                 if (!departments.hasOwnProperty(dept)) continue;
-
                 const percentageValue = parseFloat(departments[dept]) || 0;
                 const barWidth = Math.min(percentageValue, 100);
                 const color = departmentColors[dept] || '#38BDF8';
@@ -1506,66 +1422,32 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                 const isClickable = !nonClickableDepts.includes(dept);
                 const clickableClass = isClickable ? 'clickable' : 'disabled';
                 const onclickAttr = isClickable ? `onclick="onDepartmentClick('${dept}', '${indicatorKey}', '${indicatorName}')"` : '';
-
                 const actualVal = (actuals[dept] !== undefined && actuals[dept] !== null && actuals[dept] !== '') ? actuals[dept] : '-';
                 const targetVal = (targets[dept] !== undefined && targets[dept] !== null && targets[dept] !== '') ? targets[dept] : '-';
-
-                // For calculated departments (MD/DIV., Remainder), always show with calculated values
-                // For regular departments, show even with 0%
                 const isCalculatedDept = (dept === 'MD/DIV.' || dept === 'Remainder');
-                const showDept = true; // Show ALL departments always
 
-                if (showDept) {
-                    hasAnyDepartmentData = true;
-                    const displayPercentage = percentageValue;
-                    const displayBarWidth = Math.min(barWidth, 100);
-                    const displayScoreColor = scoreColor;
-
-                    // Format actual and target for display (handle decimals properly)
-                    let displayActual = actualVal;
-                    let displayTarget = targetVal;
-
-                    // For calculated departments, show dash
-                    if (isCalculatedDept) {
-                        displayActual = '-';
-                        displayTarget = '-';
-                    } else if (actualVal !== '-' && actualVal !== null && !isNaN(parseFloat(actualVal))) {
-                        // Format numbers nicely (remove .00 if it's a whole number)
-                        const numActual = parseFloat(actualVal);
-                        const numTarget = parseFloat(targetVal);
-                        displayActual = Number.isInteger(numActual) ? numActual : numActual.toFixed(1);
-                        displayTarget = Number.isInteger(numTarget) ? numTarget : numTarget.toFixed(1);
-                    }
-
-                    html += `
-                <div class="dept-bar-item ${clickableClass}" ${onclickAttr}>
-                    <div class="dept-bar-label">
-                        <span class="dept-name" style="color: ${color};">${dept}</span>
-                        <span class="dept-percentage" style="color: ${displayScoreColor};">${displayPercentage}%</span>
-                    </div>
-                    <div class="dept-bar-container">
-                        <div class="dept-bar-fill" style="width: ${displayBarWidth}%; background: ${color};"></div>
-                    </div>
-                    <div style="font-size: 0.55rem; margin-top: 0.2rem; display: flex; justify-content: space-between;">
-                        <span>Actual: ${displayActual}</span>
-                        <span>Target: ${displayTarget}</span>
-                    </div>
-                </div>
-            `;
+                hasAnyDepartmentData = true;
+                const displayPercentage = percentageValue;
+                const displayBarWidth = Math.min(barWidth, 100);
+                let displayActual = actualVal;
+                let displayTarget = targetVal;
+                if (isCalculatedDept) {
+                    displayActual = '-';
+                    displayTarget = '-';
+                } else if (actualVal !== '-' && actualVal !== null && !isNaN(parseFloat(actualVal))) {
+                    const numActual = parseFloat(actualVal);
+                    const numTarget = parseFloat(targetVal);
+                    displayActual = Number.isInteger(numActual) ? numActual : numActual.toFixed(1);
+                    displayTarget = Number.isInteger(numTarget) ? numTarget : numTarget.toFixed(1);
                 }
+                html += `<div class="dept-bar-item ${clickableClass}" ${onclickAttr}><div class="dept-bar-label"><span class="dept-name" style="color: ${color};">${dept}</span><span class="dept-percentage" style="color: ${scoreColor};">${displayPercentage}%</span></div><div class="dept-bar-container"><div class="dept-bar-fill" style="width: ${displayBarWidth}%; background: ${color};"></div></div><div style="font-size: 0.55rem; margin-top: 0.2rem; display: flex; justify-content: space-between;"><span>Actual: ${displayActual}</span><span>Target: ${displayTarget}</span></div></div>`;
             }
-
-            if (!hasAnyDepartmentData) {
-                container.innerHTML = '<div class="no-data-bar">No data available for this period</div>';
-            } else {
-                container.innerHTML = html;
-            }
+            container.innerHTML = hasAnyDepartmentData ? html : '<div class="no-data-bar">No data available for this period</div>';
         }
 
         function renderDashboard() {
             const container = document.getElementById('dashboard-content');
             container.innerHTML = '';
-
             const metricsGrid = document.createElement('div');
             metricsGrid.className = 'metrics-grid';
 
@@ -1573,25 +1455,19 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                 const chartId = `chart-${metric.id}`;
                 const barsId = `bars-${metric.id}`;
                 const overallColor = getScoreColor(metric.overall);
-
-                // Always show the overall percentage, even if 0
                 const displayOverall = metric.overall;
-                const displayOverallColor = overallColor;
 
                 const card = document.createElement('div');
                 card.className = 'metric-card';
-                card.innerHTML = `
-            <div class="metric-header">
-                <div class="metric-title" style="cursor: default;">${metric.display_name}</div>
-                <div class="overall-score" style="color: ${displayOverallColor}; cursor: default;">${displayOverall}%</div>
-            </div>
-            <div class="chart-container">
-                <canvas id="${chartId}" width="180" height="140"></canvas>
-            </div>
-            <div id="${barsId}" class="dept-bars"></div>
-        `;
-                metricsGrid.appendChild(card);
+                card.innerHTML = `<div class="metric-header"><div class="metric-title" style="cursor: default;">${metric.display_name}</div><div class="overall-score" style="color: ${overallColor}; cursor: default;">${displayOverall}%</div></div><div class="chart-container"><canvas id="${chartId}" width="180" height="140"></canvas></div><div id="${barsId}" class="dept-bars"></div>`;
 
+                const chartContainer = card.querySelector('.chart-container');
+                if (chartContainer) {
+                    chartContainer.addEventListener('touchstart', (e) => e.stopPropagation());
+                    chartContainer.addEventListener('touchmove', (e) => e.stopPropagation());
+                }
+
+                metricsGrid.appendChild(card);
                 setTimeout(() => {
                     const chart = createPieChart(chartId, displayOverall, metric.display_name, metricKey);
                     if (chart) chartInstances[chartId] = chart;
@@ -1601,152 +1477,92 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             container.appendChild(metricsGrid);
         }
 
-        // Change month function
         function changeMonth(direction) {
             let currentUrl = new URL(window.location.href);
             let currentMonthParam = currentUrl.searchParams.get('month') || currentMonth;
             let date = new Date(currentMonthParam + '-01');
-
             if (direction === 'prev') {
                 date.setMonth(date.getMonth() - 1);
             } else {
                 date.setMonth(date.getMonth() + 1);
             }
-
             let newMonth = date.toISOString().slice(0, 7);
             window.location.href = `md_dashboard.php?month=${newMonth}`;
         }
 
-        // Initialize theme manager and dashboard when page loads
         document.addEventListener('DOMContentLoaded', function() {
             new ThemeManager();
             renderDashboard();
-
-            // Initialize fullscreen buttons
             const fullscreenBtns = document.querySelectorAll('#fullscreenHeaderBtn, #fullscreenHeaderBtn2');
             const exitFullscreenBtn = document.getElementById('exitFullscreenBtn');
-
             fullscreenBtns.forEach(btn => {
-                if (btn) {
-                    btn.addEventListener('click', toggleFullscreen);
-                }
+                if (btn) btn.addEventListener('click', toggleFullscreen);
             });
-
-            if (exitFullscreenBtn) {
-                exitFullscreenBtn.addEventListener('click', exitFullscreen);
-            }
-
-            // Update floating overall percentage
+            if (exitFullscreenBtn) exitFullscreenBtn.addEventListener('click', exitFullscreen);
             const floatingOverall = document.getElementById('floatingOverall');
-            if (floatingOverall) {
-                floatingOverall.textContent = averageOverall + '%';
-            }
-
-            // Pause auto-scroll on user interaction
+            if (floatingOverall) floatingOverall.textContent = averageOverall + '%';
             const container = document.getElementById('mainContainer');
             if (container) {
                 let userScrollTimeout = null;
-
                 container.addEventListener('wheel', function() {
                     if (document.body.classList.contains('fullscreen-mode')) {
                         stopAutoScroll();
                         if (userScrollTimeout) clearTimeout(userScrollTimeout);
                         userScrollTimeout = setTimeout(() => {
-                            if (document.body.classList.contains('fullscreen-mode')) {
-                                startAutoScroll();
-                            }
+                            if (document.body.classList.contains('fullscreen-mode')) startAutoScroll();
                         }, 5000);
                     }
                 });
-
                 container.addEventListener('touchmove', function() {
                     if (document.body.classList.contains('fullscreen-mode')) {
                         stopAutoScroll();
                         if (userScrollTimeout) clearTimeout(userScrollTimeout);
                         userScrollTimeout = setTimeout(() => {
-                            if (document.body.classList.contains('fullscreen-mode')) {
-                                startAutoScroll();
-                            }
+                            if (document.body.classList.contains('fullscreen-mode')) startAutoScroll();
                         }, 5000);
                     }
                 });
             }
         });
 
-        // Close modal when clicking outside
         window.onclick = function(event) {
             const modal = document.getElementById('deptModal');
-            if (event.target === modal) {
-                closeDeptModal();
-            }
+            if (event.target === modal) closeDeptModal();
         }
 
-        // Function to open password change modal
         function openPasswordModal() {
-            if (document.getElementById('passwordModalOverlay')) {
-                return;
-            }
-
+            if (document.getElementById('passwordModalOverlay')) return;
             const modalOverlay = document.createElement('div');
             modalOverlay.id = 'passwordModalOverlay';
-            modalOverlay.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.8);
-                z-index: 10001;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            `;
-// Add the onclick handler
-modalOverlay.onclick = function() {
-    parent.closePasswordPopup();
-};
+            modalOverlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 10001; display: flex; align-items: center; justify-content: center;`;
+            modalOverlay.onclick = function() {
+                parent.closePasswordPopup();
+            };
             const iframe = document.createElement('iframe');
             iframe.src = '../change_password.php';
-            iframe.style.cssText = `
-                width: 100%;
-                max-width: 450px;
-                height: auto;
-                min-height: 450px;
-                border: none;
-                border-radius: 16px;
-                background: transparent;
-            `;
-
+            iframe.style.cssText = `width: 100%; max-width: 450px; height: auto; min-height: 450px; border: none; border-radius: 16px; background: transparent;`;
             modalOverlay.appendChild(iframe);
             document.body.appendChild(modalOverlay);
-
             window.closePasswordPopup = function() {
-                if (modalOverlay && modalOverlay.parentNode) {
-                    modalOverlay.remove();
-                }
+                if (modalOverlay && modalOverlay.parentNode) modalOverlay.remove();
                 delete window.closePasswordPopup;
             };
-
             const escapeHandler = function(e) {
                 if (e.key === 'Escape') {
-                    if (modalOverlay && modalOverlay.parentNode) {
-                        modalOverlay.remove();
-                        delete window.closePasswordPopup;
-                    }
+                    if (modalOverlay && modalOverlay.parentNode) modalOverlay.remove();
+                    delete window.closePasswordPopup;
                     document.removeEventListener('keydown', escapeHandler);
                 }
             };
             document.addEventListener('keydown', escapeHandler);
         }
 
-        // Keep session alive by sending heartbeat every 5 minutes
         function keepSessionAlive() {
             fetch('/HRandMDDash/keep_alive.php', {
                 method: 'GET',
                 cache: 'no-cache'
             }).catch(error => console.log('Session keep-alive failed:', error));
         }
-
         setInterval(keepSessionAlive, 5 * 60 * 1000);
     </script>
 </body>

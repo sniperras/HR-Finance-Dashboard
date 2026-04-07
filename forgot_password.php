@@ -160,22 +160,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </html>
                 ";
 
-                // Send email using PHPMailer
+                // Send email using PHPMailer - PRODUCTION CONFIGURATION
                 $mail = new PHPMailer(true);
 
                 try {
+                    // Server settings - PRODUCTION (with proper SSL verification)
                     $mail->isSMTP();
                     $mail->Host       = 'smtp.gmail.com';
                     $mail->SMTPAuth   = true;
                     $mail->Username   = 'nathanaelbizuneh@gmail.com';
-                    $mail->Password   = 'raaqanjfgikzqciz';
+                    $mail->Password   = 'raaqanjfgikzqciz'; // Use App Password, not regular password
                     $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
                     $mail->Port       = 587;
 
+                    // PRODUCTION: Remove or comment out SMTPOptions that disable SSL verification
+                    // If your server has up-to-date CA certificates, this should work
+                    // If you still have issues, uncomment the line below to use SSL instead
+                    // $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+                    // $mail->Port = 465;
+
+                    // Recipients
                     $mail->setFrom('nathanaelbizuneh@gmail.com', 'HR & Finance Dashboard');
                     $mail->addAddress($to, $user['full_name']);
                     $mail->addReplyTo('nathanaelbizuneh@gmail.com', 'HR & Finance Dashboard');
 
+                    // Content
                     $mail->isHTML(true);
                     $mail->CharSet = 'UTF-8';
                     $mail->Subject = $subject;
@@ -190,7 +199,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['fp_success'] = "A temporary password has been sent to your email address: " . htmlspecialchars($maskedEmail) . ". The password is valid for 24 hours.<br><br>
                     <span style='color: #ff9800; font-weight: bold;'>⚠️ SECURITY NOTICE:</span> Please ensure the email is sent from <strong>nathanaelbizuneh@gmail.com</strong>. If you receive a password reset email from any other email address, DO NOT click any links inside and report it immediately to the IT Team.";
                 } catch (Exception $e) {
-                    $_SESSION['fp_error'] = "Failed to send email. Mailer Error: " . $mail->ErrorInfo;
+                    // Log the error for debugging (don't show full error to users in production)
+                    error_log("PHPMailer Error: " . $mail->ErrorInfo);
+                    $_SESSION['fp_error'] = "Failed to send email. Please try again later or contact administrator.";
                 }
             }
         } else {

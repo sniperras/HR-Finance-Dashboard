@@ -1021,9 +1021,9 @@ unset($_SESSION['message'], $_SESSION['error']);
 
         <div class="info-banner">
             <strong>Data is automatically synced from Director Data Entry</strong>
-            <?php if ($_SESSION['username'] === 'RamsisE' || $_SESSION['username'] === 'mgrhr_mro'): ?>
+            <!-- <?php if ($_SESSION['username'] === 'RamsisE' || $_SESSION['username'] === 'mgrhr_mro'): ?>
                 <span class="sync-badge">🔄 Auto-sync enabled</span>
-            <?php endif; ?>
+            <?php endif; ?> -->
             <!-- <br><span style="font-size: 0.65rem;">Target = Sum of Expected across all cost centers | Actual = Sum of Completed across all cost centers</span> -->
         </div>
 
@@ -1686,10 +1686,10 @@ unset($_SESSION['message'], $_SESSION['error']);
                 align-items: center;
                 justify-content: center;
             `;
-// Add the onclick handler
-modalOverlay.onclick = function() {
-    parent.closePasswordPopup();
-};
+            // Add the onclick handler
+            modalOverlay.onclick = function() {
+                parent.closePasswordPopup();
+            };
             const iframe = document.createElement('iframe');
             iframe.src = '../change_password.php';
             iframe.style.cssText = `
