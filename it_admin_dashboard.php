@@ -1292,7 +1292,10 @@ $conn->close();
             align-items: center;
             justify-content: center;
         `;
-
+            // Add the onclick handler
+            modalOverlay.onclick = function() {
+                parent.closePasswordPopup();
+            };
             // Create iframe to load the password change page
             const iframe = document.createElement('iframe');
             iframe.src = 'change_password.php';

@@ -1260,7 +1260,10 @@ unset($_SESSION['error']);
                 align-items: center;
                 justify-content: center;
             `;
-
+// Add the onclick handler
+modalOverlay.onclick = function() {
+    parent.closePasswordPopup();
+};
             const iframe = document.createElement('iframe');
             iframe.src = '../change_password.php';
             iframe.style.cssText = `

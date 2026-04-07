@@ -1421,7 +1421,10 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
                 align-items: center;
                 justify-content: center;
             `;
-
+// Add the onclick handler
+modalOverlay.onclick = function() {
+    parent.closePasswordPopup();
+};
             const iframe = document.createElement('iframe');
             iframe.src = '../change_password.php';
             iframe.style.cssText = `
