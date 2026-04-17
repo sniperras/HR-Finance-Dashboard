@@ -27,6 +27,27 @@ $userDept = $userData['section'] ?? '';
 $userCostCenter = $userData['costcenter'] ?? '';
 $userFullName = $userData['full_name'] ?? $fullName;
 
+// Username to Cost Center mapping for managers
+$usernameToCostCenter = [
+    // BMT Managers
+    'mgr787_bmt' => 'B787',
+    'mgr737_bmt' => 'B737',
+    'mgr777_bmt' => 'B777',
+    'mgr_structure_bmt' => 'ACS',
+    'mgr_avionics_bmt' => 'AVS',
+    'mgr_cabin_bmt' => 'CAB',
+    'mgr_patch_bmt' => 'APS',
+    'mgr_technical_bmt' => 'TEC',
+    
+    // Add other managers from different departments as needed
+    // Format: 'username' => 'cost_center_code'
+];
+
+// Override cost center based on username mapping
+if (isset($usernameToCostCenter[$username])) {
+    $userCostCenter = $usernameToCostCenter[$username];
+}
+
 // Define cost centers for display names
 $costCenterNames = [
     // BMT
@@ -81,28 +102,14 @@ $costCenterNames = [
     'HR' => 'Mgr. Human Resources',
 ];
 
-// Get all indicators for this department from mro_cpr_report
-$indicatorsQuery = "SELECT DISTINCT report_type FROM mro_cpr_report WHERE department = ? AND cost_center_code = ? ORDER BY report_type";
-$stmt = $conn->prepare($indicatorsQuery);
-$stmt->bind_param("ss", $userDept, $userCostCenter);
-$stmt->execute();
-$indicatorsResult = $stmt->get_result();
+// Get ALL indicators from performance_indicators table (master list)
+$indicatorsQuery = "SELECT DISTINCT TRIM(indicator_name) as indicator_name FROM performance_indicators ORDER BY indicator_name";
+$indicatorsResult = $conn->query($indicatorsQuery);
 
 $indicators = [];
 while ($row = $indicatorsResult->fetch_assoc()) {
-    $indicators[] = $row['report_type'];
+    $indicators[] = $row['indicator_name'];
 }
-$stmt->close();
-
-// If no indicators found, get from performance_indicators
-if (empty($indicators)) {
-    $fallbackQuery = "SELECT DISTINCT TRIM(indicator_name) as indicator_name FROM performance_indicators ORDER BY indicator_name";
-    $fallbackResult = $conn->query($fallbackQuery);
-    while ($row = $fallbackResult->fetch_assoc()) {
-        $indicators[] = $row['indicator_name'];
-    }
-}
-
 // Fetch data for this manager's cost center
 $reportData = [];
 $query = "SELECT report_type, expected, completed, percentage 
@@ -154,15 +161,15 @@ foreach ($indicators as $indicator) {
     }
 }
 
-// Calculate overall percentage
+// Calculate overall percentage - AVERAGE OF ALL CARD PERCENTAGES
 $overallPercentage = 0;
-$totalExpected = 0;
-$totalCompleted = 0;
+$totalPercentage = 0;
+$cardCount = 0;
 foreach ($reportData as $data) {
-    $totalExpected += $data['expected'];
-    $totalCompleted += $data['completed'];
+    $totalPercentage += $data['percentage'];
+    $cardCount++;
 }
-$overallPercentage = $totalExpected > 0 ? round(($totalCompleted / $totalExpected) * 100, 1) : 0;
+$overallPercentage = $cardCount > 0 ? round($totalPercentage / $cardCount, 1) : 0;
 
 $conn->close();
 ?>
@@ -1044,19 +1051,32 @@ $conn->close();
         }
 
         function changeMonth(direction) {
-            let currentUrl = new URL(window.location.href);
-            let currentMonthParam = currentUrl.searchParams.get('month') || '<?php echo $currentMonth; ?>';
-            let date = new Date(currentMonthParam + '-01');
-
-            if (direction === 'prev') {
-                date.setMonth(date.getMonth() - 1);
-            } else {
-                date.setMonth(date.getMonth() + 1);
-            }
-
-            let newMonth = date.toISOString().slice(0, 7);
-            window.location.href = `manager_dashboard.php?month=${newMonth}`;
+    let currentUrl = new URL(window.location.href);
+    let currentMonthParam = currentUrl.searchParams.get('month') || '<?php echo $currentMonth; ?>';
+    
+    // Parse year and month manually to avoid timezone issues
+    let parts = currentMonthParam.split('-');
+    let year = parseInt(parts[0]);
+    let month = parseInt(parts[1]);
+    
+    if (direction === 'prev') {
+        month--;
+        if (month < 1) {
+            month = 12;
+            year--;
         }
+    } else {
+        month++;
+        if (month > 12) {
+            month = 1;
+            year++;
+        }
+    }
+    
+    // Format month with leading zero
+    let newMonth = year + '-' + String(month).padStart(2, '0');
+    window.location.href = `manager_dashboard.php?month=${newMonth}`;
+}
 
         document.addEventListener('DOMContentLoaded', function() {
             new ThemeManager();
