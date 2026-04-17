@@ -24,71 +24,71 @@ if (empty($selectedReport) && !empty($reports)) {
 // Define departments
 $departments = ['ALL', 'BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'PSCM'];
 
-// Define cost centers for each department (with actual cost center codes)
+// Define cost centers for each department (with SHORT codes that match database)
 $costCenters = [
     'BMT' => [
-        ['code' => 'MRODR441', 'name' => 'Dir. BMT', 'isDirector' => true],
-        ['code' => 'MROMG471', 'name' => 'Mgr. A/C Structure Main', 'isDirector' => false],
-        ['code' => 'MROMG451', 'name' => 'Mgr. Avionics Sys Maint', 'isDirector' => false],
-        ['code' => 'MROMG461', 'name' => 'Mgr. B787/767 Mainten', 'isDirector' => false],
-        ['code' => 'MROMG463', 'name' => 'Mgr. B737 Maintenance', 'isDirector' => false],
-        ['code' => 'MROMG521', 'name' => 'Mgr. Cabin Maint', 'isDirector' => false],
-        ['code' => 'MRORFM462', 'name' => 'Mgr. B777/A350 Mainten', 'isDirector' => false],
-        ['code' => 'MROFM525', 'name' => 'Mgr. A/C Paint Svs', 'isDirector' => false],
-        ['code' => 'MROMG442', 'name' => 'Mgr. Technical Supp', 'isDirector' => false],
+        ['code' => 'DIR', 'name' => 'Dir. BMT', 'isDirector' => true],
+        ['code' => 'ACS', 'name' => 'Mgr. A/C Structure Maint', 'isDirector' => false],
+        ['code' => 'AVS', 'name' => 'Mgr. Avionics Sys Maint', 'isDirector' => false],
+        ['code' => 'B787', 'name' => 'Mgr. B787/767 Mainten', 'isDirector' => false],
+        ['code' => 'B737', 'name' => 'Mgr. B737 Maintenance', 'isDirector' => false],
+        ['code' => 'CAB', 'name' => 'Mgr. Cabin Maint', 'isDirector' => false],
+        ['code' => 'B777', 'name' => 'Mgr. B777/A350 Mainten', 'isDirector' => false],
+        ['code' => 'APS', 'name' => 'Mgr. A/C Patch Svs.', 'isDirector' => false],
+        ['code' => 'TEC', 'name' => 'Mgr. Technical Supp.', 'isDirector' => false],
     ],
     'LMT' => [
-        ['code' => 'MRODR446', 'name' => 'Dir. LMT', 'isDirector' => true],
-        ['code' => 'MROMG481', 'name' => 'Duty Manager MCC', 'isDirector' => false],
-        ['code' => 'MROSU483', 'name' => 'MGR. Admin & OutstationMaint', 'isDirector' => false],
-        ['code' => 'MROMG531', 'name' => 'Mgr A/C Line Maint', 'isDirector' => false],
-        ['code' => 'MROMG540', 'name' => 'Mgr. General Ava. A/C Maint', 'isDirector' => false],
-        ['code' => 'MROMG533', 'name' => 'MGR. Turbo Prop & Light A/C Maint', 'isDirector' => false],
-        ['code' => 'MRORSP572', 'name' => 'Mgr. A/C Cabin Maint', 'isDirector' => false],
+        ['code' => 'DIR', 'name' => 'Dir. LMT', 'isDirector' => true],
+        ['code' => 'DMM', 'name' => 'Duty Manager MCC', 'isDirector' => false],
+        ['code' => 'ADM', 'name' => 'MGR. Admin & Outstation Maint', 'isDirector' => false],
+        ['code' => 'ALM', 'name' => 'Mgr. A/C Line Maint.', 'isDirector' => false],
+        ['code' => 'GAM', 'name' => 'Mgr. General Ava. A/C Maint.', 'isDirector' => false],
+        ['code' => 'TPL', 'name' => 'MGR. Turbo Prop & Light A/C Maint', 'isDirector' => false],
+        ['code' => 'ACM', 'name' => 'Mgr. A/C Cabin Maint', 'isDirector' => false],
     ],
     'CMT' => [
-        ['code' => 'MRODR541', 'name' => 'Dir. CMT', 'isDirector' => true],
-        ['code' => 'MROMG546', 'name' => 'Mgr. Wire Kit & Harness Prod', 'isDirector' => false],
-        ['code' => 'MROMG551', 'name' => 'Mgr Computerized equipment shop', 'isDirector' => false],
-        ['code' => 'MROMG413', 'name' => 'Mgr. NDT, Stand. & Part Recv. Insp', 'isDirector' => false],
-        ['code' => 'MROSU547', 'name' => 'Comp.Maint.Engineering support', 'isDirector' => false],
-        ['code' => 'MROMG561', 'name' => 'Mgr. Mechanical Comp shops', 'isDirector' => false],
-        ['code' => 'MROMG571', 'name' => 'Mgr Avionics Comp shops', 'isDirector' => false],
+        ['code' => 'DIR', 'name' => 'Dir. CMT', 'isDirector' => true],
+        ['code' => 'WKH', 'name' => 'Mgr. Wire Kit & Harness Prod.', 'isDirector' => false],
+        ['code' => 'CES', 'name' => 'Mgr. Computerized Equipment Shop', 'isDirector' => false],
+        ['code' => 'NDT', 'name' => 'Mgr. NDT, Stand. & Part Recv. Insp.', 'isDirector' => false],
+        ['code' => 'MES', 'name' => 'Comp. Maint. Engineering Support', 'isDirector' => false],
+        ['code' => 'MCS', 'name' => 'Mgr. Mechanical Comp Shops', 'isDirector' => false],
+        ['code' => 'ACS', 'name' => 'Mgr. Avionics Comp Shops', 'isDirector' => false],
     ],
     'EMT' => [
-        ['code' => 'MRODR581', 'name' => 'Dir. EMT', 'isDirector' => true],
-        ['code' => 'MROMG414', 'name' => 'Mgr. Engine Maint. Inspection', 'isDirector' => false],
-        ['code' => 'MROMG582', 'name' => 'Mgr. Technical Support', 'isDirector' => false],
-        ['code' => 'MROMG583', 'name' => 'Mgr. RR/PW4000/LEAP/APU eng. Maint', 'isDirector' => false],
-        ['code' => 'MROMG584', 'name' => 'Mgr. CFM56/GE90/GENX & Turbo prop. Engines', 'isDirector' => false],
-        ['code' => 'MROMG585', 'name' => 'Mgr. Repair Shops', 'isDirector' => false],
+        ['code' => 'DIR', 'name' => 'Dir. EMT', 'isDirector' => true],
+        ['code' => 'EMI', 'name' => 'Mgr. Engine Maint. Inspection', 'isDirector' => false],
+        ['code' => 'ETS', 'name' => 'Mgr. Technical Support', 'isDirector' => false],
+        ['code' => 'RNP', 'name' => 'Mgr. RNP PW4000/LEAP/APU Eng. Maint.', 'isDirector' => false],
+        ['code' => 'CFM', 'name' => 'Mgr. CFM56/GE90/GENX & Turbo Prop. Engines', 'isDirector' => false],
+        ['code' => 'RSH', 'name' => 'Mgr. Repair Shops', 'isDirector' => false],
     ],
     'AEP' => [
-        ['code' => 'MRODR341', 'name' => 'DIR. AEP', 'isDirector' => true],
-        ['code' => 'MROMG332', 'name' => 'MGR. A/C LEASE , EIS & SPECIAL PROJECTS', 'isDirector' => false],
-        ['code' => 'MROMG351', 'name' => 'MGR. A/C MAINT. PROG.& TASK CARD ENGINEE', 'isDirector' => false],
-        ['code' => 'MROMG371', 'name' => 'MGR. MAINT. PLNG & RECORD CONTROL', 'isDirector' => false],
-        ['code' => 'MROMG381', 'name' => 'MGR. ENGINEERING QUALITY ASSURANCE', 'isDirector' => false],
-        ['code' => 'MRORMG361', 'name' => 'Mgr. A/C systems Eng', 'isDirector' => false],
-        ['code' => 'MROMG382', 'name' => 'MGR. A/C Design Organization', 'isDirector' => false],
+        ['code' => 'DIR', 'name' => 'Dir. AEP', 'isDirector' => true],
+        ['code' => 'ALE', 'name' => 'MGR. A/C Lease, EIS & Special Projects', 'isDirector' => false],
+        ['code' => 'AMP', 'name' => 'MGR. A/C Maint. Prog. & Task Card Engineer', 'isDirector' => false],
+        ['code' => 'MPR', 'name' => 'MGR. Maint. Plng. & Record Control', 'isDirector' => false],
+        ['code' => 'EQA', 'name' => 'MGR. Engineering Quality Assurance', 'isDirector' => false],
+        ['code' => 'ASE', 'name' => 'Mgr. A/C Systems Eng', 'isDirector' => false],
+        ['code' => 'ADO', 'name' => 'MGR. A/C Design Organization', 'isDirector' => false],
     ],
     'MSM' => [
-        ['code' => 'MRODR321', 'name' => 'Dir MSM', 'isDirector' => true],
-        ['code' => 'MROMG322', 'name' => 'Mgr. MRO Sales and Marketing', 'isDirector' => false],
-        ['code' => 'MROMG323', 'name' => 'Mgr. MRO Customer Support', 'isDirector' => false],
+        ['code' => 'DIR', 'name' => 'Dir. MSM', 'isDirector' => true],
+        ['code' => 'MSM', 'name' => 'Mgr. MRO Sales and Marketing', 'isDirector' => false],
+        ['code' => 'MCS', 'name' => 'Mgr. MRO Customer Support', 'isDirector' => false],
     ],
     'QA' => [
-        ['code' => 'MROMG421', 'name' => 'Mgr .MRO Qty Ass & Sa', 'isDirector' => false],
+        ['code' => 'QAS', 'name' => 'Mgr. MRO Qty Ass & S/a', 'isDirector' => false],
     ],
     'PSCM' => [
-        ['code' => 'MRODR431', 'name' => 'Dir. Pro. & Supp. Chain Mgt', 'isDirector' => true],
-        ['code' => 'MROMG430', 'name' => 'Mgr. Grp Warr,Cont Mg', 'isDirector' => false],
-        ['code' => 'MROMG433', 'name' => 'Mgr. Tactical Purchase', 'isDirector' => false],
-        ['code' => 'MROMG450', 'name' => 'Mgr. Group Material Planning', 'isDirector' => false],
-        ['code' => 'MROMG434', 'name' => 'Mgr.Engine Maint.Tactical Pur', 'isDirector' => false],
-        ['code' => 'MROMG437', 'name' => 'Mgr. Warehouse A/C Part', 'isDirector' => false],
-        ['code' => 'MROMG439', 'name' => 'Mgr. Stra.Sourcing Te', 'isDirector' => false],
-        ['code' => 'MROMG542', 'name' => 'Mgr.Tac. Purchase -LMT&CMT Maint', 'isDirector' => false],
+        ['code' => 'DIR', 'name' => 'Dir. Prop. & Supp. Chain Mgt', 'isDirector' => true],
+        ['code' => 'GWC', 'name' => 'Mgr. Grp Warp Cont Mgt', 'isDirector' => false],
+        ['code' => 'TPU', 'name' => 'Mgr. Tactical Purchase', 'isDirector' => false],
+        ['code' => 'MMP', 'name' => 'Mgr. MRO Material Planning', 'isDirector' => false],
+        ['code' => 'EMP', 'name' => 'Mgr. Engine Maint/Tactical Pur', 'isDirector' => false],
+        ['code' => 'WAP', 'name' => 'Mgr. Warehouse A/C Part', 'isDirector' => false],
+        ['code' => 'EXT', 'name' => 'Extra Sourcing', 'isDirector' => false],
+        ['code' => 'PLC', 'name' => 'Mgr. Purchase-LMT&CMT Maint.', 'isDirector' => false],
     ],
 ];
 
@@ -667,13 +667,16 @@ $isCPRSelected = ($selectedReport === 'CPR');
         }
 
         @media (max-width: 768px) {
+
             .filter-form,
             .upload-form {
                 grid-template-columns: 1fr;
             }
+
             .data-table {
                 font-size: 0.7rem;
             }
+
             .data-table input {
                 width: 70px;
             }
@@ -806,26 +809,34 @@ $isCPRSelected = ($selectedReport === 'CPR');
                             <?php
                             $costCentersList = $costCenters[$selectedDept] ?? [];
                             $hasDirectorDept = hasDirector($costCentersList);
-                            $directorRowIndex = -1;
 
-                            // First pass: display all non-director rows and track director position
-                            foreach ($costCentersList as $index => $cc):
+                            // Calculate totals from ALL cost centers (including director if it has data)
+                            $totalExpected = 0;
+                            $totalCompleted = 0;
+                            foreach ($costCentersList as $cc):
+                                $code = $cc['code'];
+                                $totalExpected += isset($existingData[$code]) ? $existingData[$code]['expected'] : 0;
+                                $totalCompleted += isset($existingData[$code]) ? $existingData[$code]['completed'] : 0;
+                            endforeach;
+
+                            $totalPercentage = $totalExpected > 0 ? round(($totalCompleted / $totalExpected) * 100, 1) : 0;
+                            $totalNotCompleted = $totalExpected - $totalCompleted;
+                            $totalColor = $totalPercentage >= 90 ? 'var(--success)' : ($totalPercentage >= 70 ? 'var(--warning)' : 'var(--danger)');
+
+                            // Display ALL rows (managers + director)
+                            foreach ($costCentersList as $cc):
                                 $code = $cc['code'];
                                 $name = $cc['name'];
                                 $isDirector = isset($cc['isDirector']) && $cc['isDirector'] === true;
-
-                                if ($isDirector) {
-                                    $directorRowIndex = $index;
-                                    continue; // Skip director row for now, will add after calculating totals
-                                }
 
                                 $expected = isset($existingData[$code]) ? $existingData[$code]['expected'] : 0;
                                 $completed = isset($existingData[$code]) ? $existingData[$code]['completed'] : 0;
                                 $percentage = $expected > 0 ? round(($completed / $expected) * 100, 1) : 0;
                                 $notCompleted = $expected - $completed;
                                 $percentageColor = $percentage >= 90 ? 'var(--success)' : ($percentage >= 70 ? 'var(--warning)' : 'var(--danger)');
+                                $isDirectorClass = $isDirector ? 'director-row' : '';
                             ?>
-                                <tr data-code="<?php echo $code; ?>" data-is-director="false">
+                                <tr data-code="<?php echo $code; ?>" data-is-director="<?php echo $isDirector ? 'true' : 'false'; ?>" class="<?php echo $isDirectorClass; ?>">
                                     <td>
                                         <?php echo htmlspecialchars($name); ?>
                                         <input type="hidden" name="cost_center[<?php echo $code; ?>][code]" value="<?php echo $code; ?>">
@@ -851,54 +862,21 @@ $isCPRSelected = ($selectedReport === 'CPR');
                                 </tr>
                             <?php endforeach; ?>
 
-                            <?php
-                            // Calculate totals for director row if department has director
-                            if ($hasDirectorDept && $directorRowIndex >= 0):
-                                $directorCC = $costCentersList[$directorRowIndex];
-                                $directorCode = $directorCC['code'];
-                                $directorName = $directorCC['name'];
-
-                                // Calculate totals from all non-director rows
-                                $totalExpected = 0;
-                                $totalCompleted = 0;
-                                foreach ($costCentersList as $cc):
-                                    if (isset($cc['isDirector']) && $cc['isDirector'] === true) continue;
-                                    $code = $cc['code'];
-                                    $totalExpected += isset($existingData[$code]) ? $existingData[$code]['expected'] : 0;
-                                    $totalCompleted += isset($existingData[$code]) ? $existingData[$code]['completed'] : 0;
-                                endforeach;
-
-                                $totalPercentage = $totalExpected > 0 ? round(($totalCompleted / $totalExpected) * 100, 1) : 0;
-                                $totalNotCompleted = $totalExpected - $totalCompleted;
-                                $totalColor = $totalPercentage >= 90 ? 'var(--success)' : ($totalPercentage >= 70 ? 'var(--warning)' : 'var(--danger)');
-                            ?>
-                                <tr data-code="<?php echo $directorCode; ?>" data-is-director="true" class="director-row">
-                                    <td>
-                                        <?php echo htmlspecialchars($directorName); ?>
-                                        <input type="hidden" name="cost_center[<?php echo $directorCode; ?>][code]" value="<?php echo $directorCode; ?>">
-                                        <input type="hidden" name="cost_center[<?php echo $directorCode; ?>][name]" value="<?php echo htmlspecialchars($directorName); ?>">
-                                    </td>
-                                    <td>
-                                        <input type="number" name="cost_center[<?php echo $directorCode; ?>][expected]"
-                                            class="expected-input director-input" value="<?php echo $totalExpected; ?>"
-                                            min="0" step="1" readonly style="background: var(--medium-bg);">
-                                    </td>
-                                    <td>
-                                        <input type="number" name="cost_center[<?php echo $directorCode; ?>][completed]"
-                                            class="completed-input director-input" value="<?php echo $totalCompleted; ?>"
-                                            min="0" step="1" readonly style="background: var(--medium-bg);">
-                                    </td>
-                                    <td class="not-completed-cell"><?php echo $totalNotCompleted; ?></td>
-                                    <td class="percentage-cell" style="color: <?php echo $totalColor; ?>;">
-                                        <span class="percentage-value"><?php echo $totalPercentage; ?></span>%
-                                    </td>
-                                    <td>
-                                        <div class="progress-bar">
-                                            <div class="progress-fill" style="width: <?php echo $totalPercentage; ?>%; background: <?php echo $totalColor; ?>;"></div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            <?php endif; ?>
+                            <!-- TOTAL row at the bottom -->
+                            <tr class="total-row">
+                                <td><strong>TOTAL (All Cost Centers)</strong></td>
+                                <td id="total-expected"><?php echo $totalExpected; ?></td>
+                                <td id="total-completed"><?php echo $totalCompleted; ?></td>
+                                <td id="total-not-completed"><?php echo $totalNotCompleted; ?></td>
+                                <td id="total-percentage" class="percentage-cell" style="color: <?php echo $totalColor; ?>;">
+                                    <span class="total-percentage-value"><?php echo $totalPercentage; ?></span>%
+                                </td>
+                                <td>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" id="total-progress-fill" style="width: <?php echo $totalPercentage; ?>%; background: <?php echo $totalColor; ?>;"></div>
+                                    </div>
+                                </td>
+                            </tr>
                         </tbody>
                         <?php if (!$hasDirectorDept): ?>
                             <tfoot>
@@ -1028,69 +1006,40 @@ $isCPRSelected = ($selectedReport === 'CPR');
             const rows = document.querySelectorAll('#tableBody tr');
             let totalExpected = 0;
             let totalCompleted = 0;
-            let directorRow = null;
 
             rows.forEach(row => {
-                const isDirector = row.getAttribute('data-is-director') === 'true';
                 const expectedInput = row.querySelector('.expected-input');
                 const completedInput = row.querySelector('.completed-input');
 
-                if (expectedInput && completedInput) {
-                    if (!isDirector) {
-                        totalExpected += parseInt(expectedInput.value) || 0;
-                        totalCompleted += parseInt(completedInput.value) || 0;
-                    } else {
-                        directorRow = row;
-                    }
+                if (expectedInput && completedInput && !expectedInput.disabled) {
+                    totalExpected += parseInt(expectedInput.value) || 0;
+                    totalCompleted += parseInt(completedInput.value) || 0;
                 }
             });
 
-            if (directorRow) {
-                const directorExpected = directorRow.querySelector('.expected-input');
-                const directorCompleted = directorRow.querySelector('.completed-input');
-                const directorNotCompleted = directorRow.querySelector('.not-completed-cell');
-                const directorPercentageSpan = directorRow.querySelector('.percentage-value');
-                const directorProgressFill = directorRow.querySelector('.progress-fill');
+            // Update TOTAL row (not director row)
+            const totalRow = document.querySelector('.total-row');
+            if (totalRow) {
+                const totalExpectedCell = document.getElementById('total-expected');
+                const totalCompletedCell = document.getElementById('total-completed');
+                const totalNotCompletedCell = document.getElementById('total-not-completed');
+                const totalPercentageSpan = document.querySelector('.total-percentage-value');
+                const totalProgressFill = document.getElementById('total-progress-fill');
 
-                if (directorExpected && directorCompleted) {
-                    directorExpected.value = totalExpected;
-                    directorCompleted.value = totalCompleted;
+                const notCompleted = Math.max(0, totalExpected - totalCompleted);
+                const percentage = totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
+                const color = percentage >= 90 ? '#10B981' : (percentage >= 70 ? '#F59E0B' : '#EF4444');
 
-                    let notCompleted = Math.max(0, totalExpected - totalCompleted);
-                    let percentage = totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
-
-                    if (directorNotCompleted) directorNotCompleted.textContent = notCompleted;
-                    if (directorPercentageSpan) {
-                        directorPercentageSpan.textContent = percentage.toFixed(1);
-                        let color = percentage >= 90 ? '#10B981' : (percentage >= 70 ? '#F59E0B' : '#EF4444');
-                        directorPercentageSpan.parentElement.style.color = color;
-                    }
-                    if (directorProgressFill) {
-                        directorProgressFill.style.width = percentage + '%';
-                        let color = percentage >= 90 ? '#10B981' : (percentage >= 70 ? '#F59E0B' : '#EF4444');
-                        directorProgressFill.style.background = color;
-                    }
+                if (totalExpectedCell) totalExpectedCell.textContent = totalExpected;
+                if (totalCompletedCell) totalCompletedCell.textContent = totalCompleted;
+                if (totalNotCompletedCell) totalNotCompletedCell.textContent = notCompleted;
+                if (totalPercentageSpan) {
+                    totalPercentageSpan.textContent = percentage.toFixed(1);
+                    totalPercentageSpan.style.color = color;
+                    totalPercentageSpan.parentElement.style.color = color;
                 }
-            }
-
-            const totalRowExists = document.querySelector('tfoot .total-row');
-            if (totalRowExists) {
-                document.getElementById('total-expected').textContent = totalExpected;
-                document.getElementById('total-completed').textContent = totalCompleted;
-                document.getElementById('total-not-completed').textContent = totalExpected - totalCompleted;
-
-                const totalPercentage = totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
-                const totalPercentSpan = document.querySelector('#total-percentage span');
-                if (totalPercentSpan) {
-                    totalPercentSpan.textContent = totalPercentage.toFixed(1);
-                    let color = totalPercentage >= 90 ? '#10B981' : (totalPercentage >= 70 ? '#F59E0B' : '#EF4444');
-                    totalPercentSpan.style.color = color;
-                }
-
-                const totalProgressFill = document.querySelector('#total-percentage + td .progress-fill');
                 if (totalProgressFill) {
-                    totalProgressFill.style.width = totalPercentage + '%';
-                    let color = totalPercentage >= 90 ? '#10B981' : (totalPercentage >= 70 ? '#F59E0B' : '#EF4444');
+                    totalProgressFill.style.width = percentage + '%';
                     totalProgressFill.style.background = color;
                 }
             }
@@ -1259,38 +1208,38 @@ $isCPRSelected = ($selectedReport === 'CPR');
                     uploadBtn.textContent = '⏳ Uploading...';
 
                     fetch('upload_cpr_report.php', {
-                        method: 'POST',
-                        body: formData
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        uploadBtn.disabled = false;
-                        uploadBtn.textContent = '📤 Upload & Preview';
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            uploadBtn.disabled = false;
+                            uploadBtn.textContent = '📤 Upload & Preview';
 
-                        if (data.success) {
-                            openPreviewModal(data.data);
-                        } else {
+                            if (data.success) {
+                                openPreviewModal(data.data);
+                            } else {
+                                const uploadMsg = document.getElementById('uploadMessage');
+                                uploadMsg.innerHTML = `<div class="alert alert-error">✗ ${escapeHtml(data.message)}</div>`;
+                                setTimeout(() => {
+                                    if (uploadMsg.innerHTML.includes('✗')) {
+                                        uploadMsg.innerHTML = '';
+                                    }
+                                }, 5000);
+                            }
+                        })
+                        .catch(error => {
+                            uploadBtn.disabled = false;
+                            uploadBtn.textContent = '📤 Upload & Preview';
+                            console.error('Upload error:', error);
                             const uploadMsg = document.getElementById('uploadMessage');
-                            uploadMsg.innerHTML = `<div class="alert alert-error">✗ ${escapeHtml(data.message)}</div>`;
+                            uploadMsg.innerHTML = `<div class="alert alert-error">✗ Error uploading file. Please try again.</div>`;
                             setTimeout(() => {
-                                if (uploadMsg.innerHTML.includes('✗')) {
+                                if (uploadMsg.innerHTML.includes('Error uploading')) {
                                     uploadMsg.innerHTML = '';
                                 }
-                            }, 5000);
-                        }
-                    })
-                    .catch(error => {
-                        uploadBtn.disabled = false;
-                        uploadBtn.textContent = '📤 Upload & Preview';
-                        console.error('Upload error:', error);
-                        const uploadMsg = document.getElementById('uploadMessage');
-                        uploadMsg.innerHTML = `<div class="alert alert-error">✗ Error uploading file. Please try again.</div>`;
-                        setTimeout(() => {
-                            if (uploadMsg.innerHTML.includes('Error uploading')) {
-                                uploadMsg.innerHTML = '';
-                            }
-                        }, 3000);
-                    });
+                            }, 3000);
+                        });
                 });
             }
 
@@ -1310,43 +1259,43 @@ $isCPRSelected = ($selectedReport === 'CPR');
                         confirmUploadBtn.textContent = '⏳ Saving...';
 
                         fetch('save_cpr_upload.php', {
-                            method: 'POST',
-                            body: formData
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            confirmUploadBtn.disabled = false;
-                            confirmUploadBtn.textContent = '✓ Apply to Database';
+                                method: 'POST',
+                                body: formData
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                confirmUploadBtn.disabled = false;
+                                confirmUploadBtn.textContent = '✓ Apply to Database';
 
-                            if (data.success) {
-                                closePreviewModal();
-                                const msgDiv = document.getElementById('message');
-                                if (msgDiv) {
-                                    msgDiv.innerHTML = `<div class="alert alert-success">✓ ${data.message}</div>`;
+                                if (data.success) {
+                                    closePreviewModal();
+                                    const msgDiv = document.getElementById('message');
+                                    if (msgDiv) {
+                                        msgDiv.innerHTML = `<div class="alert alert-success">✓ ${data.message}</div>`;
+                                        setTimeout(() => {
+                                            msgDiv.innerHTML = '';
+                                        }, 5000);
+                                    }
+                                    // Optionally reload the page to show updated data
                                     setTimeout(() => {
-                                        msgDiv.innerHTML = '';
-                                    }, 5000);
+                                        window.location.href = window.location.href.split('?')[0] + '?report=CPR&month=<?php echo $currentMonth; ?>&year=<?php echo $currentYear; ?>&department=ALL&saved=1';
+                                    }, 1500);
+                                } else {
+                                    const uploadMsg = document.getElementById('uploadMessage');
+                                    if (uploadMsg) {
+                                        uploadMsg.innerHTML = `<div class="alert alert-error">✗ ${escapeHtml(data.message)}</div>`;
+                                    }
                                 }
-                                // Optionally reload the page to show updated data
-                                setTimeout(() => {
-                                    window.location.href = window.location.href.split('?')[0] + '?report=CPR&month=<?php echo $currentMonth; ?>&year=<?php echo $currentYear; ?>&department=ALL&saved=1';
-                                }, 1500);
-                            } else {
+                            })
+                            .catch(error => {
+                                confirmUploadBtn.disabled = false;
+                                confirmUploadBtn.textContent = '✓ Apply to Database';
+                                console.error('Save error:', error);
                                 const uploadMsg = document.getElementById('uploadMessage');
                                 if (uploadMsg) {
-                                    uploadMsg.innerHTML = `<div class="alert alert-error">✗ ${escapeHtml(data.message)}</div>`;
+                                    uploadMsg.innerHTML = `<div class="alert alert-error">✗ Error saving data. Please try again.</div>`;
                                 }
-                            }
-                        })
-                        .catch(error => {
-                            confirmUploadBtn.disabled = false;
-                            confirmUploadBtn.textContent = '✓ Apply to Database';
-                            console.error('Save error:', error);
-                            const uploadMsg = document.getElementById('uploadMessage');
-                            if (uploadMsg) {
-                                uploadMsg.innerHTML = `<div class="alert alert-error">✗ Error saving data. Please try again.</div>`;
-                            }
-                        });
+                            });
                     }
                 });
             }
