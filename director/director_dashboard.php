@@ -81,7 +81,8 @@ $costCenters = [
         'DIR' => 'Dir. MSM'
     ],
     'QA' => [
-        'QAS' => 'Mgr. MRO Qty Ass & S/a'
+        'QAS' => 'Mgr. MRO Qty Ass & S/a',
+        'DIR' => 'Dir. QA'
     ],
     'PSCM' => [
         'GWC' => 'Mgr. Grp Warp Cont Mgt',
@@ -147,8 +148,10 @@ if (empty($indicators)) {
 }
 
 // Fetch ALL data from mro_cpr_report for this department (all cost centers)
-$reportData = [];
-$managerData = [];
+$reportData = [];      // For card display (will store AVERAGE of all percentages)
+$managerData = [];     // For detail modal
+$allPercentages = [];  // Track all percentages per indicator
+
 $query = "SELECT report_type, cost_center_code, expected, completed, percentage 
           FROM mro_cpr_report 
           WHERE report_month = ? AND report_year = ? AND department = ? AND verification_status = 'verified'";
@@ -176,15 +179,27 @@ while ($row = $result->fetch_assoc()) {
         'percentage' => $percentage,
         'name' => $costCenterName
     ];
-
-    // Store director-level data (for the card)
-    if ($costCenter === 'DIR') {
-        $reportData[$reportType] = $percentage;
+    
+    // Track percentages for this indicator (for calculating average)
+    if (!isset($allPercentages[$reportType])) {
+        $allPercentages[$reportType] = [];
     }
+    $allPercentages[$reportType][] = $percentage;
 }
 $stmt->close();
 
-// Also get data from master_performance_data for this department (fallback for missing DIR rows)
+// Calculate AVERAGE percentage for each indicator (sum of all percentages / number of rows)
+foreach ($indicators as $indicatorKey => $indicatorDisplay) {
+    if (isset($allPercentages[$indicatorKey]) && !empty($allPercentages[$indicatorKey])) {
+        $totalPercentage = array_sum($allPercentages[$indicatorKey]);
+        $rowCount = count($allPercentages[$indicatorKey]);
+        $reportData[$indicatorKey] = round($totalPercentage / $rowCount, 1);
+    } else {
+        $reportData[$indicatorKey] = 0;
+    }
+}
+
+// Also get data from master_performance_data for this department (fallback for missing data)
 $masterQuery = "SELECT indicator_name, percentage_achievement 
                 FROM master_performance_data 
                 WHERE data_month = ? AND department = ? AND verification_status = 'verified'";
@@ -196,8 +211,8 @@ $masterResult = $masterStmt->get_result();
 while ($row = $masterResult->fetch_assoc()) {
     $indicatorName = $row['indicator_name'];
     $percentage = round((float)$row['percentage_achievement'], 1);
-
-    // If no DIR row found in mro_cpr_report, use master data
+    
+    // Only use master data if we have no data for this indicator
     if (!isset($reportData[$indicatorName]) || $reportData[$indicatorName] == 0) {
         $reportData[$indicatorName] = $percentage;
     }
@@ -213,7 +228,7 @@ foreach ($indicators as $indicatorKey => $indicatorDisplay) {
 
 $conn->close();
 
-// Calculate average overall percentage
+// Calculate average overall percentage (for the header)
 $totalPercentage = 0;
 $count = 0;
 foreach ($reportData as $percentage) {
@@ -887,8 +902,8 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
         </div>
 
         <div class="info-banner">
-            <span>Department Performance Overview</span>
-            <span style="display: inline-block; margin-left: 10px; font-size: 0.6rem;">Click on any card to view detailed manager breakdown | Cards automatically update when new data are added</span>
+            <span>Department Performance Overview (Average of all Manager + Director percentages)</span>
+            <span style="display: inline-block; margin-left: 10px; font-size: 0.6rem;">Click on any card to view detailed manager breakdown</span>
         </div>
 
         <div class="metrics-grid" id="metricsGrid">
@@ -910,7 +925,7 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
                     </div>
                     <div class="actual-target">
                         <span>Target: 100%</span>
-                        <span>Achieved: <?php echo $percentage; ?>%</span>
+                        <span>Avg of All: <?php echo $percentage; ?>%</span>
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -1120,12 +1135,10 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
 
             const data = managerData[indicatorKey] || {};
 
-            // Calculate totals
-            let totalExpected = 0;
-            let totalCompleted = 0;
+            // Collect ALL rows (both managers and director)
+            let allRows = [];
             let directorData = null;
-            const managerRows = [];
-
+            
             for (const [code, manager] of Object.entries(costCenters)) {
                 const record = data[code] || {
                     expected: 0,
@@ -1133,23 +1146,48 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
                     percentage: 0,
                     name: manager
                 };
-
+                
                 if (code === 'DIR') {
-                    directorData = record;
-                } else {
-                    totalExpected += record.expected;
-                    totalCompleted += record.completed;
-                    managerRows.push({
-                        name: manager,
+                    directorData = {
                         code: code,
+                        name: manager,
+                        expected: record.expected,
+                        completed: record.completed,
+                        percentage: record.percentage
+                    };
+                } else {
+                    allRows.push({
+                        code: code,
+                        name: manager,
                         expected: record.expected,
                         completed: record.completed,
                         percentage: record.percentage
                     });
                 }
             }
-
-            const totalPercentage = totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
+            
+            // Add director to allRows if it exists
+            if (directorData) {
+                allRows.push(directorData);
+            }
+            
+            // Calculate totals for display
+            let totalExpected = 0;
+            let totalCompleted = 0;
+            let totalPercentageSum = 0;
+            let rowCount = allRows.length;
+            
+            for (const row of allRows) {
+                totalExpected += row.expected;
+                totalCompleted += row.completed;
+                totalPercentageSum += row.percentage;
+            }
+            
+            // Calculate the average of all completion percentages (sum / number of rows)
+            const averageOfPercentages = rowCount > 0 ? (totalPercentageSum / rowCount) : 0;
+            
+            // Calculate overall from actual totals (for reference)
+            const overallFromTotals = totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
 
             let tableHtml = `
                 <table class="detail-table">
@@ -1165,74 +1203,56 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
                     </thead>
                     <tbody>
             `;
-
-            // Manager rows
-            for (const manager of managerRows) {
-                const notCompleted = manager.expected - manager.completed;
-                const percentageColor = getColor(manager.percentage);
+            
+            // Display all rows (managers + director)
+            for (const row of allRows) {
+                const notCompleted = row.expected - row.completed;
+                const percentageColor = getColor(row.percentage);
+                const isDirector = (row.code === 'DIR');
+                const rowClass = isDirector ? 'director-row' : '';
+                
                 tableHtml += `
-                    <tr>
-                        <td>${escapeHtml(manager.name)}</td>
-                        <td>${manager.expected}</td>
-                        <td>${manager.completed}</td>
+                    <tr class="${rowClass}">
+                        <td>${escapeHtml(row.name)}</td>
+                        <td>${row.expected}</td>
+                        <td>${row.completed}</td>
                         <td>${notCompleted}</td>
-                        <td style="color: ${percentageColor}; font-weight: bold;">${manager.percentage}%</td>
+                        <td style="color: ${percentageColor}; font-weight: bold;">${row.percentage}%</td>
                         <td>
                             <div class="progress-bar-modal">
-                                <div class="progress-fill-modal" style="width: ${manager.percentage}%; background: ${percentageColor};"></div>
+                                <div class="progress-fill-modal" style="width: ${row.percentage}%; background: ${percentageColor};"></div>
                             </div>
                         </td>
                     </tr>
                 `;
             }
-
-            // Director row (only show if there is data, or if there are manager rows)
-            if (directorData && (directorData.expected > 0 || directorData.completed > 0)) {
-                const dirExpected = directorData.expected;
-                const dirCompleted = directorData.completed;
-                const dirPercentage = directorData.percentage;
-                const dirNotCompleted = dirExpected - dirCompleted;
-                const dirColor = getColor(dirPercentage);
-                const dirName = costCenters['DIR'] || (userDept === 'BMT' ? 'Dir. BMT' : 'Dir. ' + userDept);
-                tableHtml += `
-                    <tr class="director-row">
-                        <td><strong>${dirName}</strong></td>
-                        <td><strong>${dirExpected}</strong></td>
-                        <td><strong>${dirCompleted}</strong></td>
-                        <td><strong>${dirNotCompleted}</strong></td>
-                        <td style="color: ${dirColor}; font-weight: bold;"><strong>${dirPercentage}%</strong></td>
-                        <td>
-                            <div class="progress-bar-modal">
-                                <div class="progress-fill-modal" style="width: ${dirPercentage}%; background: ${dirColor};"></div>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            } else if (totalExpected > 0) {
-                const totalPercentageCalc = (totalCompleted / totalExpected) * 100;
-                const totalColor = getColor(totalPercentageCalc);
-                const totalNotCompleted = totalExpected - totalCompleted;
-                tableHtml += `
-                    <tr class="director-row">
-                        <td><strong>TOTAL</strong></td>
-                        <td><strong>${totalExpected}</strong></td>
-                        <td><strong>${totalCompleted}</strong></td>
-                        <td><strong>${totalNotCompleted}</strong></td>
-                        <td style="color: ${totalColor}; font-weight: bold;"><strong>${totalPercentageCalc.toFixed(1)}%</strong></td>
-                        <td>
-                            <div class="progress-bar-modal">
-                                <div class="progress-fill-modal" style="width: ${totalPercentageCalc}%; background: ${totalColor};"></div>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            }
-
+            
+            // Add TOTAL row using AVERAGE OF PERCENTAGES (sum of all % / number of rows)
+            const totalColor = getColor(averageOfPercentages);
+            const totalNotCompleted = totalExpected - totalCompleted;
+            
+            tableHtml += `
+                <tr style="background: rgba(56, 189, 248, 0.2); font-weight: bold;">
+                    <td><strong>TOTAL (Avg of %)</strong></td>
+                    <td><strong>${totalExpected}</strong></td>
+                    <td><strong>${totalCompleted}</strong></td>
+                    <td><strong>${totalNotCompleted}</strong></td>
+                    <td style="color: ${totalColor}; font-weight: bold; font-size: 1.1rem;">
+                        <strong>${averageOfPercentages.toFixed(1)}%</strong>
+                    </td>
+                    <td>
+                        <div class="progress-bar-modal">
+                            <div class="progress-fill-modal" style="width: ${averageOfPercentages}%; background: ${totalColor};"></div>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            
             tableHtml += `
                     </tbody>
                 </table>
             `;
-
+            
             modalBody.innerHTML = tableHtml;
             modal.style.display = 'flex';
         }
@@ -1421,10 +1441,9 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
                 align-items: center;
                 justify-content: center;
             `;
-// Add the onclick handler
-modalOverlay.onclick = function() {
-    parent.closePasswordPopup();
-};
+            modalOverlay.onclick = function() {
+                parent.closePasswordPopup();
+            };
             const iframe = document.createElement('iframe');
             iframe.src = '../change_password.php';
             iframe.style.cssText = `

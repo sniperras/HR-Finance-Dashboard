@@ -24,77 +24,77 @@ if (empty($selectedReport) && !empty($reports)) {
 // Define departments
 $departments = ['ALL', 'BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'PSCM'];
 
-// Define cost centers for each department
+// Define cost centers for each department (with actual cost center codes)
 $costCenters = [
     'BMT' => [
-        ['code' => 'ACS', 'name' => 'Mgr. A/C Structure Maint', 'isDirector' => false],
-        ['code' => 'AVS', 'name' => 'Mgr. Avionics Sys Maint', 'isDirector' => false],
-        ['code' => 'B787', 'name' => 'Mgr. B787/767 Mainten', 'isDirector' => false],
-        ['code' => 'B737', 'name' => 'Mgr. B737 Maintenance', 'isDirector' => false],
-        ['code' => 'CAB', 'name' => 'Mgr. Cabin Maint', 'isDirector' => false],
-        ['code' => 'B777', 'name' => 'Mgr. B777/A350 Mainten', 'isDirector' => false],
-        ['code' => 'APS', 'name' => 'Mgr. A/C Patch Svs.', 'isDirector' => false],
-        ['code' => 'TEC', 'name' => 'Mgr. Technical Supp.', 'isDirector' => false],
-        ['code' => 'DIR', 'name' => 'Dir. BMT', 'isDirector' => true],
+        ['code' => 'MRODR441', 'name' => 'Dir. BMT', 'isDirector' => true],
+        ['code' => 'MROMG471', 'name' => 'Mgr. A/C Structure Main', 'isDirector' => false],
+        ['code' => 'MROMG451', 'name' => 'Mgr. Avionics Sys Maint', 'isDirector' => false],
+        ['code' => 'MROMG461', 'name' => 'Mgr. B787/767 Mainten', 'isDirector' => false],
+        ['code' => 'MROMG463', 'name' => 'Mgr. B737 Maintenance', 'isDirector' => false],
+        ['code' => 'MROMG521', 'name' => 'Mgr. Cabin Maint', 'isDirector' => false],
+        ['code' => 'MRORFM462', 'name' => 'Mgr. B777/A350 Mainten', 'isDirector' => false],
+        ['code' => 'MROFM525', 'name' => 'Mgr. A/C Paint Svs', 'isDirector' => false],
+        ['code' => 'MROMG442', 'name' => 'Mgr. Technical Supp', 'isDirector' => false],
     ],
     'LMT' => [
-        ['code' => 'DMM', 'name' => 'Duty Manager MCC', 'isDirector' => false],
-        ['code' => 'ADM', 'name' => 'MGR. Admin & Outstation Maint', 'isDirector' => false],
-        ['code' => 'ALM', 'name' => 'Mgr. A/C Line Maint.', 'isDirector' => false],
-        ['code' => 'GAM', 'name' => 'Mgr. General Ava. A/C Maint.', 'isDirector' => false],
-        ['code' => 'TPL', 'name' => 'MGR. Turbo Prop & Light A/C Maint', 'isDirector' => false],
-        ['code' => 'ACM', 'name' => 'Mgr. A/C Cabin Maint', 'isDirector' => false],
-        ['code' => 'DIR', 'name' => 'Dir. LMT', 'isDirector' => true],
+        ['code' => 'MRODR446', 'name' => 'Dir. LMT', 'isDirector' => true],
+        ['code' => 'MROMG481', 'name' => 'Duty Manager MCC', 'isDirector' => false],
+        ['code' => 'MROSU483', 'name' => 'MGR. Admin & OutstationMaint', 'isDirector' => false],
+        ['code' => 'MROMG531', 'name' => 'Mgr A/C Line Maint', 'isDirector' => false],
+        ['code' => 'MROMG540', 'name' => 'Mgr. General Ava. A/C Maint', 'isDirector' => false],
+        ['code' => 'MROMG533', 'name' => 'MGR. Turbo Prop & Light A/C Maint', 'isDirector' => false],
+        ['code' => 'MRORSP572', 'name' => 'Mgr. A/C Cabin Maint', 'isDirector' => false],
     ],
     'CMT' => [
-        ['code' => 'WKH', 'name' => 'Mgr. Wire Kit & Harness Prod.', 'isDirector' => false],
-        ['code' => 'CES', 'name' => 'Mgr. Computerized Equipment Shop', 'isDirector' => false],
-        ['code' => 'NDT', 'name' => 'Mgr. NDT, Stand. & Part Recv. Insp.', 'isDirector' => false],
-        ['code' => 'MES', 'name' => 'Comp. Maint. Engineering Support', 'isDirector' => false],
-        ['code' => 'MCS', 'name' => 'Mgr. Mechanical Comp Shops', 'isDirector' => false],
-        ['code' => 'ACS', 'name' => 'Mgr. Avionics Comp Shops', 'isDirector' => false],
-        ['code' => 'DIR', 'name' => 'Dir. CMT', 'isDirector' => true],
+        ['code' => 'MRODR541', 'name' => 'Dir. CMT', 'isDirector' => true],
+        ['code' => 'MROMG546', 'name' => 'Mgr. Wire Kit & Harness Prod', 'isDirector' => false],
+        ['code' => 'MROMG551', 'name' => 'Mgr Computerized equipment shop', 'isDirector' => false],
+        ['code' => 'MROMG413', 'name' => 'Mgr. NDT, Stand. & Part Recv. Insp', 'isDirector' => false],
+        ['code' => 'MROSU547', 'name' => 'Comp.Maint.Engineering support', 'isDirector' => false],
+        ['code' => 'MROMG561', 'name' => 'Mgr. Mechanical Comp shops', 'isDirector' => false],
+        ['code' => 'MROMG571', 'name' => 'Mgr Avionics Comp shops', 'isDirector' => false],
     ],
     'EMT' => [
-        ['code' => 'EMI', 'name' => 'Mgr. Engine Maint. Inspection', 'isDirector' => false],
-        ['code' => 'ETS', 'name' => 'Mgr. Technical Support', 'isDirector' => false],
-        ['code' => 'RNP', 'name' => 'Mgr. RNP PW4000/LEAP/APU Eng. Maint.', 'isDirector' => false],
-        ['code' => 'CFM', 'name' => 'Mgr. CFM56/GE90/GENX & Turbo Prop. Engines', 'isDirector' => false],
-        ['code' => 'RSH', 'name' => 'Mgr. Repair Shops', 'isDirector' => false],
-        ['code' => 'DIR', 'name' => 'Dir. EMT', 'isDirector' => true],
+        ['code' => 'MRODR581', 'name' => 'Dir. EMT', 'isDirector' => true],
+        ['code' => 'MROMG414', 'name' => 'Mgr. Engine Maint. Inspection', 'isDirector' => false],
+        ['code' => 'MROMG582', 'name' => 'Mgr. Technical Support', 'isDirector' => false],
+        ['code' => 'MROMG583', 'name' => 'Mgr. RR/PW4000/LEAP/APU eng. Maint', 'isDirector' => false],
+        ['code' => 'MROMG584', 'name' => 'Mgr. CFM56/GE90/GENX & Turbo prop. Engines', 'isDirector' => false],
+        ['code' => 'MROMG585', 'name' => 'Mgr. Repair Shops', 'isDirector' => false],
     ],
     'AEP' => [
-        ['code' => 'ALE', 'name' => 'MGR. A/C Lease, EIS & Special Projects', 'isDirector' => false],
-        ['code' => 'AMP', 'name' => 'MGR. A/C Maint. Prog. & Task Card Engineer', 'isDirector' => false],
-        ['code' => 'MPR', 'name' => 'MGR. Maint. Plng. & Record Control', 'isDirector' => false],
-        ['code' => 'EQA', 'name' => 'MGR. Engineering Quality Assurance', 'isDirector' => false],
-        ['code' => 'ASE', 'name' => 'Mgr. A/C Systems Eng', 'isDirector' => false],
-        ['code' => 'ADO', 'name' => 'MGR. A/C Design Organization', 'isDirector' => false],
-        ['code' => 'DIR', 'name' => 'Dir. AEP', 'isDirector' => true],
+        ['code' => 'MRODR341', 'name' => 'DIR. AEP', 'isDirector' => true],
+        ['code' => 'MROMG332', 'name' => 'MGR. A/C LEASE , EIS & SPECIAL PROJECTS', 'isDirector' => false],
+        ['code' => 'MROMG351', 'name' => 'MGR. A/C MAINT. PROG.& TASK CARD ENGINEE', 'isDirector' => false],
+        ['code' => 'MROMG371', 'name' => 'MGR. MAINT. PLNG & RECORD CONTROL', 'isDirector' => false],
+        ['code' => 'MROMG381', 'name' => 'MGR. ENGINEERING QUALITY ASSURANCE', 'isDirector' => false],
+        ['code' => 'MRORMG361', 'name' => 'Mgr. A/C systems Eng', 'isDirector' => false],
+        ['code' => 'MROMG382', 'name' => 'MGR. A/C Design Organization', 'isDirector' => false],
     ],
     'MSM' => [
-        ['code' => 'MSM', 'name' => 'Mgr. MRO Sales and Marketing', 'isDirector' => false],
-        ['code' => 'MCS', 'name' => 'Mgr. MRO Customer Support', 'isDirector' => false],
-        ['code' => 'DIR', 'name' => 'Dir. MSM', 'isDirector' => true],
+        ['code' => 'MRODR321', 'name' => 'Dir MSM', 'isDirector' => true],
+        ['code' => 'MROMG322', 'name' => 'Mgr. MRO Sales and Marketing', 'isDirector' => false],
+        ['code' => 'MROMG323', 'name' => 'Mgr. MRO Customer Support', 'isDirector' => false],
     ],
     'QA' => [
-        ['code' => 'QAS', 'name' => 'Mgr. MRO Qty Ass & S/a', 'isDirector' => false],
+        ['code' => 'MROMG421', 'name' => 'Mgr .MRO Qty Ass & Sa', 'isDirector' => false],
     ],
     'PSCM' => [
-        ['code' => 'GWC', 'name' => 'Mgr. Grp Warp Cont Mgt', 'isDirector' => false],
-        ['code' => 'TPU', 'name' => 'Mgr. Tactical Purchase', 'isDirector' => false],
-        ['code' => 'MMP', 'name' => 'Mgr. MRO Material Planning', 'isDirector' => false],
-        ['code' => 'EMP', 'name' => 'Mgr. Engine Maint/Tactical Pur', 'isDirector' => false],
-        ['code' => 'WAP', 'name' => 'Mgr. Warehouse A/C Part', 'isDirector' => false],
-        ['code' => 'EXT', 'name' => 'Extra Sourcing', 'isDirector' => false],
-        ['code' => 'PLC', 'name' => 'Mgr. Purchase-LMT&CMT Maint.', 'isDirector' => false],
-        ['code' => 'DIR', 'name' => 'Dir. Prop. & Supp. Chain Mgt', 'isDirector' => true],
-    ]
+        ['code' => 'MRODR431', 'name' => 'Dir. Pro. & Supp. Chain Mgt', 'isDirector' => true],
+        ['code' => 'MROMG430', 'name' => 'Mgr. Grp Warr,Cont Mg', 'isDirector' => false],
+        ['code' => 'MROMG433', 'name' => 'Mgr. Tactical Purchase', 'isDirector' => false],
+        ['code' => 'MROMG450', 'name' => 'Mgr. Group Material Planning', 'isDirector' => false],
+        ['code' => 'MROMG434', 'name' => 'Mgr.Engine Maint.Tactical Pur', 'isDirector' => false],
+        ['code' => 'MROMG437', 'name' => 'Mgr. Warehouse A/C Part', 'isDirector' => false],
+        ['code' => 'MROMG439', 'name' => 'Mgr. Stra.Sourcing Te', 'isDirector' => false],
+        ['code' => 'MROMG542', 'name' => 'Mgr.Tac. Purchase -LMT&CMT Maint', 'isDirector' => false],
+    ],
 ];
 
-// Fetch existing data if any
+// Fetch existing data if a specific department is selected (not ALL)
 $existingData = [];
-if ($selectedDept && $currentMonth && $currentYear && $selectedReport) {
+if ($selectedDept && $selectedDept !== 'ALL' && $currentMonth && $currentYear && $selectedReport) {
     $query = "SELECT * FROM mro_cpr_report
               WHERE report_type = ? AND report_month = ? AND report_year = ? AND department = ?";
     $stmt = $conn->prepare($query);
@@ -119,6 +119,9 @@ function hasDirector($costCentersList)
     }
     return false;
 }
+
+// Check if CPR is selected
+$isCPRSelected = ($selectedReport === 'CPR');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -154,12 +157,6 @@ function hasDirector($costCentersList)
             background: var(--dark-bg);
             color: var(--light-bg);
             transition: background-color 0.3s, color 0.3s;
-        }
-
-        .navbar {
-            background: var(--medium-bg);
-            padding: 0.5rem 0;
-            transition: background-color 0.3s;
         }
 
         .navbar {
@@ -222,6 +219,7 @@ function hasDirector($costCentersList)
             color: var(--accent);
             padding: 0.3rem 0.8rem;
             cursor: pointer;
+            border-radius: 5px;
         }
 
         .theme-toggle:hover {
@@ -283,16 +281,171 @@ function hasDirector($costCentersList)
             font-size: 0.7rem;
             font-weight: bold;
             color: var(--accent);
+            display: block;
+            margin-bottom: 0.25rem;
         }
 
         .filter-group select,
         .filter-group input {
+            width: 100%;
             padding: 0.5rem;
             border-radius: 6px;
             border: 1px solid var(--border-light);
             background: var(--dark-bg);
             color: var(--light-bg);
             font-size: 0.8rem;
+        }
+
+        /* Upload Section - only for CPR with ALL department */
+        .upload-section {
+            background: var(--card-bg);
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-light);
+        }
+
+        .upload-section h3 {
+            font-size: 0.9rem;
+            margin-bottom: 0.75rem;
+            color: var(--accent);
+        }
+
+        .upload-form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: flex-end;
+        }
+
+        .upload-group {
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .upload-group label {
+            font-size: 0.7rem;
+            font-weight: bold;
+            color: var(--accent);
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        .upload-group input[type="file"] {
+            width: 100%;
+            padding: 0.5rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-light);
+            background: var(--dark-bg);
+            color: var(--light-bg);
+            font-size: 0.8rem;
+        }
+
+        .btn-upload {
+            background: var(--warning);
+            color: white;
+        }
+
+        .btn-upload:hover {
+            background: #e67e22;
+        }
+
+        .btn-preview {
+            background: var(--accent);
+        }
+
+        .btn-submit-upload {
+            background: var(--success);
+        }
+
+        /* Preview Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility 0.3s, opacity 0.3s;
+        }
+
+        .modal-overlay.active {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .modal-container {
+            background: var(--card-bg);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 85vh;
+            overflow: auto;
+            border: 1px solid var(--border-light);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: var(--card-bg);
+            z-index: 1;
+        }
+
+        .modal-header h3 {
+            color: var(--accent);
+            font-size: 1rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--light-bg);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            padding: 1rem;
+        }
+
+        .preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.75rem;
+        }
+
+        .preview-table th,
+        .preview-table td {
+            padding: 0.5rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .preview-table th {
+            background: var(--dark-bg);
+            color: var(--accent);
+            position: sticky;
+            top: 0;
+        }
+
+        .preview-actions {
+            padding: 1rem;
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            border-top: 1px solid var(--border-light);
         }
 
         .data-table {
@@ -392,6 +545,18 @@ function hasDirector($costCentersList)
             color: var(--danger);
         }
 
+        .alert-warning {
+            background: rgba(245, 158, 11, 0.2);
+            border: 1px solid var(--warning);
+            color: var(--warning);
+        }
+
+        .alert-info {
+            background: rgba(56, 189, 248, 0.2);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+        }
+
         .progress-bar {
             width: 80px;
             height: 6px;
@@ -419,10 +584,10 @@ function hasDirector($costCentersList)
             background: var(--accent);
             color: white;
             border: none;
-            padding: 0.3rem 0.8rem;
+            padding: 0.2rem 0.6rem;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 0.7rem;
+            font-size: 0.6rem;
             margin-left: 0.5rem;
         }
 
@@ -435,8 +600,10 @@ function hasDirector($costCentersList)
         body.light-theme .navbar,
         body.light-theme .report-header,
         body.light-theme .filter-section,
+        body.light-theme .upload-section,
         body.light-theme .data-table,
-        body.light-theme .no-dept-message {
+        body.light-theme .no-dept-message,
+        body.light-theme .modal-container {
             background: white !important;
             border-color: #E2E8F0 !important;
         }
@@ -445,7 +612,8 @@ function hasDirector($costCentersList)
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
 
-        body.light-theme .data-table th {
+        body.light-theme .data-table th,
+        body.light-theme .preview-table th {
             background: #F1F5F9;
             color: #0284C7;
         }
@@ -462,7 +630,8 @@ function hasDirector($costCentersList)
         }
 
         body.light-theme .filter-group select,
-        body.light-theme .filter-group input {
+        body.light-theme .filter-group input,
+        body.light-theme .upload-group input[type="file"] {
             background: white;
             color: #0F172A;
             border-color: #CBD5E1;
@@ -497,13 +666,17 @@ function hasDirector($costCentersList)
             color: #0F172A;
         }
 
-        .sync-info {
-            font-size: 0.7rem;
-            color: var(--accent);
-            margin-top: 0.5rem;
-            padding: 0.5rem;
-            background: rgba(56, 189, 248, 0.1);
-            border-radius: 8px;
+        @media (max-width: 768px) {
+            .filter-form,
+            .upload-form {
+                grid-template-columns: 1fr;
+            }
+            .data-table {
+                font-size: 0.7rem;
+            }
+            .data-table input {
+                width: 70px;
+            }
         }
     </style>
 </head>
@@ -575,7 +748,7 @@ function hasDirector($costCentersList)
 
                 <div class="filter-group">
                     <label>Department</label>
-                    <select name="department" onchange="this.form.submit()">
+                    <select name="department" id="deptSelect" onchange="this.form.submit()">
                         <option value="">Select Department</option>
                         <?php foreach ($departments as $dept): ?>
                             <option value="<?php echo $dept; ?>" <?php echo $selectedDept == $dept ? 'selected' : ''; ?>>
@@ -587,7 +760,28 @@ function hasDirector($costCentersList)
             </form>
         </div>
 
-        <?php if ($selectedDept): ?>
+        <?php if ($selectedDept === 'ALL' && $isCPRSelected): ?>
+            <!-- Excel Upload Section - Only for CPR with ALL department -->
+            <div class="upload-section">
+                <h3>📂 Upload Excel File (CPR - All Departments)</h3>
+                <div class="upload-form">
+                    <div class="upload-group">
+                        <label>Excel File (.xlsx, .xls)</label>
+                        <input type="file" id="excelFile" accept=".xlsx,.xls">
+                    </div>
+                    <div class="upload-group">
+                        <button type="button" class="btn btn-upload" id="uploadBtn">📤 Upload & Preview</button>
+                    </div>
+                </div>
+                <div id="uploadMessage"></div>
+                <div class="sync-info" style="margin-top: 0.75rem;">
+                    ℹ️ The Excel file must contain data for all departments (BMT, LMT, CMT, EMT, AEP, MSM, QA, PSCM) in the standard CPR format.
+                </div>
+            </div>
+            <div id="message"></div>
+
+        <?php elseif ($selectedDept && $selectedDept !== 'ALL'): ?>
+            <!-- Manual Entry Form - For specific departments -->
             <div id="message"></div>
 
             <form id="reportForm" method="POST" action="save_mro_report.php">
@@ -731,11 +925,32 @@ function hasDirector($costCentersList)
                     <button type="submit" class="btn btn-save">💾 Save Report</button>
                 </div>
             </form>
-        <?php else: ?>
+        <?php elseif ($selectedDept === 'ALL' && !$isCPRSelected): ?>
+            <div class="no-dept-message">
+                <p>Excel upload is only available for CPR report type. Please select a specific department to enter data for <?php echo htmlspecialchars($selectedReport); ?>.</p>
+            </div>
+        <?php elseif ($selectedDept === ''): ?>
             <div class="no-dept-message">
                 <p>Please select a department to view and enter report data.</p>
             </div>
         <?php endif; ?>
+    </div>
+
+    <!-- Preview Modal -->
+    <div id="previewModal" class="modal-overlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3>📋 Upload Preview - Review Data by Department</h3>
+                <button class="modal-close" onclick="closePreviewModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="previewContent"></div>
+            </div>
+            <div class="preview-actions">
+                <button type="button" class="btn" onclick="closePreviewModal()">Cancel</button>
+                <button type="button" class="btn btn-submit-upload" id="confirmUploadBtn">✓ Apply to Database</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -783,6 +998,8 @@ function hasDirector($costCentersList)
                 }
             }
         }
+
+        let uploadedData = null;
 
         function calculateRow(row) {
             const expectedInput = row.querySelector('.expected-input');
@@ -880,7 +1097,6 @@ function hasDirector($costCentersList)
         }
 
         function refreshReports() {
-            // AJAX call to refresh the report dropdown without page reload
             fetch('get_indicators.php')
                 .then(response => response.json())
                 .then(data => {
@@ -888,10 +1104,7 @@ function hasDirector($costCentersList)
                         const reportSelect = document.getElementById('reportSelect');
                         const currentValue = reportSelect.value;
 
-                        // Clear existing options
                         reportSelect.innerHTML = '';
-
-                        // Add new options
                         data.indicators.forEach(indicator => {
                             const option = document.createElement('option');
                             option.value = indicator;
@@ -902,7 +1115,6 @@ function hasDirector($costCentersList)
                             reportSelect.appendChild(option);
                         });
 
-                        // Show success message
                         const msgDiv = document.getElementById('message');
                         if (msgDiv) {
                             msgDiv.innerHTML = `<div class="alert alert-success">✓ Indicators refreshed from database (${data.indicators.length} indicators)</div>`;
@@ -911,7 +1123,6 @@ function hasDirector($costCentersList)
                             }, 3000);
                         }
 
-                        // If the current selected value is no longer available, submit the form to reload
                         if (!data.indicators.includes(currentValue) && data.indicators.length > 0) {
                             reportSelect.value = data.indicators[0];
                             reportSelect.form.submit();
@@ -930,35 +1141,222 @@ function hasDirector($costCentersList)
                 });
         }
 
+        function openPreviewModal(data) {
+            const modal = document.getElementById('previewModal');
+            const previewContent = document.getElementById('previewContent');
+
+            if (!modal || !previewContent) return;
+
+            // Build preview HTML grouped by department
+            let html = '';
+            for (const [dept, departmentsData] of Object.entries(data)) {
+                html += `<h4 style="color: var(--accent); margin: 1rem 0 0.5rem 0; border-bottom: 1px solid var(--border-light); padding-bottom: 0.25rem;">📁 ${escapeHtml(dept)}</h4>`;
+                html += `<table class="preview-table" style="width:100%; margin-bottom:1rem;">`;
+                html += `<thead><tr><th>Cost Center</th><th>Expected</th><th>Completed</th><th>Not Completed</th><th>%</th></tr></thead><tbody>`;
+
+                for (const [code, rowData] of Object.entries(departmentsData)) {
+                    const expected = rowData.expected || 0;
+                    const completed = rowData.completed || 0;
+                    const notCompleted = expected - completed;
+                    const percentage = expected > 0 ? ((completed / expected) * 100).toFixed(1) : 0;
+
+                    html += `<tr>
+                        <td>${escapeHtml(rowData.name || code)}</td>
+                        <td>${expected}</td>
+                        <td>${completed}</td>
+                        <td>${notCompleted}</td>
+                        <td>${percentage}%</td>
+                    </tr>`;
+                }
+                html += `</tbody></table>`;
+            }
+
+            previewContent.innerHTML = html;
+            modal.classList.add('active');
+            uploadedData = data;
+        }
+
+        function closePreviewModal() {
+            const modal = document.getElementById('previewModal');
+            if (modal) {
+                modal.classList.remove('active');
+            }
+            uploadedData = null;
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             new ThemeManager();
 
-            document.querySelectorAll('#tableBody tr .expected-input, #tableBody tr .completed-input').forEach(input => {
-                if (!input.disabled) {
-                    input.addEventListener('input', function() {
-                        const row = this.closest('tr');
+            // Set up input event listeners for manual entry forms
+            const tableBody = document.getElementById('tableBody');
+            if (tableBody) {
+                document.querySelectorAll('#tableBody tr .expected-input, #tableBody tr .completed-input').forEach(input => {
+                    if (!input.disabled) {
+                        input.addEventListener('input', function() {
+                            const row = this.closest('tr');
+                            calculateRow(row);
+                            calculateDirectorAndTotals();
+                        });
+                    }
+                });
+
+                document.querySelectorAll('#tableBody tr').forEach(row => {
+                    if (row.getAttribute('data-is-director') !== 'true') {
                         calculateRow(row);
-                        calculateDirectorAndTotals();
-                    });
-                }
-            });
-
-            document.querySelectorAll('#tableBody tr').forEach(row => {
-                if (row.getAttribute('data-is-director') !== 'true') {
-                    calculateRow(row);
-                }
-            });
-            calculateDirectorAndTotals();
-
-            const urlParams = new URLSearchParams(window.location.search);
-            const message = urlParams.get('message');
-            if (message) {
-                const msgDiv = document.getElementById('message');
-                msgDiv.innerHTML = `<div class="alert alert-success">✓ ${decodeURIComponent(message)}</div>`;
-                setTimeout(() => {
-                    msgDiv.innerHTML = '';
-                }, 3000);
+                    }
+                });
+                calculateDirectorAndTotals();
             }
+
+            // Check for saved message
+            const urlParams = new URLSearchParams(window.location.search);
+            const saved = urlParams.get('saved');
+            if (saved === '1') {
+                const msgDiv = document.getElementById('message');
+                if (msgDiv) {
+                    msgDiv.innerHTML = `<div class="alert alert-success">✓ Report saved successfully!</div>`;
+                    setTimeout(() => {
+                        msgDiv.innerHTML = '';
+                    }, 3000);
+                }
+            }
+
+            // Excel Upload functionality - only for CPR with ALL department
+            const uploadBtn = document.getElementById('uploadBtn');
+            const excelFileInput = document.getElementById('excelFile');
+
+            if (uploadBtn && excelFileInput) {
+                uploadBtn.addEventListener('click', function() {
+                    const file = excelFileInput.files[0];
+                    if (!file) {
+                        const uploadMsg = document.getElementById('uploadMessage');
+                        uploadMsg.innerHTML = `<div class="alert alert-warning">Please select an Excel file first.</div>`;
+                        setTimeout(() => {
+                            if (uploadMsg.innerHTML.includes('Please select')) {
+                                uploadMsg.innerHTML = '';
+                            }
+                        }, 3000);
+                        return;
+                    }
+
+                    const formData = new FormData();
+                    formData.append('excel_file', file);
+                    formData.append('report_type', 'CPR');
+                    formData.append('month', '<?php echo $currentMonth; ?>');
+                    formData.append('year', '<?php echo $currentYear; ?>');
+
+                    uploadBtn.disabled = true;
+                    uploadBtn.textContent = '⏳ Uploading...';
+
+                    fetch('upload_cpr_report.php', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        uploadBtn.disabled = false;
+                        uploadBtn.textContent = '📤 Upload & Preview';
+
+                        if (data.success) {
+                            openPreviewModal(data.data);
+                        } else {
+                            const uploadMsg = document.getElementById('uploadMessage');
+                            uploadMsg.innerHTML = `<div class="alert alert-error">✗ ${escapeHtml(data.message)}</div>`;
+                            setTimeout(() => {
+                                if (uploadMsg.innerHTML.includes('✗')) {
+                                    uploadMsg.innerHTML = '';
+                                }
+                            }, 5000);
+                        }
+                    })
+                    .catch(error => {
+                        uploadBtn.disabled = false;
+                        uploadBtn.textContent = '📤 Upload & Preview';
+                        console.error('Upload error:', error);
+                        const uploadMsg = document.getElementById('uploadMessage');
+                        uploadMsg.innerHTML = `<div class="alert alert-error">✗ Error uploading file. Please try again.</div>`;
+                        setTimeout(() => {
+                            if (uploadMsg.innerHTML.includes('Error uploading')) {
+                                uploadMsg.innerHTML = '';
+                            }
+                        }, 3000);
+                    });
+                });
+            }
+
+            // Confirm upload button
+            const confirmUploadBtn = document.getElementById('confirmUploadBtn');
+            if (confirmUploadBtn) {
+                confirmUploadBtn.addEventListener('click', function() {
+                    if (uploadedData) {
+                        // Submit the data to save_cpr_upload.php
+                        const formData = new FormData();
+                        formData.append('report_type', 'CPR');
+                        formData.append('report_month', '<?php echo $currentMonth; ?>');
+                        formData.append('report_year', '<?php echo $currentYear; ?>');
+                        formData.append('data', JSON.stringify(uploadedData));
+
+                        confirmUploadBtn.disabled = true;
+                        confirmUploadBtn.textContent = '⏳ Saving...';
+
+                        fetch('save_cpr_upload.php', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            confirmUploadBtn.disabled = false;
+                            confirmUploadBtn.textContent = '✓ Apply to Database';
+
+                            if (data.success) {
+                                closePreviewModal();
+                                const msgDiv = document.getElementById('message');
+                                if (msgDiv) {
+                                    msgDiv.innerHTML = `<div class="alert alert-success">✓ ${data.message}</div>`;
+                                    setTimeout(() => {
+                                        msgDiv.innerHTML = '';
+                                    }, 5000);
+                                }
+                                // Optionally reload the page to show updated data
+                                setTimeout(() => {
+                                    window.location.href = window.location.href.split('?')[0] + '?report=CPR&month=<?php echo $currentMonth; ?>&year=<?php echo $currentYear; ?>&department=ALL&saved=1';
+                                }, 1500);
+                            } else {
+                                const uploadMsg = document.getElementById('uploadMessage');
+                                if (uploadMsg) {
+                                    uploadMsg.innerHTML = `<div class="alert alert-error">✗ ${escapeHtml(data.message)}</div>`;
+                                }
+                            }
+                        })
+                        .catch(error => {
+                            confirmUploadBtn.disabled = false;
+                            confirmUploadBtn.textContent = '✓ Apply to Database';
+                            console.error('Save error:', error);
+                            const uploadMsg = document.getElementById('uploadMessage');
+                            if (uploadMsg) {
+                                uploadMsg.innerHTML = `<div class="alert alert-error">✗ Error saving data. Please try again.</div>`;
+                            }
+                        });
+                    }
+                });
+            }
+
+            // Close modal on escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closePreviewModal();
+                }
+            });
         });
 
         function openPasswordModal() {
@@ -980,10 +1378,13 @@ function hasDirector($costCentersList)
                 align-items: center;
                 justify-content: center;
             `;
-// Add the onclick handler
-modalOverlay.onclick = function() {
-    parent.closePasswordPopup();
-};
+
+            modalOverlay.onclick = function(e) {
+                if (e.target === modalOverlay) {
+                    closePasswordPopup();
+                }
+            };
+
             const iframe = document.createElement('iframe');
             iframe.src = '../change_password.php';
             iframe.style.cssText = `
@@ -1016,6 +1417,12 @@ modalOverlay.onclick = function() {
                 }
             };
             document.addEventListener('keydown', escapeHandler);
+        }
+
+        function closePasswordPopup() {
+            if (window.closePasswordPopup) {
+                window.closePasswordPopup();
+            }
         }
 
         function keepSessionAlive() {

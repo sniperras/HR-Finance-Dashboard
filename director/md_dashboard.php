@@ -164,14 +164,20 @@ $departmentColors = [
     'Remainder' => '#95A5A6'
 ];
 
-// Fetch actual data from mro_cpr_report for the selected month (only DIR level)
+// ==============================================
+// MODIFIED: Fetch ALL data from mro_cpr_report (ALL cost centers, not just DIR)
+// ==============================================
 $dbData = [];
-$query = "SELECT report_type as indicator_name, department, percentage, expected, completed 
-          FROM mro_cpr_report 
-          WHERE report_month = ? AND report_year = ? AND cost_center_code = 'DIR'";
+$allPercentagesByDept = []; // Store all percentages per department per indicator
 
 $year = date('Y', strtotime($dataMonth));
 $month = date('m', strtotime($dataMonth));
+
+// Fetch ALL cost centers for ALL departments
+$query = "SELECT report_type as indicator_name, department, cost_center_code, percentage, expected, completed 
+          FROM mro_cpr_report 
+          WHERE report_month = ? AND report_year = ? AND verification_status = 'verified'";
+
 $stmt = $conn->prepare($query);
 $stmt->bind_param("ii", $month, $year);
 $stmt->execute();
@@ -183,15 +189,27 @@ while ($row = $result->fetch_assoc()) {
     $percentage = round($row['percentage'], 1);
     $actual = $row['completed'];
     $target = $row['expected'];
+    $costCenter = $row['cost_center_code'];
 
+    // Store ALL data for later use in modal
     if (!isset($dbData[$indicator])) {
         $dbData[$indicator] = [];
     }
-    $dbData[$indicator][$dept] = [
+    if (!isset($dbData[$indicator][$dept])) {
+        $dbData[$indicator][$dept] = [];
+    }
+    $dbData[$indicator][$dept][$costCenter] = [
         'percentage' => $percentage,
         'actual' => $actual,
-        'target' => $target
+        'target' => $target,
+        'cost_center' => $costCenter
     ];
+    
+    // Track all percentages for this department and indicator (for calculating average)
+    if (!isset($allPercentagesByDept[$indicator][$dept])) {
+        $allPercentagesByDept[$indicator][$dept] = [];
+    }
+    $allPercentagesByDept[$indicator][$dept][] = $percentage;
 }
 $stmt->close();
 
@@ -213,16 +231,27 @@ while ($row = $masterResult->fetch_assoc()) {
         if (!isset($dbData[$indicator])) {
             $dbData[$indicator] = [];
         }
-        $dbData[$indicator][$dept] = [
+        if (!isset($dbData[$indicator][$dept])) {
+            $dbData[$indicator][$dept] = [];
+        }
+        $dbData[$indicator][$dept]['DIR'] = [
             'percentage' => $percentage,
             'actual' => $row['actual_value'],
-            'target' => $row['target_value']
+            'target' => $row['target_value'],
+            'cost_center' => 'DIR'
         ];
+        
+        if (!isset($allPercentagesByDept[$indicator][$dept])) {
+            $allPercentagesByDept[$indicator][$dept] = [];
+        }
+        $allPercentagesByDept[$indicator][$dept][] = $percentage;
     }
 }
 $masterStmt->close();
 
-/// Calculate overall percentages and prepare data for display
+// ==============================================
+// MODIFIED: Calculate department percentages as AVERAGE of all cost centers (MGR + DIR)
+// ==============================================
 $metricsData = [];
 foreach ($indicators as $indicatorKey => $indicatorInfo) {
     $departmentData = [];
@@ -231,32 +260,39 @@ foreach ($indicators as $indicatorKey => $indicatorInfo) {
     $validPercentages = [];
     $hasAnyActualData = false;
 
-    // Initialize ALL departments with 0 or null values
+    // Initialize ALL departments
     foreach ($allDepartments as $dept) {
-        if (isset($dbData[$indicatorKey]) && isset($dbData[$indicatorKey][$dept])) {
-            $departmentData[$dept] = $dbData[$indicatorKey][$dept]['percentage'];
-            $departmentActuals[$dept] = $dbData[$indicatorKey][$dept]['actual'];
-            $departmentTargets[$dept] = $dbData[$indicatorKey][$dept]['target'];
-            if ($dbData[$indicatorKey][$dept]['percentage'] > 0) {
-                $validPercentages[] = $dbData[$indicatorKey][$dept]['percentage'];
-                $hasAnyActualData = true;
+        // Calculate average percentage for this department
+        if (isset($allPercentagesByDept[$indicatorKey][$dept]) && !empty($allPercentagesByDept[$indicatorKey][$dept])) {
+            $percentages = $allPercentagesByDept[$indicatorKey][$dept];
+            $avgPercentage = round(array_sum($percentages) / count($percentages), 1);
+            $departmentData[$dept] = $avgPercentage;
+            $hasAnyActualData = true;
+            
+            // For actuals and targets, we need to sum them up from all cost centers
+            $totalActual = 0;
+            $totalTarget = 0;
+            if (isset($dbData[$indicatorKey][$dept])) {
+                foreach ($dbData[$indicatorKey][$dept] as $costCenter => $data) {
+                    $totalActual += $data['actual'];
+                    $totalTarget += $data['target'];
+                }
             }
+            $departmentActuals[$dept] = $totalActual > 0 ? $totalActual : null;
+            $departmentTargets[$dept] = $totalTarget > 0 ? $totalTarget : null;
         } else {
-            // For departments with no data, set percentage to 0 but keep them visible
+            // No data for this department
             $departmentData[$dept] = 0;
             $departmentActuals[$dept] = null;
             $departmentTargets[$dept] = null;
         }
     }
 
-    // Calculate MD/DIV. as average of ALL main departments (including those with 0%)
+    // Calculate MD/DIV. as average of ALL main departments (excluding MD/DIV and Remainder from the calculation)
     $mainDeptPercentages = [];
     foreach ($mainDepartments as $mainDept) {
-        // Include ALL main departments, even if they have 0%
         $percentage = isset($departmentData[$mainDept]) ? $departmentData[$mainDept] : 0;
         $mainDeptPercentages[] = $percentage;
-
-        // Track if ANY main department has actual data
         if ($percentage > 0) {
             $hasAnyActualData = true;
         }
@@ -272,25 +308,22 @@ foreach ($indicators as $indicatorKey => $indicatorInfo) {
     // Calculate Remainder (what's left to reach 100% from MD/DIV.)
     $remainderPercentage = round(max(0, 100 - $mdDivPercentage), 1);
 
-    // Update department data with calculated values (always show them)
+    // Update department data with calculated values
     $departmentData['MD/DIV.'] = $mdDivPercentage;
     $departmentData['Remainder'] = $remainderPercentage;
+    
+    // For MD/DIV and Remainder, actuals/targets are not applicable
+    $departmentActuals['MD/DIV.'] = null;
+    $departmentTargets['MD/DIV.'] = null;
+    $departmentActuals['Remainder'] = null;
+    $departmentTargets['Remainder'] = null;
 
-    // Calculate overall percentage - ONLY if there is actual data
+        // Calculate overall percentage for the metric card - USE MD/DIV value instead of average
     if ($hasAnyActualData) {
-        // Include all main departments plus MD/DIV. and Remainder in average
-        $allPercentagesForOverall = [];
-        foreach ($mainDepartments as $mainDept) {
-            $allPercentagesForOverall[] = $departmentData[$mainDept];
-        }
-        $allPercentagesForOverall[] = $mdDivPercentage;
-        $allPercentagesForOverall[] = $remainderPercentage;
-
-        $overall = round(array_sum($allPercentagesForOverall) / count($allPercentagesForOverall), 1);
+        // Overall card should show the MD/DIV percentage, not an average
+        $overall = $mdDivPercentage;
     } else {
-        // No data at all - overall should be 0
         $overall = 0;
-        // Also set MD/DIV. and Remainder to 0 when no data
         $departmentData['MD/DIV.'] = 0;
         $departmentData['Remainder'] = 0;
         $mdDivPercentage = 0;
@@ -305,17 +338,17 @@ foreach ($indicators as $indicatorKey => $indicatorInfo) {
         'has_data' => $hasAnyActualData,
         'departments' => $departmentData,
         'actuals' => $departmentActuals,
-        'targets' => $departmentTargets
+        'targets' => $departmentTargets,
+        'all_data' => $dbData[$indicatorKey] ?? [] // Store all data for modal
     ];
 }
 
 $conn->close();
 
-// Calculate average overall percentage (only for indicators that have data)
+// Calculate average overall percentage
 $totalOverall = 0;
 $countOverall = 0;
 foreach ($metricsData as $metric) {
-    // Only include in average if there is actual data
     if ($metric['has_data']) {
         $totalOverall += $metric['overall'];
         $countOverall++;
@@ -363,7 +396,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             transition: background-color 0.3s, color 0.3s;
         }
 
-        /* Fullscreen mode styles */
         body.fullscreen-mode {
             overflow: hidden;
         }
@@ -393,7 +425,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             padding-top: 70px;
         }
 
-        /* Floating controls for fullscreen mode */
         .floating-controls {
             position: fixed;
             top: 0;
@@ -455,7 +486,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             opacity: 0.9;
         }
 
-        /* Navigation */
         .navbar {
             background: var(--medium-bg);
             padding: 0.6rem 0;
@@ -544,7 +574,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             background: var(--accent-hover);
         }
 
-        /* Theme Toggle Button */
         .theme-toggle {
             background: transparent;
             border: 1px solid var(--accent);
@@ -561,7 +590,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             color: var(--dark-bg);
         }
 
-        /* Fullscreen Button */
         .fullscreen-header-btn {
             background: transparent;
             border: 1px solid var(--accent);
@@ -590,7 +618,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             filter: brightness(0);
         }
 
-        /* Main Container */
         .container {
             width: 100%;
             max-width: 100%;
@@ -598,7 +625,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             padding: 0.75rem 1rem;
         }
 
-        /* Dashboard Header */
         .dashboard-header {
             background: linear-gradient(135deg, var(--medium-bg) 0%, var(--dark-bg) 100%);
             padding: 0.6rem 1rem;
@@ -649,7 +675,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             align-items: center;
         }
 
-        /* Responsive Grid Layout */
         .metrics-grid {
             display: grid;
             gap: 1rem;
@@ -684,7 +709,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             }
         }
 
-        /* Metric Card */
         .metric-card {
             background: var(--card-bg);
             border-radius: 12px;
@@ -695,13 +719,11 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             flex-direction: column;
         }
 
-        /* Disable hover effects on mobile to prevent jitter */
         @media (max-width: 768px) {
             .metric-card:hover {
                 transform: none;
                 box-shadow: none;
             }
-
             .dept-bar-item.clickable:hover {
                 background: none;
                 transform: none;
@@ -744,13 +766,11 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             background: none;
         }
 
-        /* Chart Container - FIXED for mobile stability */
         .chart-container {
             position: relative;
             width: 100%;
             max-width: 180px;
             height: 140px;
-            /* FIXED HEIGHT - critical for stopping wiggle */
             margin: 0 auto 0.6rem;
             cursor: pointer;
             touch-action: manipulation;
@@ -764,7 +784,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             touch-action: none;
         }
 
-        /* Department Bars */
         .dept-bars {
             margin-top: 0.5rem;
             flex: 1;
@@ -853,16 +872,10 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
         }
 
         @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
-        /* Modal Styles */
         .modal {
             display: none;
             position: fixed;
@@ -971,7 +984,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             border-radius: 3px;
         }
 
-        /* Light Theme */
         body.light-theme {
             --dark-bg: #F8FAFC;
             --medium-bg: #FFFFFF;
@@ -1036,7 +1048,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             border-bottom-color: #E2E8F0;
         }
 
-        /* Global canvas stability */
         canvas {
             -webkit-tap-highlight-color: transparent;
             touch-action: none;
@@ -1045,7 +1056,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
 </head>
 
 <body>
-    <!-- Floating controls for fullscreen mode -->
     <div class="floating-controls" id="floatingControls">
         <div class="dashboard-title">MRO Performance Dashboard</div>
         <div class="overall-mini">
@@ -1060,25 +1070,20 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
         <div class="navbar-container">
             <a href="md_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
             <div class="navbar-menu">
-
                 <?php if ($_SESSION['user_role'] !== 'director'): ?>
                     <a href="../admin/master_data.php">Master Data</a>
                 <?php endif; ?>
-
                 <a href="../director/md_dashboard.php" style="color: var(--accent);">Dashboard</a>
                 <?php if ($_SESSION['user_role'] !== 'director'): ?>
                     <a href="../admin/report_mro_cpr.php">Director Data Entry</a>
                     <a href="../admin/data_history.php">History</a>
                 <?php endif; ?>
-
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
-
                     <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
                     <?php if ($_SESSION['user_role'] == 'director'): ?>
                         <span class="department-badge"><?php echo htmlspecialchars($userDept); ?></span>
                     <?php endif; ?>
-
                     <a href="#" onclick="openPasswordModal(); return false;" style="cursor: pointer;">🔑 Change Password</a>
                     <a href="../logout.php" class="btn">Logout</a>
                 </div>
@@ -1104,7 +1109,7 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
         </div>
 
         <div class="welcome-banner">
-            Viewing all departments performance metrics | Click on any department bar for detailed report
+            Viewing all departments performance metrics (Average of all Managers + Director) | Click on any department bar for detailed report
         </div>
 
         <div id="dashboard-content">
@@ -1112,7 +1117,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
         </div>
     </div>
 
-    <!-- Department Detail Modal -->
     <div id="deptModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -1126,7 +1130,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
     </div>
 
     <script>
-        // Theme Manager
         class ThemeManager {
             constructor() {
                 this.themeKey = 'dashboard_theme';
@@ -1172,7 +1175,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             }
         }
 
-        // Fullscreen functionality with auto-scroll and pauses
         let autoScrollInterval = null;
         let isScrolling = false;
 
@@ -1265,7 +1267,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             }
         });
 
-        // Data passed from PHP
         const metricsData = <?php echo json_encode($metricsData); ?>;
         const departmentColors = <?php echo json_encode($departmentColors); ?>;
         const currentMonth = '<?php echo $currentMonth; ?>';
@@ -1303,15 +1304,22 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                                 <tr><th>Cost Center</th><th>Expected Tasks</th><th>Completed Tasks</th><th>Not Completed</th><th>Completion %</th><th>Progress</th></tr>
                             </thead>
                             <tbody>`;
+                    
                     let directorData = null;
                     let managerRows = [];
+                    let totalExpected = 0;
+                    let totalCompleted = 0;
+                    
                     for (const record of data.data) {
                         if (record.cost_center_code === 'DIR') {
                             directorData = record;
                         } else {
                             managerRows.push(record);
                         }
+                        totalExpected += parseInt(record.expected) || 0;
+                        totalCompleted += parseInt(record.completed) || 0;
                     }
+                    
                     for (const record of managerRows) {
                         const expected = parseInt(record.expected) || 0;
                         const completed = parseInt(record.completed) || 0;
@@ -1320,6 +1328,7 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                         const percentageColor = getScoreColor(percentage);
                         tableHtml += `<tr><td>${record.cost_center_text || record.cost_center_code}</td><td>${expected}</td><td>${completed}</td><td>${notCompleted}</td><td style="color: ${percentageColor}; font-weight: bold;">${percentage}%</td><td><div class="progress-bar-modal"><div class="progress-fill-modal" style="width: ${percentage}%; background: ${percentageColor};"></div></div></td></tr>`;
                     }
+                    
                     if (directorData) {
                         const dirExpected = parseInt(directorData.expected) || 0;
                         const dirCompleted = parseInt(directorData.completed) || 0;
@@ -1327,19 +1336,28 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                         const dirNotCompleted = dirExpected - dirCompleted;
                         const dirColor = getScoreColor(dirPercentage);
                         tableHtml += `<tr class="director-row"><td><strong>${directorData.cost_center_text || 'Director/Total'}</strong></td><td><strong>${dirExpected}</strong></td><td><strong>${dirCompleted}</strong></td><td><strong>${dirNotCompleted}</strong></td><td style="color: ${dirColor}; font-weight: bold;"><strong>${dirPercentage}%</strong></td><td><div class="progress-bar-modal"><div class="progress-fill-modal" style="width: ${dirPercentage}%; background: ${dirColor};"></div></div></td></tr>`;
-                    } else if (managerRows.length > 0) {
-                        let totalExpected = 0,
-                            totalCompleted = 0;
-                        for (const record of managerRows) {
-                            totalExpected += parseInt(record.expected) || 0;
-                            totalCompleted += parseInt(record.completed) || 0;
-                        }
-                        const totalPercentage = totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
-                        const totalColor = getScoreColor(totalPercentage);
-                        const totalNotCompleted = totalExpected - totalCompleted;
-                        tableHtml += `<tr class="director-row"><td><strong>TOTAL (Calculated)</strong></td><td><strong>${totalExpected}</strong></td><td><strong>${totalCompleted}</strong></td><td><strong>${totalNotCompleted}</strong></td><td style="color: ${totalColor}; font-weight: bold;"><strong>${totalPercentage.toFixed(1)}%</strong></td><td><div class="progress-bar-modal"><div class="progress-fill-modal" style="width: ${totalPercentage}%; background: ${totalColor};"></div></div></td></tr>`;
                     }
-                    tableHtml += `</tbody><tr>`;
+                    
+                    // Calculate average of all percentages
+                    let allPercentages = [];
+                    for (const record of data.data) {
+                        allPercentages.push(parseFloat(record.percentage) || 0);
+                    }
+                    const avgPercentage = allPercentages.length > 0 ? (allPercentages.reduce((a, b) => a + b, 0) / allPercentages.length).toFixed(1) : 0;
+                    const totalPercentage = totalExpected > 0 ? ((totalCompleted / totalExpected) * 100).toFixed(1) : 0;
+                    const avgColor = getScoreColor(avgPercentage);
+                    const totalNotCompleted = totalExpected - totalCompleted;
+                    
+                    tableHtml += `<tr style="background: rgba(56, 189, 248, 0.2); font-weight: bold;">
+                        <td><strong>TOTAL (Avg of %)</strong></td>
+                        <td><strong>${totalExpected}</strong></td>
+                        <td><strong>${totalCompleted}</strong></td>
+                        <td><strong>${totalNotCompleted}</strong></td>
+                        <td style="color: ${avgColor}; font-weight: bold; font-size: 1.1rem;"><strong>${avgPercentage}%</strong></td>
+                        <td><div class="progress-bar-modal"><div class="progress-fill-modal" style="width: ${avgPercentage}%; background: ${avgColor};"></div></div></td>
+                    </tr>`;
+                    
+                    tableHtml += `</tbody></table>`;
                     modalBody.innerHTML = tableHtml;
                 } else {
                     modalBody.innerHTML = '<div class="no-data">No data available for this department and indicator.</div>';
@@ -1361,7 +1379,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
 
         let chartInstances = {};
 
-        // FIXED: Anti-wiggle pie chart configuration
         function createPieChart(canvasId, percentage, metricName, indicatorKey) {
             const ctx = document.getElementById(canvasId);
             if (!ctx) return null;
@@ -1378,27 +1395,23 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                         data: [achieved, remaining],
                         backgroundColor: [color, 'rgba(51, 65, 85, 0.6)'],
                         borderWidth: 0,
-                        hoverOffset: 0 // Prevents movement on touch/hover
+                        hoverOffset: 0
                     }]
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: false, // Critical: prevents constant resize recalc
+                    maintainAspectRatio: false,
                     cutout: '65%',
                     animation: {
-                        duration: 0, // NO animation = NO wiggle
+                        duration: 0,
                         animateRotate: false,
                         animateScale: false
                     },
                     plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            enabled: false
-                        } // Disable tooltips on mobile
+                        legend: { display: false },
+                        tooltip: { enabled: false }
                     },
-                    events: [], // Disable all chart events completely
+                    events: [],
                     onClick: null,
                     onHover: null
                 }
@@ -1478,17 +1491,32 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
         }
 
         function changeMonth(direction) {
-            let currentUrl = new URL(window.location.href);
-            let currentMonthParam = currentUrl.searchParams.get('month') || currentMonth;
-            let date = new Date(currentMonthParam + '-01');
-            if (direction === 'prev') {
-                date.setMonth(date.getMonth() - 1);
-            } else {
-                date.setMonth(date.getMonth() + 1);
-            }
-            let newMonth = date.toISOString().slice(0, 7);
-            window.location.href = `md_dashboard.php?month=${newMonth}`;
+    let currentUrl = new URL(window.location.href);
+    let currentMonthParam = currentUrl.searchParams.get('month') || currentMonth;
+    
+    // Parse year and month manually to avoid timezone issues
+    let parts = currentMonthParam.split('-');
+    let year = parseInt(parts[0]);
+    let month = parseInt(parts[1]);
+    
+    if (direction === 'prev') {
+        month--;
+        if (month < 1) {
+            month = 12;
+            year--;
         }
+    } else {
+        month++;
+        if (month > 12) {
+            month = 1;
+            year++;
+        }
+    }
+    
+    // Format month with leading zero
+    let newMonth = year + '-' + String(month).padStart(2, '0');
+    window.location.href = `md_dashboard.php?month=${newMonth}`;
+}
 
         document.addEventListener('DOMContentLoaded', function() {
             new ThemeManager();
