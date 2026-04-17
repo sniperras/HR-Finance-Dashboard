@@ -25,4 +25,3 @@ if (!isset($_SESSION['CREATED'])) {
     session_regenerate_id(true);
     $_SESSION['CREATED'] = time();
 }
-?>

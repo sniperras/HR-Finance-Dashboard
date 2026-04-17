@@ -766,19 +766,19 @@ $isCPRSelected = ($selectedReport === 'CPR');
         <?php if ($selectedDept === 'ALL' && $isCPRSelected): ?>
             <!-- Excel Upload Section - Only for CPR with ALL department -->
             <div class="upload-section">
-                <h3>📂 Upload Excel File (CPR - All Departments)</h3>
+                <h3>Upload Excel File (CPR - All Departments)</h3>
                 <div class="upload-form">
                     <div class="upload-group">
                         <label>Excel File (.xlsx, .xls)</label>
                         <input type="file" id="excelFile" accept=".xlsx,.xls">
                     </div>
                     <div class="upload-group">
-                        <button type="button" class="btn btn-upload" id="uploadBtn">📤 Upload & Preview</button>
+                        <button type="button" class="btn btn-upload" id="uploadBtn">Upload & Preview</button>
                     </div>
                 </div>
                 <div id="uploadMessage"></div>
                 <div class="sync-info" style="margin-top: 0.75rem;">
-                    ℹ️ The Excel file must contain data for all departments (BMT, LMT, CMT, EMT, AEP, MSM, QA, PSCM) in the standard CPR format.
+                    The Excel file must contain data for all departments (BMT, LMT, CMT, EMT, AEP, MSM, QA, PSCM) in the standard CPR format.
                 </div>
             </div>
             <div id="message"></div>
@@ -1214,7 +1214,7 @@ $isCPRSelected = ($selectedReport === 'CPR');
                         .then(response => response.json())
                         .then(data => {
                             uploadBtn.disabled = false;
-                            uploadBtn.textContent = '📤 Upload & Preview';
+                            uploadBtn.textContent = 'Upload & Preview';
 
                             if (data.success) {
                                 openPreviewModal(data.data);
@@ -1230,7 +1230,7 @@ $isCPRSelected = ($selectedReport === 'CPR');
                         })
                         .catch(error => {
                             uploadBtn.disabled = false;
-                            uploadBtn.textContent = '📤 Upload & Preview';
+                            uploadBtn.textContent = 'Upload & Preview';
                             console.error('Upload error:', error);
                             const uploadMsg = document.getElementById('uploadMessage');
                             uploadMsg.innerHTML = `<div class="alert alert-error">✗ Error uploading file. Please try again.</div>`;
