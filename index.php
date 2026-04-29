@@ -54,6 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: it_admin_dashboard.php');
             } elseif ($user['role'] === 'hr') {
                 header('Location: admin/master_data.php');
+            } elseif ($user['role'] === 'qa_auditor') {
+                header('Location: qa/qa_report_entry.php');
             } elseif ($user['role'] === 'manager') {
                 header('Location: director/manager_dashboard.php');
             } elseif ($user['role'] === 'director') {
