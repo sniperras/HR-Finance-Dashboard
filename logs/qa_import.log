@@ -1,0 +1,19 @@
+2026-04-30 09:24:56 | IR | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | Imported: 26 | Failed: 25 | Errors: Row 3: Missing Items and Occurrence; Row 6: Missing Items and Occurrence; Row 7: Missing Items and Occurrence
+2026-04-30 09:25:41 | IR | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | Imported: 26 | Failed: 25 | Errors: Row 3: Missing Items and Occurrence; Row 6: Missing Items and Occurrence; Row 7: Missing Items and Occurrence
+2026-04-30 09:26:31 | IR | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | Imported: 26 | Failed: 25 | Errors: Row 3: Missing Items and Occurrence; Row 6: Missing Items and Occurrence; Row 7: Missing Items and Occurrence
+2026-04-30 09:31:46 | IR | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | Imported: 26 | Failed: 25 | Errors: Row 3: Missing Items and Occurrence; Row 6: Missing Items and Occurrence; Row 7: Missing Items and Occurrence
+2026-04-30 09:43:28 | IR | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | Imported: 10 | Updated: 0 | Skipped: 16 | Failed: 25 | First few errors: Row 1: Skipped - Cannot insert closed record directly; Row 2: Skipped - Cannot insert closed record directly; Row 3: Missing Occurrence
+2026-04-30 10:02:54 | IR | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | New: 26 | Updated: 0 | Skipped: 0 | Failed: 25 | Sample issues: Row 3: Missing Occurrence; Row 6: Missing Occurrence; Row 7: Missing Occurrence; Row 8: Missing Occurrence; Row 10: Missing Occurrence
+2026-04-30 10:45:10 | IR | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | New: 51 | Updated: 0 | Skipped: 0 | Failed: 0
+2026-04-30 11:05:26 | LOOH | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | New: 22 | Updated: 0 | Skipped: 0 | Failed: 0
+2026-04-30 11:43:02 | SR | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | New: 0 | Updated: 0 | Skipped: 0 | Failed: 44 | Issues: Row 1: Missing Damage Description; Row 2: Missing Damage Description; Row 3: Missing Damage Description
+2026-04-30 11:44:49 | SR | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | New: 44 | Updated: 0 | Skipped: 0 | Failed: 0
+2026-04-30 11:45:20 | SR | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | New: 0 | Updated: 44 | Skipped: 0 | Failed: 0
+2026-04-30 11:45:52 | SR | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | New: 0 | Updated: 44 | Skipped: 0 | Failed: 0
+2026-04-30 12:47:29 | SRBAI | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | New: 10 | Updated: 2 | Skipped: 0 | Failed: 0
+2026-04-30 14:10:27 | LOO | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | New: 8 | Updated: 0 | Skipped: 0 | Failed: 0
+2026-04-30 14:20:44 | LOO | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | New: 8 | Updated: 0 | Skipped: 0 | Failed: 0
+2026-04-30 14:20:52 | LOO | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | New: 0 | Updated: 0 | Skipped: 8 | Failed: 0
+2026-04-30 15:29:21 | LOO | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | New: 0 | Updated: 0 | Skipped: 8 | Failed: 0
+2026-04-30 15:38:05 | IR | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | New: 0 | Updated: 0 | Skipped: 51 | Failed: 0
+2026-04-30 15:38:37 | IR | Month: 1 | Year: 2026 | Dept: ALL | User: qa_auditor1 | New: 45 | Updated: 6 | Skipped: 0 | Failed: 0
