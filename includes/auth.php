@@ -39,7 +39,7 @@ function requireRole($role)
     }
 
     // QA Auditor role check
-    if ($role === 'qa_auditor' && $_SESSION['user_role'] === 'qa_auditor') {
+    if ($role === 'qa auditor' && $_SESSION['user_role'] === 'qa auditor') {
         return true;
     }
 
@@ -63,7 +63,7 @@ function requireRole($role)
         // Redirect based on role
         if ($_SESSION['user_role'] === 'it_admin') {
             header('Location: ../admin/it_admin_dashboard.php');
-        } elseif ($_SESSION['user_role'] === 'qa_auditor') {
+        } elseif ($_SESSION['user_role'] === 'qa auditor') {
             header('Location: /HRandMDDash/qa/qa_report_entry.php');
         } elseif ($_SESSION['user_role'] === 'manager') {
             header('Location: /HRandMDDash/director/manager_dashboard.php');
@@ -106,7 +106,7 @@ function checkAccess($allowedRoles = [])
     // No access - redirect based on role
     if ($_SESSION['user_role'] === 'it_admin') {
         header('Location: ../admin/it_admin_dashboard.php');
-    } elseif ($_SESSION['user_role'] === 'qa_auditor') {
+    } elseif ($_SESSION['user_role'] === 'qa auditor') {
         header('Location: /HRandMDDash/qa/qa_report_entry.php');
     } elseif ($_SESSION['user_role'] === 'manager') {
         header('Location: /HRandMDDash/director/manager_dashboard.php');
@@ -204,7 +204,7 @@ function isManager()
 // Check if user is QA Auditor
 function isQAAuditor()
 {
-    return (isLoggedIn() && $_SESSION['user_role'] === 'qa_auditor');
+    return (isLoggedIn() && $_SESSION['user_role'] === 'qa auditor');
 }
 
 // Check if user is a department director
@@ -262,7 +262,7 @@ function hasPageAccess($pageType)
     }
 
     // QA Auditor access
-    if ($_SESSION['user_role'] === 'qa_auditor') {
+    if ($_SESSION['user_role'] === 'qa auditor') {
         $allowedPages = ['qa_report_entry'];
         return in_array($pageType, $allowedPages);
     }
