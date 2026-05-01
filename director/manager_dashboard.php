@@ -38,7 +38,7 @@ $usernameToCostCenter = [
     'mgr_cabin_bmt' => 'CAB',
     'mgr_patch_bmt' => 'APS',
     'mgr_technical_bmt' => 'TEC',
-    
+
     // Add other managers from different departments as needed
     // Format: 'username' => 'cost_center_code'
 ];
@@ -731,7 +731,7 @@ $conn->close();
             <div class="navbar-menu">
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
-                    <span class="user-name">👤 <?php echo htmlspecialchars($userFullName); ?></span>
+                    <span class="user-name"><?php echo htmlspecialchars($userFullName); ?></span>
                     <span class="dept-badge"><?php echo htmlspecialchars($userDept); ?></span>
                     <a href="#" onclick="openPasswordModal(); return false;" style="cursor: pointer;">🔑 Change Password</a>
                     <a href="../logout.php" class="btn">Logout</a>
@@ -1051,32 +1051,32 @@ $conn->close();
         }
 
         function changeMonth(direction) {
-    let currentUrl = new URL(window.location.href);
-    let currentMonthParam = currentUrl.searchParams.get('month') || '<?php echo $currentMonth; ?>';
-    
-    // Parse year and month manually to avoid timezone issues
-    let parts = currentMonthParam.split('-');
-    let year = parseInt(parts[0]);
-    let month = parseInt(parts[1]);
-    
-    if (direction === 'prev') {
-        month--;
-        if (month < 1) {
-            month = 12;
-            year--;
+            let currentUrl = new URL(window.location.href);
+            let currentMonthParam = currentUrl.searchParams.get('month') || '<?php echo $currentMonth; ?>';
+
+            // Parse year and month manually to avoid timezone issues
+            let parts = currentMonthParam.split('-');
+            let year = parseInt(parts[0]);
+            let month = parseInt(parts[1]);
+
+            if (direction === 'prev') {
+                month--;
+                if (month < 1) {
+                    month = 12;
+                    year--;
+                }
+            } else {
+                month++;
+                if (month > 12) {
+                    month = 1;
+                    year++;
+                }
+            }
+
+            // Format month with leading zero
+            let newMonth = year + '-' + String(month).padStart(2, '0');
+            window.location.href = `manager_dashboard.php?month=${newMonth}`;
         }
-    } else {
-        month++;
-        if (month > 12) {
-            month = 1;
-            year++;
-        }
-    }
-    
-    // Format month with leading zero
-    let newMonth = year + '-' + String(month).padStart(2, '0');
-    window.location.href = `manager_dashboard.php?month=${newMonth}`;
-}
 
         document.addEventListener('DOMContentLoaded', function() {
             new ThemeManager();
@@ -1153,10 +1153,10 @@ $conn->close();
                 align-items: center;
                 justify-content: center;
             `;
-// Add the onclick handler
-modalOverlay.onclick = function() {
-    parent.closePasswordPopup();
-};
+            // Add the onclick handler
+            modalOverlay.onclick = function() {
+                parent.closePasswordPopup();
+            };
             const iframe = document.createElement('iframe');
             iframe.src = '../change_password.php';
             iframe.style.cssText = `
