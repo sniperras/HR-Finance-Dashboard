@@ -5,7 +5,7 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../config/database.php';
 
 // Check if user is logged in and has QA Auditor role
-if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'qa_auditor') {
+if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'qa auditor') {
     $response = ['success' => false, 'message' => 'Unauthorized access'];
     echo json_encode($response);
     exit;

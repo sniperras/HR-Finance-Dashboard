@@ -23,7 +23,7 @@ function sendJsonResponse($success, $message, $data = [], $record_count = 0, $co
 }
 
 // Check authentication
-if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'qa_auditor') {
+if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'qa auditor') {
     sendJsonResponse(false, 'Unauthorized access');
 }
 

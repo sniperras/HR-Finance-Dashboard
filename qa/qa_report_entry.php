@@ -3,10 +3,18 @@ require_once '../session_config.php';
 require_once '../includes/auth.php';
 
 // Check if user is QA Auditor
-requireRole('qa_auditor');
+requireRole('qa auditor');
 
 $conn = getConnection();
+$userRole = $_SESSION['user_role'];
+$username = $_SESSION['username'];
+$userFullName = $_SESSION['full_name'];
 
+// Determine user's department from username (director_LMT, director_BMT, etc.)
+$userDepartment = null;
+if (($userRole === 'director' || $userRole === 'manager') && preg_match('/_([A-Z\/\s]+)/', $username, $matches)) {
+    $userDepartment = trim($matches[1]);
+}
 $success_message = '';
 $error_message = '';
 $report_type = $_GET['report_type'] ?? '';
@@ -17,7 +25,8 @@ $department = $_GET['department'] ?? 'ALL';
 // Define report types with their abbreviations and display names
 $reportTypes = [
     'ir' => ['name' => 'Investigation Recommendations', 'file' => 'upload_ir_report.php', 'save' => 'save_ir_upload.php', 'abbr' => 'IR'],
-    'loo' => ['name' => 'List of Occurrence', 'file' => 'upload_loo_report.php', 'save' => 'save_loo_upload.php', 'abbr' => 'LOO'],
+    'loo' => ['name' => 'List of Occurrence (Excel)', 'file' => 'upload_loo_report.php', 'save' => 'save_loo_upload.php', 'abbr' => 'LOO'],
+    'looform' => ['name' => 'List of Occurrence Form', 'file' => null, 'save' => 'looform_save.php', 'abbr' => 'LOOFORM'],
     'looh' => ['name' => 'List of Open Hazards', 'file' => 'upload_looh_report.php', 'save' => 'save_looh_upload.php', 'abbr' => 'LOOH'],
     'sr' => ['name' => 'Safety Report', 'file' => 'upload_sr_report.php', 'save' => 'save_sr_upload.php', 'abbr' => 'SR'],
     'srbai' => ['name' => 'SRB Action Item', 'file' => 'upload_srbai_report.php', 'save' => 'save_srbai_upload.php', 'abbr' => 'SRBAI']
@@ -25,6 +34,19 @@ $reportTypes = [
 
 // Define departments
 $departments = ['ALL'];
+
+// Fetch existing data for List of Occurrence Form
+$existingLooData = [];
+if ($report_type === 'looform' && $month && $year) {
+    $stmt = $conn->prepare("SELECT Item, Event, Number FROM ListofOccurrenceForm WHERE Month = ? AND Year = ? ORDER BY CAST(Item AS UNSIGNED) ASC");
+    $stmt->bind_param("ii", $month, $year);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $existingLooData[] = $row;
+    }
+    $stmt->close();
+}
 
 $conn->close();
 ?>
@@ -131,7 +153,6 @@ $conn->close();
             font-size: 0.85rem;
         }
 
-        /* Change Password link styling */
         .change-password-link {
             color: var(--accent);
             text-decoration: none;
@@ -143,7 +164,7 @@ $conn->close();
 
         .change-password-link:hover {
             color: var(--accent-hover);
-            text-decoration: underline;
+
         }
 
         .theme-toggle {
@@ -175,7 +196,6 @@ $conn->close();
             display: inline-block;
         }
 
-        /* Logout button with wider width */
         .logout-btn {
             background: var(--accent);
             color: var(--dark-bg);
@@ -205,7 +225,6 @@ $conn->close();
             padding: 0 1.5rem;
         }
 
-        /* Header Section */
         .page-header {
             background: linear-gradient(135deg, var(--medium-bg) 0%, var(--dark-bg) 100%);
             padding: 1.5rem;
@@ -228,7 +247,6 @@ $conn->close();
             margin-top: 0.5rem;
         }
 
-        /* Filter Section */
         .filter-section {
             background: var(--card-bg);
             padding: 1.25rem;
@@ -276,7 +294,6 @@ $conn->close();
             box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
         }
 
-        /* Upload Section */
         .upload-section {
             background: var(--card-bg);
             padding: 1.5rem;
@@ -340,7 +357,6 @@ $conn->close();
             background: #e67e22;
         }
 
-        /* Alerts */
         .alert {
             padding: 0.75rem 1rem;
             border-radius: 8px;
@@ -372,7 +388,6 @@ $conn->close();
             color: var(--accent);
         }
 
-        /* Preview Modal */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -462,6 +477,15 @@ $conn->close();
             border-top: 1px solid var(--border-light);
         }
 
+        .role-badge {
+            background: rgba(56, 189, 248, 0.15);
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            color: var(--accent);
+        }
+
         .btn-confirm {
             background: var(--success);
         }
@@ -470,7 +494,6 @@ $conn->close();
             background: var(--danger);
         }
 
-        /* Loading Spinner */
         .loading {
             display: inline-block;
             width: 16px;
@@ -488,66 +511,103 @@ $conn->close();
             }
         }
 
-        /* Light Theme */
-        body.light-theme {
-            background: #F8FAFC;
-            color: #0F172A;
+        /* List of Occurrence Form Section */
+        .form-section {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+            border: 1px solid var(--border-light);
         }
 
-        body.light-theme .navbar,
-        body.light-theme .page-header,
-        body.light-theme .filter-section,
-        body.light-theme .upload-section,
-        body.light-theme .modal-container {
-            background: white !important;
-            border-color: #E2E8F0 !important;
+        .section-header {
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--accent);
         }
 
-        body.light-theme .navbar {
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        .section-header h3 {
+            color: var(--accent);
+            font-size: 1.1rem;
+            margin-bottom: 0.25rem;
         }
 
-        body.light-theme .filter-group select,
-        body.light-theme .upload-group input[type="file"] {
-            background: white;
-            color: #0F172A;
-            border-color: #CBD5E1;
+        .section-header p {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
         }
 
-        body.light-theme .preview-table th {
-            background: #F1F5F9;
-            color: #0284C7;
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
         }
 
-        body.light-theme .btn,
-        body.light-theme .logout-btn {
-            background: #0284C7;
+        .data-table th,
+        .data-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-light);
+            vertical-align: top;
+        }
+
+        .data-table th {
+            background: var(--dark-bg);
+            color: var(--accent);
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+
+        .data-table input,
+        .data-table select {
+            background: var(--dark-bg);
+            border: 1px solid var(--border-light);
+            color: var(--text-primary);
+            border-radius: 6px;
+            font-size: 0.8rem;
+        }
+
+        .data-table input:focus,
+        .data-table select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .total-row {
+            background: rgba(56, 189, 248, 0.1);
+            font-weight: bold;
+        }
+
+        .total-row td {
+            padding: 0.75rem;
+            border-top: 2px solid var(--accent);
+        }
+
+        .btn-remove-row {
+            background: var(--danger);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            padding: 0.3rem 0.6rem;
+        }
+
+        .btn-remove-row:hover {
+            opacity: 0.8;
+            transform: scale(1.05);
+        }
+
+        .btn-success {
+            background: var(--success);
             color: white;
         }
 
-        body.light-theme .theme-toggle {
-            border-color: #0284C7;
-            color: #0284C7;
+        .btn-success:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
         }
 
-        body.light-theme .theme-toggle:hover {
-            background: #0284C7;
-            color: white;
-        }
-
-        body.light-theme .user-name {
-            color: #0284C7;
-        }
-
-        body.light-theme .change-password-link {
-            color: #0284C7;
-        }
-
-        body.light-theme .change-password-link:hover {
-            color: #0EA5E9;
-        }
-
-        /* Password Modal Override - No extra background */
+        /* Password Modal Override */
         #passwordModalOverlay {
             position: fixed;
             top: 0;
@@ -571,6 +631,70 @@ $conn->close();
             background: transparent;
         }
 
+        /* Light Theme */
+        body.light-theme {
+            background: #F8FAFC;
+            color: #0F172A;
+        }
+
+        body.light-theme .navbar,
+        body.light-theme .page-header,
+        body.light-theme .filter-section,
+        body.light-theme .upload-section,
+        body.light-theme .modal-container,
+        body.light-theme .form-section {
+            background: white !important;
+            border-color: #E2E8F0 !important;
+        }
+
+        body.light-theme .navbar {
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        body.light-theme .filter-group select,
+        body.light-theme .upload-group input[type="file"],
+        body.light-theme .data-table input,
+        body.light-theme .data-table select {
+            background: white;
+            color: #0F172A;
+            border-color: #CBD5E1;
+        }
+
+        body.light-theme .preview-table th,
+        body.light-theme .data-table th {
+            background: #F1F5F9;
+            color: #0284C7;
+        }
+
+        body.light-theme .btn,
+        body.light-theme .logout-btn {
+            background: #0284C7;
+            color: white;
+        }
+
+        body.light-theme .theme-toggle {
+            border-color: #0284C7;
+            color: #0284C7;
+        }
+
+        body.light-theme .theme-toggle:hover {
+            background: #0284C7;
+            color: white;
+        }
+
+        body.light-theme .user-name,
+        body.light-theme .change-password-link {
+            color: #0284C7;
+        }
+
+        body.light-theme .change-password-link:hover {
+            color: #0EA5E9;
+        }
+
+        body.light-theme .total-row {
+            background: rgba(2, 132, 199, 0.08);
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
 
@@ -591,6 +715,11 @@ $conn->close();
             .container {
                 padding: 0 1rem;
             }
+
+            .data-table th,
+            .data-table td {
+                padding: 0.5rem;
+            }
         }
     </style>
 </head>
@@ -599,12 +728,14 @@ $conn->close();
     <nav class="navbar">
         <div class="navbar-container">
             <a href="qa_report_entry.php" class="navbar-brand">
-                QA Report Entry System
+                QA Report
             </a>
             <div class="navbar-menu">
-                <a href="qa_report_entry.php" style="color: var(--accent);">Upload Reports</a>
+                <a href="QA_dashboard.php">QA Dashboard</a>
+                <a href="qa_report_entry.php" style="color: var(--accent);">Upload QA Reports</a>
 
                 <div class="user-info">
+                    <span class="role-badge"><?php echo strtoupper($userRole); ?></span>
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
                     <span class="user-name"> <?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
                     <a href="#" class="change-password-link" onclick="openPasswordModal(); return false;">🔑 Change Password</a>
@@ -686,6 +817,43 @@ $conn->close();
                 </div>
             </div>
         </div>
+
+        <!-- List of Occurrence Form Section -->
+        <div id="looFormSection" class="form-section" style="display: none;">
+            <div class="section-header">
+                <h3>List of Occurrence Form</h3>
+                <p>Enter occurrence data manually</p>
+            </div>
+
+            <div id="looFormContainer">
+                <div class="table-wrapper">
+                    <table class="data-table" id="looTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 15%">Item</th>
+                                <th style="width: 60%">Event</th>
+                                <th style="width: 15%">Number</th>
+                                <th style="width: 10%">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="looTableBody">
+                            <!-- Rows will be populated by JavaScript -->
+                        </tbody>
+                        <tfoot>
+                            <tr class="total-row">
+                                <td colspan="3" style="text-align: right;"><strong>Total:</strong></td>
+                                <td id="totalNumber" style="font-weight: bold; text-align: left;">0</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div class="form-buttons" style="margin-top: 1rem; display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button type="button" class="btn" id="addRowBtn">➕ Add Item</button>
+                    <button type="button" class="btn btn-success" id="saveLooFormBtn" style="background: var(--success);">💾 Save List of Occurrence</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Preview Modal -->
@@ -754,13 +922,11 @@ $conn->close();
             }
         }
 
-        // Initialize theme
         new ThemeManager();
 
         let currentPreviewData = null;
         let currentUploadHandler = null;
 
-        // File input display
         const excelFile = document.getElementById('excelFile');
         const fileInfo = document.getElementById('fileInfo');
 
@@ -775,7 +941,6 @@ $conn->close();
             });
         }
 
-        // Show alert message
         function showAlert(type, message) {
             const alertContainer = document.getElementById('alertContainer');
             const alertClass = type === 'success' ? 'alert-success' : (type === 'error' ? 'alert-error' : 'alert-warning');
@@ -785,7 +950,6 @@ $conn->close();
             }, 5000);
         }
 
-        // Upload file
         const uploadBtn = document.getElementById('uploadBtn');
         if (uploadBtn) {
             uploadBtn.addEventListener('click', function() {
@@ -795,7 +959,6 @@ $conn->close();
                 const department = document.getElementById('deptSelect').value;
                 const file = excelFile.files[0];
 
-                // Validation
                 if (!reportType) {
                     showAlert('error', 'Please select a report type');
                     return;
@@ -813,7 +976,6 @@ $conn->close();
                     return;
                 }
 
-                // Validate file extension
                 const allowedExtensions = ['xlsx', 'xls'];
                 const fileExtension = file.name.split('.').pop().toLowerCase();
                 if (!allowedExtensions.includes(fileExtension)) {
@@ -821,7 +983,6 @@ $conn->close();
                     return;
                 }
 
-                // Get the upload handler script based on report type
                 const reportConfig = {
                     'ir': {
                         upload: 'upload_ir_report.php',
@@ -858,7 +1019,6 @@ $conn->close();
 
                 currentUploadHandler = config.save;
 
-                // Prepare form data
                 const formData = new FormData();
                 formData.append('excel_file', file);
                 formData.append('report_type', reportType);
@@ -866,19 +1026,15 @@ $conn->close();
                 formData.append('year', year);
                 formData.append('department', department);
 
-                // Show loading state
                 uploadBtn.disabled = true;
                 uploadBtn.innerHTML = '<span class="loading"></span> Uploading...';
 
-                // Call upload script
                 fetch(config.upload, {
                         method: 'POST',
                         body: formData
                     })
                     .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                         return response.json();
                     })
                     .then(data => {
@@ -903,24 +1059,20 @@ $conn->close();
             });
         }
 
-        // Display preview in modal
         function displayPreview(data, columns) {
             const previewContent = document.getElementById('previewContent');
-
             if (!data || data.length === 0) {
                 previewContent.innerHTML = '<div class="alert alert-warning">No data found in the uploaded file.</div>';
                 return;
             }
 
             const previewRows = data.slice(0, 10);
-
             let html = `<div style="margin-bottom: 1rem;">
                             <span class="alert alert-info" style="display: inline-block; padding: 0.25rem 0.5rem;">Total records: ${data.length} | Showing first ${previewRows.length} rows</span>
                         </div>`;
             html += `<div style="overflow-x: auto;">
                         <table class="preview-table">
-                            <thead>
-                                <tr>`;
+                            <thead><tr>`;
 
             if (previewRows.length > 0) {
                 const headers = Object.keys(previewRows[0]);
@@ -930,27 +1082,20 @@ $conn->close();
                     }
                 });
             }
-            html += `</tr>
-                    </thead>
-                    <tbody>`;
+            html += `</tr></thead><tbody>`;
 
             previewRows.forEach((row, index) => {
                 html += `<tr>`;
                 Object.keys(row).forEach(key => {
                     if (!['upload_date', 'status'].includes(key)) {
                         let value = row[key] || '';
-                        if (value.length > 50) {
-                            value = value.substring(0, 50) + '...';
-                        }
+                        if (value.length > 50) value = value.substring(0, 50) + '...';
                         html += `<td title="${escapeHtml(row[key] || '')}">${escapeHtml(value)}</td>`;
                     }
                 });
                 html += `</tr>`;
             });
-            html += `</tbody>
-                    </table>
-                </div>`;
-
+            html += `</tbody></table></div>`;
             previewContent.innerHTML = html;
         }
 
@@ -968,23 +1113,17 @@ $conn->close();
             });
         }
 
-        // Preview Modal functions
         function openPreviewModal() {
             const modal = document.getElementById('previewModal');
-            if (modal) {
-                modal.classList.add('active');
-            }
+            if (modal) modal.classList.add('active');
         }
 
         function closePreviewModal() {
             const modal = document.getElementById('previewModal');
-            if (modal) {
-                modal.classList.remove('active');
-            }
+            if (modal) modal.classList.remove('active');
             currentPreviewData = null;
         }
 
-        // Confirm import
         const confirmBtn = document.getElementById('confirmUploadBtn');
         if (confirmBtn) {
             confirmBtn.addEventListener('click', function() {
@@ -1036,7 +1175,6 @@ $conn->close();
             });
         }
 
-        // Close modals on escape
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closePreviewModal();
@@ -1044,23 +1182,15 @@ $conn->close();
             }
         });
 
-        // Password Modal Functions
         let passwordModalOverlay = null;
 
         function openPasswordModal() {
-            if (passwordModalOverlay) {
-                return;
-            }
-
+            if (passwordModalOverlay) return;
             passwordModalOverlay = document.createElement('div');
             passwordModalOverlay.id = 'passwordModalOverlay';
-
             passwordModalOverlay.onclick = function(e) {
-                if (e.target === passwordModalOverlay) {
-                    closePasswordModal();
-                }
+                if (e.target === passwordModalOverlay) closePasswordModal();
             };
-
             const iframe = document.createElement('iframe');
             iframe.src = '../change_password.php';
             iframe.style.border = 'none';
@@ -1070,10 +1200,8 @@ $conn->close();
             iframe.style.height = 'auto';
             iframe.style.minHeight = '450px';
             iframe.style.backgroundColor = 'transparent';
-
             passwordModalOverlay.appendChild(iframe);
             document.body.appendChild(passwordModalOverlay);
-
             const escapeHandler = function(e) {
                 if (e.key === 'Escape') {
                     closePasswordModal();
@@ -1090,12 +1218,10 @@ $conn->close();
             }
         }
 
-        // Alias for closePasswordPopup (called from iframe)
         window.closePasswordPopup = function() {
             closePasswordModal();
         };
 
-        // Session keep-alive
         function keepSessionAlive() {
             fetch('../keep_alive.php', {
                     method: 'GET',
@@ -1104,6 +1230,251 @@ $conn->close();
                 .catch(error => console.log('Session keep-alive failed:', error));
         }
         setInterval(keepSessionAlive, 5 * 60 * 1000);
+
+        // ==================== List of Occurrence Form Functions ====================
+        let eventOptions = [
+            'ATB/DIV',
+            'depressurization',
+            'Maintenance Occ',
+            'Mechanical & technical incident',
+            'Air turn back/diversion due to Mechanical failure',
+            'In flight emergency/depressurization',
+            'Other'
+        ];
+
+        let nextItemNumber = 1;
+
+        function calculateNextItemNumber() {
+            let maxItem = 0;
+            document.querySelectorAll('.item-input').forEach(input => {
+                let val = parseInt(input.value) || 0;
+                if (val > maxItem) maxItem = val;
+            });
+            nextItemNumber = maxItem + 1;
+        }
+
+        function updateTotal() {
+            let total = 0;
+            document.querySelectorAll('.number-input').forEach(input => {
+                let val = parseInt(input.value) || 0;
+                total += val;
+            });
+            document.getElementById('totalNumber').textContent = total;
+        }
+
+        function addRow(itemValue = '', eventValue = '', numberValue = 0) {
+            const tbody = document.getElementById('looTableBody');
+            const newRow = document.createElement('tr');
+            newRow.className = 'loo-row';
+
+            const itemDisplay = itemValue || nextItemNumber;
+
+            newRow.innerHTML = `
+                <td>
+                    <input type="text" class="item-input" value="${itemDisplay}" style="width: 100%; padding: 0.5rem;" readonly>
+                </td>
+                <td>
+                    <select class="event-select" style="width: 100%; padding: 0.5rem;">
+                        <option value="">Select Event</option>
+                        ${eventOptions.map(opt => `<option value="${opt}" ${eventValue === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+                    </select>
+                    <input type="text" class="event-custom" placeholder="Enter custom event" value="${eventValue && !eventOptions.includes(eventValue) ? eventValue : ''}" style="width: 100%; padding: 0.5rem; margin-top: 0.5rem; display: ${eventValue && !eventOptions.includes(eventValue) ? 'block' : 'none'};">
+                </td>
+                <td>
+                    <input type="number" class="number-input" value="${numberValue}" min="0" step="1" style="width: 100%; padding: 0.5rem;">
+                </td>
+                <td>
+                    <button type="button" class="btn-remove-row" onclick="removeRow(this)">🗑️</button>
+                </td>
+            `;
+
+            const select = newRow.querySelector('.event-select');
+            const customInput = newRow.querySelector('.event-custom');
+            const numberInput = newRow.querySelector('.number-input');
+
+            select.addEventListener('change', function() {
+                if (this.value === 'Other') {
+                    customInput.style.display = 'block';
+                } else {
+                    customInput.style.display = 'none';
+                    customInput.value = '';
+                }
+            });
+
+            numberInput.addEventListener('input', function() {
+                updateTotal();
+                calculateNextItemNumber();
+            });
+
+            tbody.appendChild(newRow);
+            updateTotal();
+            calculateNextItemNumber();
+
+            if (!itemValue) {
+                nextItemNumber++;
+            }
+        }
+
+        function removeRow(btn) {
+            const row = btn.closest('tr');
+            if (document.querySelectorAll('.loo-row').length > 1) {
+                row.remove();
+                updateTotal();
+                calculateNextItemNumber();
+                renumberItems();
+            } else {
+                showAlert('warning', 'You must keep at least one row');
+            }
+        }
+
+        function renumberItems() {
+            let counter = 1;
+            document.querySelectorAll('.item-input').forEach(input => {
+                input.value = counter++;
+            });
+            calculateNextItemNumber();
+        }
+
+        function loadExistingData() {
+            const existingData = <?php echo json_encode($existingLooData); ?>;
+            const tbody = document.getElementById('looTableBody');
+            tbody.innerHTML = '';
+
+            if (existingData && existingData.length > 0) {
+                existingData.forEach(record => {
+                    addRow(record.Item, record.Event, record.Number);
+                });
+                calculateNextItemNumber();
+            } else {
+                addRow();
+            }
+        }
+
+        function saveLooForm() {
+            const month = document.getElementById('monthSelect').value;
+            const year = document.getElementById('yearSelect').value;
+            const rows = document.querySelectorAll('.loo-row');
+            const data = [];
+
+            for (let row of rows) {
+                let item = row.querySelector('.item-input')?.value.trim() || '';
+                let event = row.querySelector('.event-select')?.value || '';
+                const customEvent = row.querySelector('.event-custom')?.value.trim() || '';
+                const number = parseInt(row.querySelector('.number-input')?.value) || 0;
+
+                if (event === 'Other' && customEvent) {
+                    event = customEvent;
+                }
+
+                if (!event) continue;
+
+                data.push({
+                    item: item,
+                    event: event,
+                    number: number
+                });
+            }
+
+            if (data.length === 0) {
+                showAlert('warning', 'No data to save');
+                return;
+            }
+
+            const saveBtn = document.getElementById('saveLooFormBtn');
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="loading"></span> Saving...';
+
+            fetch('looform_save.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        data: data,
+                        month: month,
+                        year: year
+                    })
+                })
+                .then(response => response.json())
+                .then(result => {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '💾 Save List of Occurrence';
+
+                    if (result.success) {
+                        showAlert('success', `✅ ${result.message} - Saved: ${result.saved}, Updated: ${result.updated}, Skipped: ${result.skipped}`);
+                        setTimeout(() => {
+                            window.location.href = `qa_report_entry.php?report_type=looform&month=${month}&year=${year}&department=ALL`;
+                        }, 1500);
+                    } else {
+                        showAlert('error', result.message || 'Error saving data');
+                    }
+                })
+                .catch(error => {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '💾 Save List of Occurrence';
+                    console.error('Save error:', error);
+                    showAlert('error', 'Error saving data: ' + error.message);
+                });
+        }
+
+        function toggleLooForm() {
+            const reportType = document.getElementById('reportTypeSelect').value;
+            const uploadSection = document.querySelector('.upload-section');
+            const looFormSection = document.getElementById('looFormSection');
+
+            if (reportType === 'looform') {
+                uploadSection.style.display = 'none';
+                looFormSection.style.display = 'block';
+                loadExistingData();
+            } else {
+                uploadSection.style.display = 'block';
+                if (looFormSection) looFormSection.style.display = 'none';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const reportTypeSelect = document.getElementById('reportTypeSelect');
+            const monthSelect = document.getElementById('monthSelect');
+            const yearSelect = document.getElementById('yearSelect');
+            const filterForm = document.getElementById('filterForm');
+
+            if (reportTypeSelect) {
+                // Initial load - check if we should show the form
+                toggleLooForm();
+
+                // When report type changes, update URL and reload
+                reportTypeSelect.addEventListener('change', function() {
+                    filterForm.submit();
+                });
+            }
+
+            // When month or year changes, reload the page to fetch new data
+            if (monthSelect) {
+                monthSelect.addEventListener('change', function() {
+                    filterForm.submit();
+                });
+            }
+
+            if (yearSelect) {
+                yearSelect.addEventListener('change', function() {
+                    filterForm.submit();
+                });
+            }
+
+            const addRowBtn = document.getElementById('addRowBtn');
+            if (addRowBtn) {
+                addRowBtn.addEventListener('click', function() {
+                    addRow();
+                });
+            }
+
+            const saveBtn = document.getElementById('saveLooFormBtn');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', saveLooForm);
+            }
+
+            updateTotal();
+        });
     </script>
 </body>
 
