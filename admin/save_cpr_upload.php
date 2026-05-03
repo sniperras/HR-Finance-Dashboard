@@ -68,7 +68,7 @@ try {
             $percentage = $expected > 0 ? round(($completed / $expected) * 100, 2) : 0;
 
             $insertStmt->bind_param(
-                "siisssiiidss",
+                "siisssiiidis",
                 $report_type,
                 $report_month,
                 $report_year,
@@ -92,7 +92,6 @@ try {
 
     $response['success'] = true;
     $response['message'] = "Successfully saved data for all departments ($totalRows records)";
-
 } catch (Exception $e) {
     $conn->rollback();
     error_log("Save CPR upload error: " . $e->getMessage());
@@ -102,4 +101,3 @@ try {
 $conn->close();
 echo json_encode($response);
 exit;
-?>
