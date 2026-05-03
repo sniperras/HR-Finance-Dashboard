@@ -119,9 +119,6 @@ function hasDirector($costCentersList)
     }
     return false;
 }
-
-// Check if CPR is selected
-$isCPRSelected = ($selectedReport === 'CPR');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -129,7 +126,7 @@ $isCPRSelected = ($selectedReport === 'CPR');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MRO CPR Report - Director Dashboard</title>
+    <title>MRO Performance Report - Director Dashboard</title>
     <link rel="stylesheet" href="../css/style.css">
     <link rel="icon" type="image/png" href="../assets/images/ethiopian_logo.ico">
     <style>
@@ -296,7 +293,7 @@ $isCPRSelected = ($selectedReport === 'CPR');
             font-size: 0.8rem;
         }
 
-        /* Upload Section - only for CPR with ALL department */
+        /* Upload Section */
         .upload-section {
             background: var(--card-bg);
             padding: 1rem;
@@ -348,10 +345,6 @@ $isCPRSelected = ($selectedReport === 'CPR');
 
         .btn-upload:hover {
             background: #e67e22;
-        }
-
-        .btn-preview {
-            background: var(--accent);
         }
 
         .btn-submit-upload {
@@ -763,10 +756,10 @@ $isCPRSelected = ($selectedReport === 'CPR');
             </form>
         </div>
 
-        <?php if ($selectedDept === 'ALL' && $isCPRSelected): ?>
-            <!-- Excel Upload Section - Only for CPR with ALL department -->
+        <?php if ($selectedDept === 'ALL'): ?>
+            <!-- Excel Upload Section - Show for ALL department -->
             <div class="upload-section">
-                <h3>Upload Excel File (CPR - All Departments)</h3>
+                <h3>📊 Upload Excel File - <?php echo htmlspecialchars($selectedReport); ?></h3>
                 <div class="upload-form">
                     <div class="upload-group">
                         <label>Excel File (.xlsx, .xls)</label>
@@ -777,8 +770,8 @@ $isCPRSelected = ($selectedReport === 'CPR');
                     </div>
                 </div>
                 <div id="uploadMessage"></div>
-                <div class="sync-info" style="margin-top: 0.75rem;">
-                    The Excel file must contain data for all departments (BMT, LMT, CMT, EMT, AEP, MSM, QA, PSCM) in the standard CPR format.
+                <div class="sync-info" style="margin-top: 0.75rem; font-size: 0.7rem; opacity: 0.8;">
+                    Upload Excel file for <?php echo htmlspecialchars($selectedReport); ?> report.
                 </div>
             </div>
             <div id="message"></div>
@@ -810,7 +803,7 @@ $isCPRSelected = ($selectedReport === 'CPR');
                             $costCentersList = $costCenters[$selectedDept] ?? [];
                             $hasDirectorDept = hasDirector($costCentersList);
 
-                            // Calculate totals from ALL cost centers (including director if it has data)
+                            // Calculate totals from ALL cost centers
                             $totalExpected = 0;
                             $totalCompleted = 0;
                             foreach ($costCentersList as $cc):
@@ -823,7 +816,7 @@ $isCPRSelected = ($selectedReport === 'CPR');
                             $totalNotCompleted = $totalExpected - $totalCompleted;
                             $totalColor = $totalPercentage >= 90 ? 'var(--success)' : ($totalPercentage >= 70 ? 'var(--warning)' : 'var(--danger)');
 
-                            // Display ALL rows (managers + director)
+                            // Display ALL rows
                             foreach ($costCentersList as $cc):
                                 $code = $cc['code'];
                                 $name = $cc['name'];
@@ -862,7 +855,7 @@ $isCPRSelected = ($selectedReport === 'CPR');
                                 </tr>
                             <?php endforeach; ?>
 
-                            <!-- TOTAL row at the bottom -->
+                            <!-- TOTAL row -->
                             <tr class="total-row">
                                 <td><strong>TOTAL (All Cost Centers)</strong></td>
                                 <td id="total-expected"><?php echo $totalExpected; ?></td>
@@ -878,24 +871,6 @@ $isCPRSelected = ($selectedReport === 'CPR');
                                 </td>
                             </tr>
                         </tbody>
-                        <?php if (!$hasDirectorDept): ?>
-                            <tfoot>
-                                <tr class="total-row">
-                                    <td><strong>TOTAL</strong></td>
-                                    <td id="total-expected">0</td>
-                                    <td id="total-completed">0</td>
-                                    <td id="total-not-completed">0</td>
-                                    <td id="total-percentage" class="percentage-cell">
-                                        <span>0%</span>
-                                    </td>
-                                    <td>
-                                        <div class="progress-bar">
-                                            <div class="progress-fill" style="width: 0%;"></div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tfoot>
-                        <?php endif; ?>
                     </table>
                 </div>
 
@@ -903,10 +878,6 @@ $isCPRSelected = ($selectedReport === 'CPR');
                     <button type="submit" class="btn btn-save">💾 Save Report</button>
                 </div>
             </form>
-        <?php elseif ($selectedDept === 'ALL' && !$isCPRSelected): ?>
-            <div class="no-dept-message">
-                <p>Excel upload is only available for CPR report type. Please select a specific department to enter data for <?php echo htmlspecialchars($selectedReport); ?>.</p>
-            </div>
         <?php elseif ($selectedDept === ''): ?>
             <div class="no-dept-message">
                 <p>Please select a department to view and enter report data.</p>
@@ -978,6 +949,9 @@ $isCPRSelected = ($selectedReport === 'CPR');
         }
 
         let uploadedData = null;
+        let currentReportType = '<?php echo $selectedReport; ?>';
+        let currentMonth = '<?php echo $currentMonth; ?>';
+        let currentYear = '<?php echo $currentYear; ?>';
 
         function calculateRow(row) {
             const expectedInput = row.querySelector('.expected-input');
@@ -1017,7 +991,6 @@ $isCPRSelected = ($selectedReport === 'CPR');
                 }
             });
 
-            // Update TOTAL row (not director row)
             const totalRow = document.querySelector('.total-row');
             if (totalRow) {
                 const totalExpectedCell = document.getElementById('total-expected');
@@ -1096,28 +1069,60 @@ $isCPRSelected = ($selectedReport === 'CPR');
 
             if (!modal || !previewContent) return;
 
-            // Build preview HTML grouped by department
             let html = '';
-            for (const [dept, departmentsData] of Object.entries(data)) {
-                html += `<h4 style="color: var(--accent); margin: 1rem 0 0.5rem 0; border-bottom: 1px solid var(--border-light); padding-bottom: 0.25rem;">📁 ${escapeHtml(dept)}</h4>`;
-                html += `<table class="preview-table" style="width:100%; margin-bottom:1rem;">`;
-                html += `<thead><tr><th>Cost Center</th><th>Expected</th><th>Completed</th><th>Not Completed</th><th>%</th></tr></thead><tbody>`;
 
-                for (const [code, rowData] of Object.entries(departmentsData)) {
-                    const expected = rowData.expected || 0;
-                    const completed = rowData.completed || 0;
-                    const notCompleted = expected - completed;
-                    const percentage = expected > 0 ? ((completed / expected) * 100).toFixed(1) : 0;
+            // For Annual Vacation report, data is an object with departments as keys
+            if (currentReportType === 'Annual Vacation Utilization Status') {
+                for (const [dept, records] of Object.entries(data)) {
+                    if (records && records.length > 0) {
+                        html += `<h4 style="color: var(--accent); margin: 1rem 0 0.5rem 0; border-bottom: 1px solid var(--border-light); padding-bottom: 0.25rem;">📁 ${escapeHtml(dept)}</h4>`;
+                        html += `<table class="preview-table" style="width:100%; margin-bottom:1rem;">`;
+                        html += `<thead><tr><th>Cost Center</th><th>Expected</th><th>Completed</th><th>Not Completed</th><th>%</th></tr></thead><tbody>`;
 
-                    html += `<tr>
-                        <td>${escapeHtml(rowData.name || code)}</td>
+                        for (const record of records) {
+                            const expected = record.expected || 0;
+                            const completed = record.completed || 0;
+                            const notCompleted = record.not_completed || (expected - completed);
+                            const percentage = record.percentage || (expected > 0 ? ((completed / expected) * 100).toFixed(1) : 0);
+
+                            html += `<tr>
+                        <td>${escapeHtml(record.cost_center_text || record.cost_center_code || '')}</td>
                         <td>${expected}</td>
                         <td>${completed}</td>
                         <td>${notCompleted}</td>
-                        <td>${percentage}%</td>
+                        <td>${typeof percentage === 'number' ? percentage.toFixed(1) : percentage}%</td>
                     </tr>`;
+                        }
+                        html += `</tbody></table>`;
+                    }
                 }
-                html += `</tbody></table>`;
+            } else if (currentReportType === 'CPR') {
+                // CPR format handling
+                for (const [dept, departmentsData] of Object.entries(data)) {
+                    html += `<h4 style="color: var(--accent); margin: 1rem 0 0.5rem 0; border-bottom: 1px solid var(--border-light); padding-bottom: 0.25rem;">📁 ${escapeHtml(dept)}</h4>`;
+                    html += `<table class="preview-table" style="width:100%; margin-bottom:1rem;">`;
+                    html += `<thead><tr><th>Cost Center</th><th>Expected</th><th>Completed</th><th>Not Completed</th><th>%</th></tr></thead><tbody>`;
+
+                    for (const [code, rowData] of Object.entries(departmentsData)) {
+                        const expected = rowData.expected || 0;
+                        const completed = rowData.completed || 0;
+                        const notCompleted = expected - completed;
+                        const percentage = expected > 0 ? ((completed / expected) * 100).toFixed(1) : 0;
+
+                        html += `<tr>
+                    <td>${escapeHtml(rowData.name || code)}</td>
+                    <td>${expected}</td>
+                    <td>${completed}</td>
+                    <td>${notCompleted}</td>
+                    <td>${percentage}%</td>
+                </tr>`;
+                    }
+                    html += `</tbody></table>`;
+                }
+            }
+
+            if (html === '') {
+                html = '<p>No data to preview</p>';
             }
 
             previewContent.innerHTML = html;
@@ -1180,7 +1185,7 @@ $isCPRSelected = ($selectedReport === 'CPR');
                 }
             }
 
-            // Excel Upload functionality - only for CPR with ALL department
+            // Excel Upload functionality
             const uploadBtn = document.getElementById('uploadBtn');
             const excelFileInput = document.getElementById('excelFile');
 
@@ -1200,14 +1205,30 @@ $isCPRSelected = ($selectedReport === 'CPR');
 
                     const formData = new FormData();
                     formData.append('excel_file', file);
-                    formData.append('report_type', 'CPR');
-                    formData.append('month', '<?php echo $currentMonth; ?>');
-                    formData.append('year', '<?php echo $currentYear; ?>');
+                    formData.append('report_type', currentReportType);
+                    formData.append('month', currentMonth);
+                    formData.append('year', currentYear);
+
+                    // Map report type to upload script
+                    let uploadScript = '';
+                    switch (currentReportType) {
+                        case 'CPR':
+                            uploadScript = 'upload_cpr_report.php';
+                            break;
+                        case 'Annual Vacation Utilization Status':
+                            uploadScript = 'upload_annualleave_report.php';
+                            break;
+                        default:
+                            // For other report types, we'll need to build upload scripts
+                            const uploadMsg = document.getElementById('uploadMessage');
+                            uploadMsg.innerHTML = `<div class="alert alert-warning">Upload not yet configured for this report type.</div>`;
+                            return;
+                    }
 
                     uploadBtn.disabled = true;
                     uploadBtn.textContent = '⏳ Uploading...';
 
-                    fetch('upload_cpr_report.php', {
+                    fetch(uploadScript, {
                             method: 'POST',
                             body: formData
                         })
@@ -1217,6 +1238,7 @@ $isCPRSelected = ($selectedReport === 'CPR');
                             uploadBtn.textContent = 'Upload & Preview';
 
                             if (data.success) {
+                                console.log('Upload success, data:', data.data); // Debug log
                                 openPreviewModal(data.data);
                             } else {
                                 const uploadMsg = document.getElementById('uploadMessage');
@@ -1248,17 +1270,32 @@ $isCPRSelected = ($selectedReport === 'CPR');
             if (confirmUploadBtn) {
                 confirmUploadBtn.addEventListener('click', function() {
                     if (uploadedData) {
-                        // Submit the data to save_cpr_upload.php
+                        let saveScript = '';
+                        switch (currentReportType) {
+                            case 'CPR':
+                                saveScript = 'save_cpr_upload.php';
+                                break;
+                            case 'Annual Vacation Utilization Status':
+                                saveScript = 'save_annualleave_upload.php';
+                                break;
+                            default:
+                                const uploadMsg = document.getElementById('uploadMessage');
+                                if (uploadMsg) {
+                                    uploadMsg.innerHTML = `<div class="alert alert-error">✗ Save not configured for this report type.</div>`;
+                                }
+                                return;
+                        }
+
                         const formData = new FormData();
-                        formData.append('report_type', 'CPR');
-                        formData.append('report_month', '<?php echo $currentMonth; ?>');
-                        formData.append('report_year', '<?php echo $currentYear; ?>');
+                        formData.append('report_type', currentReportType);
+                        formData.append('report_month', currentMonth);
+                        formData.append('report_year', currentYear);
                         formData.append('data', JSON.stringify(uploadedData));
 
                         confirmUploadBtn.disabled = true;
                         confirmUploadBtn.textContent = '⏳ Saving...';
 
-                        fetch('save_cpr_upload.php', {
+                        fetch(saveScript, {
                                 method: 'POST',
                                 body: formData
                             })
@@ -1276,9 +1313,9 @@ $isCPRSelected = ($selectedReport === 'CPR');
                                             msgDiv.innerHTML = '';
                                         }, 5000);
                                     }
-                                    // Optionally reload the page to show updated data
+                                    // Reload the page to show updated data
                                     setTimeout(() => {
-                                        window.location.href = window.location.href.split('?')[0] + '?report=CPR&month=<?php echo $currentMonth; ?>&year=<?php echo $currentYear; ?>&department=ALL&saved=1';
+                                        window.location.href = window.location.href.split('?')[0] + '?report=' + encodeURIComponent(currentReportType) + '&month=' + currentMonth + '&year=' + currentYear + '&department=ALL&saved=1';
                                     }, 1500);
                                 } else {
                                     const uploadMsg = document.getElementById('uploadMessage');
