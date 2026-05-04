@@ -279,7 +279,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="password-container">
         <div class="password-header">
             <h3>🔐 Change Password</h3>
-            <button class="close-btn" onclick="parent.closePasswordPopup()">&times;</button>
+            <button class="close-btn" onclick="closeModalAndReset()">&times;</button>
         </div>
         <div class="password-body">
             <div id="messageContainer"></div>
@@ -302,7 +302,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="button-group">
-                    <button type="button" class="btn btn-secondary" onclick="parent.closePasswordPopup()">Cancel</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModalAndReset()">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="submitBtn">Change Password</button>
                 </div>
             </form>
@@ -310,6 +310,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <script>
+        // Add this function to change_password.php
+        function closeModalAndReset() {
+            // Try to call parent function to close modal
+            if (window.parent && window.parent.closePasswordModalFromIframe) {
+                window.parent.closePasswordModalFromIframe();
+            }
+            // Also try to close if called directly (fallback)
+            if (typeof window.closePasswordModal === 'function') {
+                window.closePasswordModal();
+            }
+        }
         // Get theme from parent page
         if (window.parent && window.parent.document.body.classList.contains('light-theme')) {
             document.body.classList.add('light-theme');

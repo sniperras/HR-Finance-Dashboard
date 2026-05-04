@@ -1,7 +1,6 @@
 <?php
 // IMPORTANT: Include session config FIRST
-require_once(__DIR__ . '/auth.php');
-
+require_once(__DIR__ . '/../session_config.php');
 require_once __DIR__ . '/../config/database.php';
 
 function isLoggedIn()
@@ -223,12 +222,6 @@ function isManagingDirector()
 function isItAdmin()
 {
     return (isLoggedIn() && $_SESSION['user_role'] === 'it_admin');
-}
-
-// Check if user is HR
-function isHR()
-{
-    return (isLoggedIn() && $_SESSION['user_role'] === 'hr');
 }
 
 function logAction($recordId, $action, $oldData, $newData)

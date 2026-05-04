@@ -870,9 +870,10 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
         <div class="navbar-container">
             <a href="director_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
             <div class="navbar-menu">
-
-                <a href="director_dashboard.php" style="color: var(--accent);">HR Dashboard</a>
+                <a href="../qa/qa_dashboard_tb.php">QA Summary Dashboard</a>
                 <a href="../qa/qa_dashboard.php">QA Dashboard</a>
+                <a href="director_dashboard.php" style="color: var(--accent);">HR Dashboard</a>
+
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
                     <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
