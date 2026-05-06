@@ -759,7 +759,7 @@ function hasDirector($costCentersList)
         <?php if ($selectedDept === 'ALL'): ?>
             <!-- Excel Upload Section - Show for ALL department -->
             <div class="upload-section">
-                <h3>📊 Upload Excel File - <?php echo htmlspecialchars($selectedReport); ?></h3>
+                <h3>Upload Excel File - <?php echo htmlspecialchars($selectedReport); ?></h3>
                 <div class="upload-form">
                     <div class="upload-group">
                         <label>Excel File (.xlsx, .xls)</label>

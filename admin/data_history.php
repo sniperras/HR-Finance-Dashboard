@@ -409,7 +409,7 @@ function getActionBadge($action)
 function getDataTypeBadge($dataType)
 {
     if ($dataType == 'master') {
-        return '<span class="badge badge-master">📊 Master Data</span>';
+        return '<span class="badge badge-master"> Master Data</span>';
     } else {
         return '<span class="badge badge-mro">🔧 MRO Report</span>';
     }
@@ -1025,7 +1025,7 @@ unset($_SESSION['error']);
                     <label>Data Type</label>
                     <select name="data_type" onchange="this.form.submit()">
                         <option value="all" <?php echo $filterDataType == 'all' ? 'selected' : ''; ?>>All Data Types</option>
-                        <option value="master" <?php echo $filterDataType == 'master' ? 'selected' : ''; ?>>📊 Master Data</option>
+                        <option value="master" <?php echo $filterDataType == 'master' ? 'selected' : ''; ?>> Master Data</option>
                         <option value="mro" <?php echo $filterDataType == 'mro' ? 'selected' : ''; ?>>🔧 MRO Reports</option>
                     </select>
                 </div>
