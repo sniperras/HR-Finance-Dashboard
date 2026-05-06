@@ -104,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // Email content
                 $to = $user['email'];
-                $subject = "Password Reset Request - HR & Finance Dashboard";
+                $subject = "Password Reset Request - MRO Dashboard";
 
                 // Email body with proper UTF-8 encoding for emoji
                 $message = "
@@ -129,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
                         <div class='content'>
                             <p>Dear <strong>" . htmlspecialchars($user['full_name']) . "</strong>,</p>
-                            <p>We received a request to reset your password for your HR & Finance Dashboard account.</p>
+                            <p>We received a request to reset your password for your MRO Dashboard account.</p>
                             <p>Your temporary password is:</p>
                             <div class='password-box'>
                                 <strong>" . $tempPassword . "</strong>
@@ -149,11 +149,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <li>Create a new strong password</li>
                             </ol>
                             <p>If you remember your password, you can continue using it. This temporary password will expire automatically.</p>
-                            <p>Best regards,<br>HR & Finance Dashboard Team</p>
+                            <p>Best regards,<br>MRO Dashboard Team</p>
                         </div>
                         <div class='footer'>
                             <p>This is an automated message, please do not reply to this email.</p>
-                            <p>&copy; " . date('Y') . " HR & Finance Dashboard. All rights reserved.</p>
+                            <p>&copy; " . date('Y') . " MRO Dashboard. All rights reserved.</p>
                         </div>
                     </div>
                 </body>
@@ -180,9 +180,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // $mail->Port = 465;
 
                     // Recipients
-                    $mail->setFrom('nathanaelbizuneh@gmail.com', 'HR & Finance Dashboard');
+                    $mail->setFrom('nathanaelbizuneh@gmail.com', 'MRO Dashboard');
                     $mail->addAddress($to, $user['full_name']);
-                    $mail->addReplyTo('nathanaelbizuneh@gmail.com', 'HR & Finance Dashboard');
+                    $mail->addReplyTo('nathanaelbizuneh@gmail.com', 'MRO Dashboard');
 
                     // Content
                     $mail->isHTML(true);
@@ -230,7 +230,7 @@ unset($_SESSION['fp_success']);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forgot Password - HR & Finance Dashboard</title>
+    <title>Forgot Password - MRO Dashboard</title>
     <link rel="icon" type="image/x-icon" href="assets/images/ethiopian_logo.ico">
     <style>
         * {

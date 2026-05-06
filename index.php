@@ -112,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/x-icon" href="assets/images/ethiopian_logo.ico">
-    <title>Login - HR & Finance Dashboard</title>
+    <title>Login - MRO Dashboard</title>
     <style>
         * {
             margin: 0;
@@ -416,7 +416,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <img src="assets/images/logo.png" alt="Online Data Icon" height="75">
                 </div>
 
-                <h2 class="title">Welcome to HR & Finance Dashboard</h2>
+                <h2 class="title">Welcome to MRO Dashboard</h2>
                 <div class="subtitle">Login using your Username or Organizational ID (OID)</div>
 
                 <?php if ($error): ?>

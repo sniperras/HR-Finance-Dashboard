@@ -680,10 +680,10 @@ function hasDirector($costCentersList)
 <body>
     <nav class="navbar">
         <div class="navbar-container">
-            <a href="master_data.php" class="navbar-brand">HR & Finance Dashboard</a>
+            <a href="master_data.php" class="navbar-brand">MRO Dashboard</a>
             <div class="navbar-menu">
                 <a href="master_data.php">Master Data</a>
-                <a href="../director/md_dashboard.php">Dashboard</a>
+                <a href="../director/md_dashboard.php">HR Dashboard</a>
                 <a href="../admin/report_mro_cpr.php" style="color: var(--accent);">Director Data Entry</a>
                 <a href="data_history.php">History</a>
                 <div class="user-info">

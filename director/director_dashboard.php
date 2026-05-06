@@ -868,7 +868,7 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
 
     <nav class="navbar">
         <div class="navbar-container">
-            <a href="director_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
+            <a href="director_dashboard.php" class="navbar-brand">MRO Dashboard</a>
             <div class="navbar-menu">
                 <a href="../qa/qa_dashboard_tb.php">QA Summary Dashboard</a>
                 <a href="../qa/qa_dashboard.php">QA Dashboard</a>

@@ -727,7 +727,7 @@ $conn->close();
 
     <nav class="navbar">
         <div class="navbar-container">
-            <a href="manager_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
+            <a href="manager_dashboard.php" class="navbar-brand">MRO Dashboard</a>
             <div class="navbar-menu">
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>

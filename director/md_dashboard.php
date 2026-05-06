@@ -1074,13 +1074,16 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
 
     <nav class="navbar">
         <div class="navbar-container">
-            <a href="md_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
+            <a href="md_dashboard.php" class="navbar-brand">MRO Dashboard</a>
             <div class="navbar-menu">
                 <?php if ($_SESSION['user_role'] !== 'director'): ?>
                     <a href="../admin/master_data.php">Master Data</a>
                 <?php endif; ?>
                 <a href="../director/md_dashboard.php" style="color: var(--accent);">HR Dashboard</a>
-                <a href="../qa/qa_dashboard.php">QA Dashboard</a>
+                <?php if ($_SESSION['user_role'] !== 'hr'): ?>
+                    <a href="../qa/qa_dashboard.php">QA Dashboard</a>
+                <?php endif; ?>
+
                 <?php if ($_SESSION['user_role'] !== 'director'): ?>
                     <a href="../admin/report_mro_cpr.php">Director Data Entry</a>
                     <a href="../admin/data_history.php">History</a>

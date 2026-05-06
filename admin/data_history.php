@@ -85,11 +85,11 @@ if ($filterDataType == 'master') {
               FROM data_audit_log al
               LEFT JOIN users u ON al.performed_by = u.id
               LEFT JOIN master_performance_data m ON al.record_id = m.id";
-    
+
     $whereClause = "";
     $queryParams = $params;
     $queryTypes = $types;
-    
+
     if ($filterDepartment) {
         $whereClause = "WHERE " . (!empty($whereParts) ? implode(" AND ", $whereParts) . " AND " : "") . "m.department = ?";
         $queryParams[] = $filterDepartment;
@@ -97,10 +97,10 @@ if ($filterDataType == 'master') {
     } elseif (!empty($whereParts)) {
         $whereClause = "WHERE " . implode(" AND ", $whereParts);
     }
-    
+
     $query .= " " . $whereClause;
     $query .= " ORDER BY performed_at DESC LIMIT 100";
-    
+
     // Execute query
     if (!empty($queryParams)) {
         $stmt = $conn->prepare($query);
@@ -121,7 +121,6 @@ if ($filterDataType == 'master') {
             }
         }
     }
-    
 } elseif ($filterDataType == 'mro') {
     // Only MRO Data - single query
     $query = "SELECT al.id, al.record_id, al.action, al.old_data, al.new_data, al.performed_at, al.performed_by,
@@ -133,11 +132,11 @@ if ($filterDataType == 'master') {
               FROM mro_audit_log al
               LEFT JOIN users u ON al.performed_by = u.id
               LEFT JOIN mro_cpr_report m ON al.record_id = m.id";
-    
+
     $whereClause = "";
     $queryParams = $params;
     $queryTypes = $types;
-    
+
     if ($filterDepartment) {
         $whereClause = "WHERE " . (!empty($whereParts) ? implode(" AND ", $whereParts) . " AND " : "") . "m.department = ?";
         $queryParams[] = $filterDepartment;
@@ -145,9 +144,9 @@ if ($filterDataType == 'master') {
     } elseif (!empty($whereParts)) {
         $whereClause = "WHERE " . implode(" AND ", $whereParts);
     }
-    
+
     $query .= " " . $whereClause;
-    
+
     if ($filterIndicator) {
         if (strpos($query, "WHERE") !== false) {
             $query .= " AND m.report_type = ?";
@@ -157,9 +156,9 @@ if ($filterDataType == 'master') {
         $queryParams[] = $filterIndicator;
         $queryTypes .= "s";
     }
-    
+
     $query .= " ORDER BY performed_at DESC LIMIT 100";
-    
+
     // Execute query
     if (!empty($queryParams)) {
         $stmt = $conn->prepare($query);
@@ -180,14 +179,13 @@ if ($filterDataType == 'master') {
             }
         }
     }
-    
 } else {
     // All Data Types - execute two separate queries and combine results
     // Master query
     $masterWhereParts = $whereParts;
     $masterParams = $params;
     $masterTypes = $types;
-    
+
     $masterQuery = "SELECT al.id, al.record_id, al.action, al.old_data, al.new_data, al.performed_at, al.performed_by,
                     u.full_name as user_name,
                     'master' as data_type,
@@ -197,7 +195,7 @@ if ($filterDataType == 'master') {
                     FROM data_audit_log al
                     LEFT JOIN users u ON al.performed_by = u.id
                     LEFT JOIN master_performance_data m ON al.record_id = m.id";
-    
+
     $masterWhereClause = "";
     if ($filterDepartment) {
         $masterWhereClause = "WHERE " . (!empty($masterWhereParts) ? implode(" AND ", $masterWhereParts) . " AND " : "") . "m.department = ?";
@@ -206,7 +204,7 @@ if ($filterDataType == 'master') {
     } elseif (!empty($masterWhereParts)) {
         $masterWhereClause = "WHERE " . implode(" AND ", $masterWhereParts);
     }
-    
+
     if ($filterIndicator) {
         if (!empty($masterWhereClause)) {
             $masterWhereClause .= " AND m.indicator_name = ?";
@@ -216,14 +214,14 @@ if ($filterDataType == 'master') {
         $masterParams[] = $filterIndicator;
         $masterTypes .= "s";
     }
-    
+
     $masterQuery .= " " . $masterWhereClause;
-    
+
     // MRO query
     $mroWhereParts = $whereParts;
     $mroParams = $params;
     $mroTypes = $types;
-    
+
     $mroQuery = "SELECT al.id, al.record_id, al.action, al.old_data, al.new_data, al.performed_at, al.performed_by,
                   u.full_name as user_name,
                   'mro' as data_type,
@@ -233,7 +231,7 @@ if ($filterDataType == 'master') {
                   FROM mro_audit_log al
                   LEFT JOIN users u ON al.performed_by = u.id
                   LEFT JOIN mro_cpr_report m ON al.record_id = m.id";
-    
+
     $mroWhereClause = "";
     if ($filterDepartment) {
         $mroWhereClause = "WHERE " . (!empty($mroWhereParts) ? implode(" AND ", $mroWhereParts) . " AND " : "") . "m.department = ?";
@@ -242,7 +240,7 @@ if ($filterDataType == 'master') {
     } elseif (!empty($mroWhereParts)) {
         $mroWhereClause = "WHERE " . implode(" AND ", $mroWhereParts);
     }
-    
+
     if ($filterIndicator) {
         if (!empty($mroWhereClause)) {
             $mroWhereClause .= " AND m.report_type = ?";
@@ -252,9 +250,9 @@ if ($filterDataType == 'master') {
         $mroParams[] = $filterIndicator;
         $mroTypes .= "s";
     }
-    
+
     $mroQuery .= " " . $mroWhereClause;
-    
+
     // Execute master query
     if (!empty($masterParams)) {
         $masterStmt = $conn->prepare($masterQuery);
@@ -275,7 +273,7 @@ if ($filterDataType == 'master') {
             }
         }
     }
-    
+
     // Execute mro query
     if (!empty($mroParams)) {
         $mroStmt = $conn->prepare($mroQuery);
@@ -296,12 +294,12 @@ if ($filterDataType == 'master') {
             }
         }
     }
-    
+
     // Sort combined results by performed_at descending
-    usort($logs, function($a, $b) {
+    usort($logs, function ($a, $b) {
         return strtotime($b['performed_at']) - strtotime($a['performed_at']);
     });
-    
+
     // Limit to 100 records
     $logs = array_slice($logs, 0, 100);
 }
@@ -351,7 +349,7 @@ function formatChangeData($oldData, $newData)
     if (!$old && !$new) return '<span style="color: #888;">No changes recorded</span>';
 
     $html = '<div class="change-container">';
-    
+
     if ($old && $new) {
         // Update action - show both
         $html .= '<div class="change-columns">';
@@ -385,7 +383,7 @@ function formatChangeData($oldData, $newData)
             $html .= '<div class="change-field"><span class="field-name">' . htmlspecialchars($key) . ':</span> <span class="field-value new-value">' . htmlspecialchars($displayValue) . '</span></div>';
         }
     }
-    
+
     $html .= '</div>';
     return $html;
 }
@@ -942,6 +940,7 @@ unset($_SESSION['error']);
         }
 
         @media (max-width: 1200px) {
+
             .history-table th:nth-child(8),
             .history-table td:nth-child(8) {
                 min-width: 300px;
@@ -976,10 +975,10 @@ unset($_SESSION['error']);
 <body>
     <nav class="navbar">
         <div class="navbar-container">
-            <a href="master_data.php" class="navbar-brand">HR & Finance Dashboard</a>
+            <a href="master_data.php" class="navbar-brand">MRO Dashboard</a>
             <div class="navbar-menu">
                 <a href="master_data.php">Master Data</a>
-                <a href="../director/md_dashboard.php">Dashboard</a>
+                <a href="../director/md_dashboard.php">HR Dashboard</a>
                 <a href="../admin/report_mro_cpr.php">Director Data Entry</a>
                 <a href="data_history.php" style="color: var(--accent);">History</a>
                 <div class="user-info">
@@ -1260,10 +1259,10 @@ unset($_SESSION['error']);
                 align-items: center;
                 justify-content: center;
             `;
-// Add the onclick handler
-modalOverlay.onclick = function() {
-    parent.closePasswordPopup();
-};
+            // Add the onclick handler
+            modalOverlay.onclick = function() {
+                parent.closePasswordPopup();
+            };
             const iframe = document.createElement('iframe');
             iframe.src = '../change_password.php';
             iframe.style.cssText = `
