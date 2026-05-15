@@ -10,6 +10,17 @@ $userRole = $_SESSION['user_role'];
 $username = $_SESSION['username'];
 $userFullName = $_SESSION['full_name'];
 
+// Get user's department and cost center from database
+$userQuery = "SELECT section, costcenter, full_name FROM users WHERE username = ?";
+$stmt = $conn->prepare($userQuery);
+$stmt->bind_param("s", $username);
+$stmt->execute();
+$userResult = $stmt->get_result();
+$userData = $userResult->fetch_assoc();
+$stmt->close();
+
+$userDept = $userData['section'] ?? '';
+
 // Get theme from cookie or default to dark
 $theme = isset($_COOKIE['dashboard_theme']) ? $_COOKIE['dashboard_theme'] : 'dark';
 

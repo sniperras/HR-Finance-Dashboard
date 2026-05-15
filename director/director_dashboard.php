@@ -879,7 +879,7 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
                     <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
-                    <span class="department-badge"><?php echo htmlspecialchars($userDept); ?></span>
+                    <span class="department-badge"><?php echo htmlspecialchars("Director"); ?></span>
                     <a href="#" onclick="openPasswordModal(); return false;" style="cursor: pointer;">🔑 Change Password</a>
                     <a href="../logout.php" class="btn">Logout</a>
                 </div>
