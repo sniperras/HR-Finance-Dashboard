@@ -204,7 +204,7 @@ while ($row = $result->fetch_assoc()) {
         'target' => $target,
         'cost_center' => $costCenter
     ];
-    
+
     // Track all percentages for this department and indicator (for calculating average)
     if (!isset($allPercentagesByDept[$indicator][$dept])) {
         $allPercentagesByDept[$indicator][$dept] = [];
@@ -240,7 +240,7 @@ while ($row = $masterResult->fetch_assoc()) {
             'target' => $row['target_value'],
             'cost_center' => 'DIR'
         ];
-        
+
         if (!isset($allPercentagesByDept[$indicator][$dept])) {
             $allPercentagesByDept[$indicator][$dept] = [];
         }
@@ -268,7 +268,7 @@ foreach ($indicators as $indicatorKey => $indicatorInfo) {
             $avgPercentage = round(array_sum($percentages) / count($percentages), 1);
             $departmentData[$dept] = $avgPercentage;
             $hasAnyActualData = true;
-            
+
             // For actuals and targets, we need to sum them up from all cost centers
             $totalActual = 0;
             $totalTarget = 0;
@@ -311,14 +311,14 @@ foreach ($indicators as $indicatorKey => $indicatorInfo) {
     // Update department data with calculated values
     $departmentData['MD/DIV.'] = $mdDivPercentage;
     $departmentData['Remainder'] = $remainderPercentage;
-    
+
     // For MD/DIV and Remainder, actuals/targets are not applicable
     $departmentActuals['MD/DIV.'] = null;
     $departmentTargets['MD/DIV.'] = null;
     $departmentActuals['Remainder'] = null;
     $departmentTargets['Remainder'] = null;
 
-        // Calculate overall percentage for the metric card - USE MD/DIV value instead of average
+    // Calculate overall percentage for the metric card - USE MD/DIV value instead of average
     if ($hasAnyActualData) {
         // Overall card should show the MD/DIV percentage, not an average
         $overall = $mdDivPercentage;
@@ -724,6 +724,7 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                 transform: none;
                 box-shadow: none;
             }
+
             .dept-bar-item.clickable:hover {
                 background: none;
                 transform: none;
@@ -872,8 +873,13 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         .modal {
@@ -1068,12 +1074,16 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
 
     <nav class="navbar">
         <div class="navbar-container">
-            <a href="md_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
+            <a href="md_dashboard.php" class="navbar-brand">MRO Dashboard</a>
             <div class="navbar-menu">
                 <?php if ($_SESSION['user_role'] !== 'director'): ?>
                     <a href="../admin/master_data.php">Master Data</a>
                 <?php endif; ?>
-                <a href="../director/md_dashboard.php" style="color: var(--accent);">Dashboard</a>
+                <a href="../director/md_dashboard.php" style="color: var(--accent);">HR Dashboard</a>
+                <?php if ($_SESSION['user_role'] !== 'hr'): ?>
+                    <a href="../qa/qa_dashboard.php">QA Dashboard</a>
+                <?php endif; ?>
+
                 <?php if ($_SESSION['user_role'] !== 'director'): ?>
                     <a href="../admin/report_mro_cpr.php">Director Data Entry</a>
                     <a href="../admin/data_history.php">History</a>
@@ -1304,12 +1314,12 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                                 <tr><th>Cost Center</th><th>Expected Tasks</th><th>Completed Tasks</th><th>Not Completed</th><th>Completion %</th><th>Progress</th></tr>
                             </thead>
                             <tbody>`;
-                    
+
                     let directorData = null;
                     let managerRows = [];
                     let totalExpected = 0;
                     let totalCompleted = 0;
-                    
+
                     for (const record of data.data) {
                         if (record.cost_center_code === 'DIR') {
                             directorData = record;
@@ -1319,7 +1329,7 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                         totalExpected += parseInt(record.expected) || 0;
                         totalCompleted += parseInt(record.completed) || 0;
                     }
-                    
+
                     for (const record of managerRows) {
                         const expected = parseInt(record.expected) || 0;
                         const completed = parseInt(record.completed) || 0;
@@ -1328,7 +1338,7 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                         const percentageColor = getScoreColor(percentage);
                         tableHtml += `<tr><td>${record.cost_center_text || record.cost_center_code}</td><td>${expected}</td><td>${completed}</td><td>${notCompleted}</td><td style="color: ${percentageColor}; font-weight: bold;">${percentage}%</td><td><div class="progress-bar-modal"><div class="progress-fill-modal" style="width: ${percentage}%; background: ${percentageColor};"></div></div></td></tr>`;
                     }
-                    
+
                     if (directorData) {
                         const dirExpected = parseInt(directorData.expected) || 0;
                         const dirCompleted = parseInt(directorData.completed) || 0;
@@ -1337,7 +1347,7 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                         const dirColor = getScoreColor(dirPercentage);
                         tableHtml += `<tr class="director-row"><td><strong>${directorData.cost_center_text || 'Director/Total'}</strong></td><td><strong>${dirExpected}</strong></td><td><strong>${dirCompleted}</strong></td><td><strong>${dirNotCompleted}</strong></td><td style="color: ${dirColor}; font-weight: bold;"><strong>${dirPercentage}%</strong></td><td><div class="progress-bar-modal"><div class="progress-fill-modal" style="width: ${dirPercentage}%; background: ${dirColor};"></div></div></td></tr>`;
                     }
-                    
+
                     // Calculate average of all percentages
                     let allPercentages = [];
                     for (const record of data.data) {
@@ -1347,7 +1357,7 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                     const totalPercentage = totalExpected > 0 ? ((totalCompleted / totalExpected) * 100).toFixed(1) : 0;
                     const avgColor = getScoreColor(avgPercentage);
                     const totalNotCompleted = totalExpected - totalCompleted;
-                    
+
                     tableHtml += `<tr style="background: rgba(56, 189, 248, 0.2); font-weight: bold;">
                         <td><strong>TOTAL (Avg of %)</strong></td>
                         <td><strong>${totalExpected}</strong></td>
@@ -1356,7 +1366,7 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                         <td style="color: ${avgColor}; font-weight: bold; font-size: 1.1rem;"><strong>${avgPercentage}%</strong></td>
                         <td><div class="progress-bar-modal"><div class="progress-fill-modal" style="width: ${avgPercentage}%; background: ${avgColor};"></div></div></td>
                     </tr>`;
-                    
+
                     tableHtml += `</tbody></table>`;
                     modalBody.innerHTML = tableHtml;
                 } else {
@@ -1408,8 +1418,12 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                         animateScale: false
                     },
                     plugins: {
-                        legend: { display: false },
-                        tooltip: { enabled: false }
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            enabled: false
+                        }
                     },
                     events: [],
                     onClick: null,
@@ -1491,32 +1505,32 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
         }
 
         function changeMonth(direction) {
-    let currentUrl = new URL(window.location.href);
-    let currentMonthParam = currentUrl.searchParams.get('month') || currentMonth;
-    
-    // Parse year and month manually to avoid timezone issues
-    let parts = currentMonthParam.split('-');
-    let year = parseInt(parts[0]);
-    let month = parseInt(parts[1]);
-    
-    if (direction === 'prev') {
-        month--;
-        if (month < 1) {
-            month = 12;
-            year--;
+            let currentUrl = new URL(window.location.href);
+            let currentMonthParam = currentUrl.searchParams.get('month') || currentMonth;
+
+            // Parse year and month manually to avoid timezone issues
+            let parts = currentMonthParam.split('-');
+            let year = parseInt(parts[0]);
+            let month = parseInt(parts[1]);
+
+            if (direction === 'prev') {
+                month--;
+                if (month < 1) {
+                    month = 12;
+                    year--;
+                }
+            } else {
+                month++;
+                if (month > 12) {
+                    month = 1;
+                    year++;
+                }
+            }
+
+            // Format month with leading zero
+            let newMonth = year + '-' + String(month).padStart(2, '0');
+            window.location.href = `md_dashboard.php?month=${newMonth}`;
         }
-    } else {
-        month++;
-        if (month > 12) {
-            month = 1;
-            year++;
-        }
-    }
-    
-    // Format month with leading zero
-    let newMonth = year + '-' + String(month).padStart(2, '0');
-    window.location.href = `md_dashboard.php?month=${newMonth}`;
-}
 
         document.addEventListener('DOMContentLoaded', function() {
             new ThemeManager();

@@ -179,7 +179,7 @@ while ($row = $result->fetch_assoc()) {
         'percentage' => $percentage,
         'name' => $costCenterName
     ];
-    
+
     // Track percentages for this indicator (for calculating average)
     if (!isset($allPercentages[$reportType])) {
         $allPercentages[$reportType] = [];
@@ -211,7 +211,7 @@ $masterResult = $masterStmt->get_result();
 while ($row = $masterResult->fetch_assoc()) {
     $indicatorName = $row['indicator_name'];
     $percentage = round((float)$row['percentage_achievement'], 1);
-    
+
     // Only use master data if we have no data for this indicator
     if (!isset($reportData[$indicatorName]) || $reportData[$indicatorName] == 0) {
         $reportData[$indicatorName] = $percentage;
@@ -868,9 +868,12 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
 
     <nav class="navbar">
         <div class="navbar-container">
-            <a href="director_dashboard.php" class="navbar-brand">HR & Finance Dashboard</a>
+            <a href="director_dashboard.php" class="navbar-brand">MRO Dashboard</a>
             <div class="navbar-menu">
-                <a href="director_dashboard.php" style="color: var(--accent);">Dashboard</a>
+                <a href="../qa/qa_dashboard_tb.php">QA Summary Dashboard</a>
+                <a href="../qa/qa_dashboard.php">QA Dashboard</a>
+                <a href="director_dashboard.php" style="color: var(--accent);">HR Dashboard</a>
+
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
                     <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
@@ -1138,7 +1141,7 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             // Collect ALL rows (both managers and director)
             let allRows = [];
             let directorData = null;
-            
+
             for (const [code, manager] of Object.entries(costCenters)) {
                 const record = data[code] || {
                     expected: 0,
@@ -1146,7 +1149,7 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
                     percentage: 0,
                     name: manager
                 };
-                
+
                 if (code === 'DIR') {
                     directorData = {
                         code: code,
@@ -1165,27 +1168,27 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
                     });
                 }
             }
-            
+
             // Add director to allRows if it exists
             if (directorData) {
                 allRows.push(directorData);
             }
-            
+
             // Calculate totals for display
             let totalExpected = 0;
             let totalCompleted = 0;
             let totalPercentageSum = 0;
             let rowCount = allRows.length;
-            
+
             for (const row of allRows) {
                 totalExpected += row.expected;
                 totalCompleted += row.completed;
                 totalPercentageSum += row.percentage;
             }
-            
+
             // Calculate the average of all completion percentages (sum / number of rows)
             const averageOfPercentages = rowCount > 0 ? (totalPercentageSum / rowCount) : 0;
-            
+
             // Calculate overall from actual totals (for reference)
             const overallFromTotals = totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
 
@@ -1203,14 +1206,14 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
                     </thead>
                     <tbody>
             `;
-            
+
             // Display all rows (managers + director)
             for (const row of allRows) {
                 const notCompleted = row.expected - row.completed;
                 const percentageColor = getColor(row.percentage);
                 const isDirector = (row.code === 'DIR');
                 const rowClass = isDirector ? 'director-row' : '';
-                
+
                 tableHtml += `
                     <tr class="${rowClass}">
                         <td>${escapeHtml(row.name)}</td>
@@ -1226,11 +1229,11 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
                     </tr>
                 `;
             }
-            
+
             // Add TOTAL row using AVERAGE OF PERCENTAGES (sum of all % / number of rows)
             const totalColor = getColor(averageOfPercentages);
             const totalNotCompleted = totalExpected - totalCompleted;
-            
+
             tableHtml += `
                 <tr style="background: rgba(56, 189, 248, 0.2); font-weight: bold;">
                     <td><strong>TOTAL (Avg of %)</strong></td>
@@ -1247,12 +1250,12 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
                     </td>
                 </tr>
             `;
-            
+
             tableHtml += `
                     </tbody>
                 </table>
             `;
-            
+
             modalBody.innerHTML = tableHtml;
             modal.style.display = 'flex';
         }

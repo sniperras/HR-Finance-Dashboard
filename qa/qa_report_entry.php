@@ -10,6 +10,9 @@ $userRole = $_SESSION['user_role'];
 $username = $_SESSION['username'];
 $userFullName = $_SESSION['full_name'];
 
+// Get theme from cookie or default to dark
+$theme = isset($_COOKIE['dashboard_theme']) ? $_COOKIE['dashboard_theme'] : 'dark';
+
 // Determine user's department from username (director_LMT, director_BMT, etc.)
 $userDepartment = null;
 if (($userRole === 'director' || $userRole === 'manager') && preg_match('/_([A-Z\/\s]+)/', $username, $matches)) {
@@ -49,6 +52,7 @@ if ($report_type === 'looform' && $month && $year) {
 }
 
 $conn->close();
+
 ?>
 
 <!DOCTYPE html>
@@ -602,6 +606,11 @@ $conn->close();
             color: white;
         }
 
+        .navbar-menu a:hover,
+        .navbar-menu a.active {
+            color: var(--accent);
+        }
+
         .btn-success:hover {
             opacity: 0.9;
             transform: translateY(-1px);
@@ -721,6 +730,69 @@ $conn->close();
                 padding: 0.5rem;
             }
         }
+
+        /* Add these to the existing CSS */
+
+        /* Navbar links - base style */
+        .navbar-menu a {
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: color 0.2s;
+            padding: 0.4rem 0;
+        }
+
+        .navbar-menu a:hover,
+        .navbar-menu a.active {
+            color: var(--accent);
+        }
+
+        /* User name and change password link */
+        .user-name {
+            color: var(--accent);
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+
+        .change-password-link {
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: color 0.2s;
+            padding: 0.4rem 0;
+            cursor: pointer;
+        }
+
+        .change-password-link:hover {
+            color: var(--accent-hover);
+        }
+
+        /* Light theme overrides for navbar text */
+        body.light-theme .navbar-menu a {
+            color: #1E293B;
+        }
+
+        body.light-theme .navbar-menu a:hover,
+        body.light-theme .navbar-menu a.active {
+            color: #0284C7;
+        }
+
+        body.light-theme .user-name {
+            color: #0284C7;
+        }
+
+        body.light-theme .change-password-link {
+            color: #0284C7;
+        }
+
+        body.light-theme .change-password-link:hover {
+            color: #0EA5E9;
+        }
+
+        body.light-theme .role-badge {
+            background: rgba(2, 132, 199, 0.15);
+            color: #0284C7;
+        }
     </style>
 </head>
 
@@ -731,14 +803,22 @@ $conn->close();
                 QA Report
             </a>
             <div class="navbar-menu">
-                <a href="QA_dashboard.php">QA Dashboard</a>
-                <a href="qa_report_entry.php" style="color: var(--accent);">Upload QA Reports</a>
-
+                <?php if ($_SESSION['user_role'] == 'director'): ?>
+                    <a href="qa_dashboard_tb.php">QA Summary Dashboard</a>
+                    <a href="qa_dashboard.php">QA Dashboard</a>
+                    <a href="../director/director_dashboard.php">HR Dashboard</a>
+                <?php endif; ?>
+                <?php if ($_SESSION['user_role'] == 'qa auditor'): ?>
+                    <a href="qa_dashboard_tb.php">QA Summary Dashboard</a>
+                    <a href="qa_dashboard.php">QA Dashboard</a>
+                    <a href="qa_report_entry.php" class="active">Upload Reports</a>
+                <?php endif; ?>
                 <div class="user-info">
                     <span class="role-badge"><?php echo strtoupper($userRole); ?></span>
-                    <button id="themeToggle" class="theme-toggle">☀️ Light</button>
-                    <span class="user-name"> <?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
-                    <a href="#" class="change-password-link" onclick="openPasswordModal(); return false;">🔑 Change Password</a>
+
+                    <button id="themeToggle" class="theme-toggle"><?php echo $theme === 'light' ? '🌙 Dark' : '☀️ Light'; ?></button>
+                    <span class="user-name"><?php echo htmlspecialchars($userFullName); ?></span>
+                    <a href="#" onclick="openPasswordModal(); return false;" class="change-password-link">🔑 Change Password</a>
                     <a href="../logout.php" class="logout-btn">Logout</a>
                 </div>
             </div>
@@ -879,7 +959,7 @@ $conn->close();
         // Theme Manager
         class ThemeManager {
             constructor() {
-                this.themeKey = 'qa_dashboard_theme';
+                this.themeKey = 'dashboard_theme';
                 this.loadTheme();
                 this.initToggle();
             }

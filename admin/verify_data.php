@@ -446,7 +446,7 @@ unset($_SESSION['error']);
 <body>
     <nav class="navbar">
         <div class="navbar-container">
-            <a href="master_data.php" class="navbar-brand">HR & Finance Dashboard</a>
+            <a href="master_data.php" class="navbar-brand">MRO Dashboard</a>
             <div class="navbar-menu">
                 <a href="master_data.php">Master Data Entry</a>
                 <a href="report_mro_cpr.php">Director Data Entry</a>

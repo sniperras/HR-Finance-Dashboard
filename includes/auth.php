@@ -1,7 +1,6 @@
 <?php
 // IMPORTANT: Include session config FIRST
-require_once(__DIR__ . '/auth.php');
-
+require_once(__DIR__ . '/../session_config.php');
 require_once __DIR__ . '/../config/database.php';
 
 function isLoggedIn()
@@ -38,6 +37,11 @@ function requireRole($role)
         return true;
     }
 
+    // QA Auditor role check
+    if ($role === 'qa auditor' && $_SESSION['user_role'] === 'qa auditor') {
+        return true;
+    }
+
     // Manager role - check if role matches
     if ($role === 'manager' && $_SESSION['user_role'] === 'manager') {
         return true;
@@ -58,6 +62,8 @@ function requireRole($role)
         // Redirect based on role
         if ($_SESSION['user_role'] === 'it_admin') {
             header('Location: ../admin/it_admin_dashboard.php');
+        } elseif ($_SESSION['user_role'] === 'qa auditor') {
+            header('Location: /HRandMDDash/qa/qa_report_entry.php');
         } elseif ($_SESSION['user_role'] === 'manager') {
             header('Location: /HRandMDDash/director/manager_dashboard.php');
         } elseif ($_SESSION['user_role'] === 'director') {
@@ -99,6 +105,8 @@ function checkAccess($allowedRoles = [])
     // No access - redirect based on role
     if ($_SESSION['user_role'] === 'it_admin') {
         header('Location: ../admin/it_admin_dashboard.php');
+    } elseif ($_SESSION['user_role'] === 'qa auditor') {
+        header('Location: /HRandMDDash/qa/qa_report_entry.php');
     } elseif ($_SESSION['user_role'] === 'manager') {
         header('Location: /HRandMDDash/director/manager_dashboard.php');
     } elseif ($_SESSION['user_role'] === 'director') {
@@ -192,6 +200,12 @@ function isManager()
     return (isLoggedIn() && $_SESSION['user_role'] === 'manager');
 }
 
+// Check if user is QA Auditor
+function isQAAuditor()
+{
+    return (isLoggedIn() && $_SESSION['user_role'] === 'qa auditor');
+}
+
 // Check if user is a department director
 function isDepartmentDirector()
 {
@@ -237,6 +251,12 @@ function hasPageAccess($pageType)
     // HR has access to everything except IT Admin pages
     if ($_SESSION['user_role'] === 'hr') {
         $allowedPages = ['master_data', 'data_history', 'manage_indicators', 'report_mro_cpr', 'md_dashboard'];
+        return in_array($pageType, $allowedPages);
+    }
+
+    // QA Auditor access
+    if ($_SESSION['user_role'] === 'qa auditor') {
+        $allowedPages = ['qa_report_entry'];
         return in_array($pageType, $allowedPages);
     }
 
