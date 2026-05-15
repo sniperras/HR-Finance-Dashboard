@@ -10,6 +10,17 @@ $userRole = $_SESSION['user_role'];
 $username = $_SESSION['username'];
 $userFullName = $_SESSION['full_name'];
 
+// Get user's department and cost center from database
+$userQuery = "SELECT section, costcenter, full_name FROM users WHERE username = ?";
+$stmt = $conn->prepare($userQuery);
+$stmt->bind_param("s", $username);
+$stmt->execute();
+$userResult = $stmt->get_result();
+$userData = $userResult->fetch_assoc();
+$stmt->close();
+
+$userDept = $userData['section'] ?? '';
+
 // Get theme from cookie or default to dark
 $theme = isset($_COOKIE['dashboard_theme']) ? $_COOKIE['dashboard_theme'] : 'dark';
 
@@ -473,6 +484,20 @@ $conn->close();
             top: 0;
         }
 
+        .department-badge {
+            background: var(--accent);
+            color: var(--dark-bg);
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        body.light-theme .department-badge {
+            background: #0284C7;
+            color: white;
+        }
+
         .preview-actions {
             padding: 1rem;
             display: flex;
@@ -788,11 +813,6 @@ $conn->close();
         body.light-theme .change-password-link:hover {
             color: #0EA5E9;
         }
-
-        body.light-theme .role-badge {
-            background: rgba(2, 132, 199, 0.15);
-            color: #0284C7;
-        }
     </style>
 </head>
 
@@ -803,6 +823,12 @@ $conn->close();
                 QA Report
             </a>
             <div class="navbar-menu">
+                <?php if ($_SESSION['user_role'] == 'it_admin'): ?>
+                    <a href="it_admin_dashboard.php">IT Dashboard</a>
+                    <a href="qa_dashboard_tb.php">QA Summary Dashboard</a>
+                    <a href="qa_dashboard.php">QA Dashboard</a>
+                    <a href="qa_report_entry.php" class="active">Upload Reports</a>
+                <?php endif; ?>
                 <?php if ($_SESSION['user_role'] == 'director'): ?>
                     <a href="qa_dashboard_tb.php">QA Summary Dashboard</a>
                     <a href="qa_dashboard.php">QA Dashboard</a>
@@ -814,10 +840,11 @@ $conn->close();
                     <a href="qa_report_entry.php" class="active">Upload Reports</a>
                 <?php endif; ?>
                 <div class="user-info">
-                    <span class="role-badge"><?php echo strtoupper($userRole); ?></span>
 
                     <button id="themeToggle" class="theme-toggle"><?php echo $theme === 'light' ? '🌙 Dark' : '☀️ Light'; ?></button>
                     <span class="user-name"><?php echo htmlspecialchars($userFullName); ?></span>
+
+                    <span class="department-badge"><?php echo strtoupper($userRole); ?></span>
                     <a href="#" onclick="openPasswordModal(); return false;" class="change-password-link">🔑 Change Password</a>
                     <a href="../logout.php" class="logout-btn">Logout</a>
                 </div>

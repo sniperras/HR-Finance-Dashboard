@@ -16,6 +16,17 @@ $userRole = $_SESSION['user_role'];
 $username = $_SESSION['username'];
 $userFullName = $_SESSION['full_name'];
 
+// Get user's department and cost center from database
+$userQuery = "SELECT section, costcenter, full_name FROM users WHERE username = ?";
+$stmt = $conn->prepare($userQuery);
+$stmt->bind_param("s", $username);
+$stmt->execute();
+$userResult = $stmt->get_result();
+$userData = $userResult->fetch_assoc();
+$stmt->close();
+
+$userDept = $userData['section'] ?? '';
+
 // Get theme from cookie or default to dark
 $theme = isset($_COOKIE['dashboard_theme']) ? $_COOKIE['dashboard_theme'] : 'dark';
 
@@ -23,6 +34,11 @@ $theme = isset($_COOKIE['dashboard_theme']) ? $_COOKIE['dashboard_theme'] : 'dar
 $userDepartment = null;
 if (($userRole === 'director' || $userRole === 'manager') && preg_match('/_([A-Z\/\s]+)/', $username, $matches)) {
     $userDepartment = trim($matches[1]);
+}
+
+// Extract department from username (format: director_BMT, director_LMT, etc.)
+if (preg_match('/director_([A-Z\/\s]+)/', $username, $matches)) {
+    $userDept = trim($matches[1]);
 }
 
 // Get selected filters
@@ -429,6 +445,20 @@ $conn->close();
             padding: 1.5rem 2rem;
         }
 
+        .department-badge {
+            background: var(--accent);
+            color: var(--dark-bg);
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        body.light-theme .department-badge {
+            background: #0284C7;
+            color: white;
+        }
+
         .dashboard-header {
             background: linear-gradient(135deg, var(--card-bg-color) 0%, var(--bg-color) 100%);
             padding: 1.5rem;
@@ -638,20 +668,46 @@ $conn->close();
                 QA Dashboard - Summary View
             </a>
             <div class="navbar-menu">
+                <?php if ($_SESSION['user_role'] == 'it_admin'): ?>
+                    <a href="/it_admin_dashboard.php">IT Dashboard</a>
+                    <a href="qa_dashboard_tb.php" class="active">QA Summary Dashboard</a>
+                    <a href="qa_dashboard.php">QA Dashboard</a>
+                    <a href="qa_report_entry.php">Upload Reports</a>
+                <?php endif; ?>
+
+                <?php if ($_SESSION['user_role'] == 'manager'): ?>
+                    <a href="qa_dashboard_tb.php" class="active">QA Summary Dashboard</a>
+                    <a href="qa_dashboard.php">QA Dashboard</a>
+                    <a href="../director/manager_dashboard.php">HR Dashboard</a>
+                <?php endif; ?>
                 <?php if ($_SESSION['user_role'] == 'director'): ?>
                     <a href="qa_dashboard_tb.php" class="active">QA Summary Dashboard</a>
                     <a href="qa_dashboard.php">QA Dashboard</a>
+
+                <?php endif; ?>
+                <?php if ($_SESSION['username'] == 'director_admin'): ?>
+                    <a href="../director/md_dashboard.php">HR Dashboard</a>
+                <?php elseif ($_SESSION['user_role'] == 'director'): ?>
                     <a href="../director/director_dashboard.php">HR Dashboard</a>
                 <?php endif; ?>
+
                 <?php if ($_SESSION['user_role'] == 'qa auditor'): ?>
                     <a href="qa_dashboard_tb.php" class="active">QA Summary Dashboard</a>
                     <a href="qa_dashboard.php">QA Dashboard</a>
                     <a href="qa_report_entry.php">Upload Reports</a>
                 <?php endif; ?>
                 <div class="user-info">
-                    <span class="role-badge"><?php echo strtoupper($userRole); ?></span>
                     <button id="themeToggle" class="theme-toggle"><?php echo $theme === 'light' ? '🌙 Dark' : '☀️ Light'; ?></button>
                     <span class="user-name"><?php echo htmlspecialchars($userFullName); ?></span>
+
+                    <?php if ($_SESSION['username'] == 'director_admin'): ?>
+                        <span class="department-badge"><?php echo htmlspecialchars("MD"); ?></span>
+                    <?php elseif ($_SESSION['user_role'] == 'manager'): ?>
+                        <span class="department-badge"><?php echo htmlspecialchars("Manager"); ?></span>
+                    <?php elseif ($_SESSION['user_role'] == 'director'): ?>
+                        <span class="department-badge"><?php echo ucfirst(htmlspecialchars($userRole)); ?></span>
+                    <?php endif; ?>
+
                     <a href="#" onclick="openPasswordModal(); return false;" class="change-password-link">🔑 Change Password</a>
                     <a href="../logout.php" class="logout-btn">Logout</a>
                 </div>
@@ -892,7 +948,10 @@ $conn->close();
             }
 
             loadTheme() {
-                const savedTheme = localStorage.getItem(this.themeKey);
+                let savedTheme = this.getCookie(this.themeKey);
+                if (!savedTheme) {
+                    savedTheme = localStorage.getItem(this.themeKey);
+                }
                 if (savedTheme === 'light') {
                     document.body.classList.add('light-theme');
                     this.updateToggleButton(true);
@@ -902,15 +961,34 @@ $conn->close();
                 }
             }
 
+            setCookie(name, value, days = 365) {
+                const expires = new Date();
+                expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+                document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+            }
+
+            getCookie(name) {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop().split(';').shift();
+                return null;
+            }
+
             toggleTheme() {
                 if (document.body.classList.contains('light-theme')) {
                     document.body.classList.remove('light-theme');
                     localStorage.setItem(this.themeKey, 'dark');
+                    this.setCookie(this.themeKey, 'dark');
                     this.updateToggleButton(false);
+                    // Reload page to apply theme from PHP
+                    location.reload();
                 } else {
                     document.body.classList.add('light-theme');
                     localStorage.setItem(this.themeKey, 'light');
+                    this.setCookie(this.themeKey, 'light');
                     this.updateToggleButton(true);
+                    // Reload page to apply theme from PHP
+                    location.reload();
                 }
             }
 

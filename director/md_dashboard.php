@@ -11,6 +11,8 @@ $dataMonth = $currentMonth . '-01';
 $username = $_SESSION['username'];
 $userDept = 'MD';
 
+$theme = isset($_COOKIE['dashboard_theme']) ? $_COOKIE['dashboard_theme'] : 'dark';
+
 // Extract department from username (format: director_BMT, director_LMT, etc.)
 if (preg_match('/director_([A-Z\/\s]+)/', $username, $matches)) {
     $userDept = trim($matches[1]);
@@ -1068,18 +1070,30 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
         <div class="navbar-container">
             <a href="md_dashboard.php" class="navbar-brand">MRO Dashboard</a>
             <div class="navbar-menu">
+                <?php if ($_SESSION['user_role'] == 'it_admin'): ?>
+                    <a href="/it_admin_dashboard.php">IT Dashboard</a>
+                <?php endif; ?>
                 <?php if ($_SESSION['user_role'] !== 'director'): ?>
                     <a href="../admin/master_data.php">Master Data</a>
                 <?php endif; ?>
-                <a href="../director/md_dashboard.php" style="color: var(--accent);">HR Dashboard</a>
-                <?php if ($_SESSION['user_role'] !== 'hr'): ?>
+
+
+                <?php if ($_SESSION['user_role'] == 'hr'): ?>
                     <a href="../qa/qa_dashboard.php">QA Dashboard</a>
+                <?php endif; ?>
+
+                <?php if ($_SESSION['username'] == 'director_admin'): ?>
+                    <a href="../qa/qa_dashboard_tb.php">QA Summary Dashboard</a>
+                    <a href="../qa/qa_dashboard.php">QA Dashboard</a>
+                    <a href="../director/md_dashboard.php" style="color: var(--accent);">HR Dashboard</a>
+
                 <?php endif; ?>
 
                 <?php if ($_SESSION['user_role'] !== 'director'): ?>
                     <a href="../admin/report_mro_cpr.php">Director Data Entry</a>
                     <a href="../admin/data_history.php">History</a>
                 <?php endif; ?>
+
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
                     <span class="user-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></span>
@@ -1140,7 +1154,10 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             }
 
             loadTheme() {
-                const savedTheme = localStorage.getItem(this.themeKey);
+                let savedTheme = this.getCookie(this.themeKey);
+                if (!savedTheme) {
+                    savedTheme = localStorage.getItem(this.themeKey);
+                }
                 if (savedTheme === 'light') {
                     document.body.classList.add('light-theme');
                     this.updateToggleButton(true);
@@ -1150,15 +1167,34 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                 }
             }
 
+            setCookie(name, value, days = 365) {
+                const expires = new Date();
+                expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+                document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+            }
+
+            getCookie(name) {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop().split(';').shift();
+                return null;
+            }
+
             toggleTheme() {
                 if (document.body.classList.contains('light-theme')) {
                     document.body.classList.remove('light-theme');
                     localStorage.setItem(this.themeKey, 'dark');
+                    this.setCookie(this.themeKey, 'dark');
                     this.updateToggleButton(false);
+                    // Reload page to apply theme from PHP
+                    location.reload();
                 } else {
                     document.body.classList.add('light-theme');
                     localStorage.setItem(this.themeKey, 'light');
+                    this.setCookie(this.themeKey, 'light');
                     this.updateToggleButton(true);
+                    // Reload page to apply theme from PHP
+                    location.reload();
                 }
             }
 

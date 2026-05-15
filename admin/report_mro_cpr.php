@@ -682,6 +682,9 @@ function hasDirector($costCentersList)
         <div class="navbar-container">
             <a href="master_data.php" class="navbar-brand">MRO Dashboard</a>
             <div class="navbar-menu">
+                <?php if ($_SESSION['user_role'] == 'it_admin'): ?>
+                    <a href="/it_admin_dashboard.php">IT Dashboard</a>
+                <?php endif; ?>
                 <a href="master_data.php">Master Data</a>
                 <a href="../director/md_dashboard.php">HR Dashboard</a>
                 <a href="../admin/report_mro_cpr.php" style="color: var(--accent);">Director Data Entry</a>
