@@ -278,6 +278,20 @@ $conn->close();
             font-size: 0.85rem;
         }
 
+        .department-badge {
+            background: var(--accent);
+            color: var(--dark-bg);
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        body.light-theme .department-badge {
+            background: #0284C7;
+            color: white;
+        }
+
         .change-password-link {
             color: var(--accent);
             text-decoration: none;
@@ -730,9 +744,19 @@ $conn->close();
                 QA Dashboard
             </a>
             <div class="navbar-menu">
+                <?php if ($_SESSION['user_role'] == 'it_admin'): ?>
+                    <a href="it_admin_dashboard.php">IT Dashboard</a>
+                    <a href="qa_dashboard_tb.php">QA Summary Dashboard</a>
+                    <a href="qa_dashboard.php" class="active">QA Dashboard</a>
+                    <a href="qa_report_entry.php">Upload Reports</a>
+                <?php endif; ?>
                 <?php if ($_SESSION['user_role'] == 'director'): ?>
                     <a href="qa_dashboard_tb.php">QA Summary Dashboard</a>
                     <a href="qa_dashboard.php" class="active">QA Dashboard</a>
+                <?php endif; ?>
+                <?php if ($_SESSION['username'] == 'director_admin'): ?>
+                    <a href="../director/md_dashboard.php">HR Dashboard</a>
+                <?php elseif ($_SESSION['user_role'] == 'director'): ?>
                     <a href="../director/director_dashboard.php">HR Dashboard</a>
                 <?php endif; ?>
                 <?php if ($_SESSION['user_role'] == 'qa auditor'): ?>
@@ -741,9 +765,16 @@ $conn->close();
                     <a href="qa_report_entry.php">Upload Reports</a>
                 <?php endif; ?>
                 <div class="user-info">
-                    <span class="role-badge"><?php echo strtoupper($userRole); ?></span>
+
                     <button id="themeToggle" class="theme-toggle"><?php echo $theme === 'light' ? '🌙 Dark' : '☀️ Light'; ?></button>
                     <span class="user-name"><?php echo htmlspecialchars($userFullName); ?></span>
+
+
+                    <?php if ($_SESSION['username'] == 'director_admin'): ?>
+                        <span class="department-badge"><?php echo htmlspecialchars("MD"); ?></span>
+                    <?php elseif ($_SESSION['user_role'] == 'director'): ?>
+                        <span class="department-badge"><?php echo strtoupper($userRole); ?></span>
+                    <?php endif; ?>
                     <a href="#" onclick="openPasswordModal(); return false;" class="change-password-link">🔑 Change Password</a>
                     <a href="../logout.php" class="logout-btn">Logout</a>
                 </div>
