@@ -6,7 +6,7 @@ requireRole('it_admin');
 $conn = getConnection();
 
 // Get all users with their roles and details
-$usersQuery = "SELECT u.id, u.username, u.full_name, u.role, u.email, u.created_at, u.last_login, 
+$usersQuery = "SELECT u.id, u.oid, u.username, u.full_name, u.role, u.email, u.costcenter, u.section, u.created_at, u.last_login, 
                COUNT(DISTINCT m.id) as master_edits,
                COUNT(DISTINCT r.id) as mro_edits
                FROM users u
@@ -22,6 +22,7 @@ $stats = [];
 // Total users count
 $totalUsersQuery = "SELECT COUNT(*) as total, 
                     SUM(CASE WHEN role = 'hr' THEN 1 ELSE 0 END) as hr_count,
+                    SUM(CASE WHEN role = 'qa auditor' THEN 1 ELSE 0 END) as qa_auditor_count,
                     SUM(CASE WHEN role = 'director' THEN 1 ELSE 0 END) as director_count,
                     SUM(CASE WHEN role = 'it_admin' THEN 1 ELSE 0 END) as admin_count,
                     SUM(CASE WHEN role = 'md' THEN 1 ELSE 0 END) as md_count,
@@ -79,7 +80,7 @@ $serverStats = [
 
 // Security metrics
 $securityMetrics = [
-    'mttr' => rand(2, 48), // Mean Time To Repair in hours
+    'mttr' => rand(2, 48),
     'vulnerabilities_critical' => rand(0, 5),
     'vulnerabilities_high' => rand(1, 12),
     'vulnerabilities_medium' => rand(5, 25),
@@ -97,7 +98,7 @@ $threatActivity = [
     'unauthorized_access' => rand(0, 30)
 ];
 
-// Handle password reset with POST-Redirect-GET pattern to prevent resubmission
+// Handle actions
 $resetMessage = '';
 $resetError = '';
 $resetType = '';
@@ -119,7 +120,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $_SESSION['reset_type'] = "success";
             $redirect = true;
 
-            // Log the action
             $logStmt = $conn->prepare("INSERT INTO data_audit_log (record_id, action, old_data, new_data, performed_by, performed_at) 
                                        VALUES (?, 'password_reset', ?, ?, ?, NOW())");
             $oldData = json_encode(['password' => '********']);
@@ -184,6 +184,89 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
                 $deleteStmt->close();
             }
+        }
+    } elseif ($_POST['action'] === 'add_user') {
+        // Get form data
+        $oid = trim($_POST['oid']);
+        $username = trim($_POST['username']);
+        $full_name = trim($_POST['full_name']);
+        $email = trim($_POST['email']);
+        $role = $_POST['role'];
+        $costcenter = trim($_POST['costcenter'] ?? '');
+        $section = trim($_POST['section'] ?? '');
+        $password = $_POST['password'];
+
+        // Validation
+        $errors = [];
+
+        // Check if OID exists
+        $checkStmt = $conn->prepare("SELECT id FROM users WHERE oid = ?");
+        $checkStmt->bind_param("s", $oid);
+        $checkStmt->execute();
+        $checkResult = $checkStmt->get_result();
+        if ($checkResult->num_rows > 0) {
+            $errors[] = "OID already exists";
+        }
+        $checkStmt->close();
+
+        // Check if username exists
+        $checkStmt = $conn->prepare("SELECT id FROM users WHERE username = ?");
+        $checkStmt->bind_param("s", $username);
+        $checkStmt->execute();
+        $checkResult = $checkStmt->get_result();
+        if ($checkResult->num_rows > 0) {
+            $errors[] = "Username already exists";
+        }
+        $checkStmt->close();
+
+        // Check if email exists
+        if (!empty($email)) {
+            $checkStmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
+            $checkStmt->bind_param("s", $email);
+            $checkStmt->execute();
+            $checkResult = $checkStmt->get_result();
+            if ($checkResult->num_rows > 0) {
+                $errors[] = "Email already exists";
+            }
+            $checkStmt->close();
+        }
+
+        // Validate password strength
+        if (strlen($password) < 6) {
+            $errors[] = "Password must be at least 6 characters";
+        }
+
+        if (empty($errors)) {
+            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+            $created_at = date('Y-m-d H:i:s');
+
+            $insertStmt = $conn->prepare("INSERT INTO users (oid, username, full_name, email, role, costcenter, section, password, created_at, temp_password, temp_password_expiry) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)");
+            $insertStmt->bind_param("sssssssss", $oid, $username, $full_name, $email, $role, $costcenter, $section, $hashedPassword, $created_at);
+
+            if ($insertStmt->execute()) {
+                $newUserId = $insertStmt->insert_id;
+                $_SESSION['reset_message'] = "User '$username' (OID: $oid) created successfully! Password: " . ($password === 'password123' ? 'password123' : 'custom password set');
+                $_SESSION['reset_type'] = "success";
+                $redirect = true;
+
+                // Log the action
+                $logStmt = $conn->prepare("INSERT INTO data_audit_log (record_id, action, old_data, new_data, performed_by, performed_at) 
+                                           VALUES (?, 'user_created', ?, ?, ?, NOW())");
+                $oldData = json_encode(['user' => 'none']);
+                $newData = json_encode(['oid' => $oid, 'username' => $username, 'role' => $role]);
+                $logStmt->bind_param("issi", $newUserId, $oldData, $newData, $_SESSION['user_id']);
+                $logStmt->execute();
+                $logStmt->close();
+            } else {
+                $_SESSION['reset_error'] = "Failed to create user: " . $conn->error;
+                $_SESSION['reset_type'] = "error";
+                $redirect = true;
+            }
+            $insertStmt->close();
+        } else {
+            $_SESSION['reset_error'] = "Validation errors: " . implode(", ", $errors);
+            $_SESSION['reset_type'] = "error";
+            $redirect = true;
         }
     }
 
@@ -328,6 +411,11 @@ $conn->close();
             color: var(--dark-bg);
         }
 
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
         .btn-sm {
             padding: 0.2rem 0.5rem;
             font-size: 0.7rem;
@@ -354,7 +442,6 @@ $conn->close();
             padding: 0 1rem;
         }
 
-        /* Stats Grid */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -395,7 +482,6 @@ $conn->close();
             border-top: 1px solid var(--border-light);
         }
 
-        /* Section Styles */
         .section {
             background: var(--card-bg);
             border-radius: 12px;
@@ -419,7 +505,6 @@ $conn->close();
             color: var(--accent);
         }
 
-        /* Monitoring Grid */
         .monitoring-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -439,13 +524,6 @@ $conn->close();
             font-weight: bold;
             color: var(--accent);
             margin-bottom: 0.75rem;
-        }
-
-        .gauge-container {
-            position: relative;
-            width: 100%;
-            height: 100px;
-            margin: 0.5rem 0;
         }
 
         .gauge-value {
@@ -468,22 +546,6 @@ $conn->close();
             transition: width 0.5s;
         }
 
-        .severity-critical {
-            background: #dc3545;
-        }
-
-        .severity-high {
-            background: #fd7e14;
-        }
-
-        .severity-medium {
-            background: #ffc107;
-        }
-
-        .severity-low {
-            background: #28a745;
-        }
-
         .threat-item {
             display: flex;
             justify-content: space-between;
@@ -500,7 +562,6 @@ $conn->close();
             font-size: 1.1rem;
         }
 
-        /* Table Styles */
         .user-table {
             width: 100%;
             border-collapse: collapse;
@@ -559,7 +620,6 @@ $conn->close();
             color: white;
         }
 
-        /* Modal Styles */
         .modal {
             display: none;
             position: fixed;
@@ -577,9 +637,11 @@ $conn->close();
             background: var(--medium-bg);
             border-radius: 12px;
             width: 90%;
-            max-width: 450px;
+            max-width: 550px;
             padding: 1.5rem;
             border: 1px solid var(--border-light);
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         .modal-header {
@@ -651,12 +713,53 @@ $conn->close();
             max-height: 400px;
         }
 
-        /* Light Theme */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.25rem;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 0.5rem;
+            border-radius: 5px;
+            border: 1px solid var(--border-light);
+            background: var(--dark-bg);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }
+
+        .form-group small {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .password-input-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .password-input-group input {
+            flex: 1;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            margin-top: 1.5rem;
+        }
+
         body.light-theme {
             --dark-bg: #F8FAFC;
             --medium-bg: #FFFFFF;
             --accent: #0284C7;
-            --accent-hover: #0EA5E9;
             --light-bg: #0F172A;
             --card-bg: #FFFFFF;
             --border-light: #E2E8F0;
@@ -672,22 +775,8 @@ $conn->close();
             border-color: #E2E8F0 !important;
         }
 
-        body.light-theme .navbar {
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
         body.light-theme .user-table th {
             background: #F1F5F9;
-        }
-
-        body.light-theme .theme-toggle {
-            border-color: #0284C7;
-            color: #0284C7;
-        }
-
-        body.light-theme .theme-toggle:hover {
-            background: #0284C7;
-            color: white;
         }
 
         ::-webkit-scrollbar {
@@ -713,18 +802,6 @@ $conn->close();
             to {
                 transform: translateX(0);
                 opacity: 1;
-            }
-        }
-
-        @keyframes slideOut {
-            from {
-                transform: translateX(0);
-                opacity: 1;
-            }
-
-            to {
-                transform: translateX(100%);
-                opacity: 0;
             }
         }
     </style>
@@ -806,9 +883,7 @@ $conn->close();
             <div class="section-header">
                 <div class="section-title">🛡️ Security & Infrastructure Monitoring</div>
             </div>
-
             <div class="monitoring-grid">
-                <!-- Incident Response - MTTR -->
                 <div class="monitor-card">
                     <div class="monitor-title">🚨 Mean Time to Repair (MTTR)</div>
                     <div class="gauge-value" style="color: <?php echo $securityMetrics['mttr'] > 24 ? 'var(--danger)' : ($securityMetrics['mttr'] > 12 ? 'var(--warning)' : 'var(--success)'); ?>">
@@ -820,7 +895,6 @@ $conn->close();
                     <div style="font-size: 0.65rem; margin-top: 0.5rem;">Target: &lt; 24 hours</div>
                 </div>
 
-                <!-- Vulnerability Management -->
                 <div class="monitor-card">
                     <div class="monitor-title">🔓 Vulnerability Status</div>
                     <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
@@ -839,13 +913,8 @@ $conn->close();
                         <span>Low</span>
                         <span style="color: #28a745; font-weight: bold;"><?php echo $securityMetrics['vulnerabilities_low']; ?></span>
                     </div>
-                    <div class="progress-bar-custom mt-2">
-                        <div class="progress-fill-custom" style="width: <?php echo $securityMetrics['patches_completed'] > 0 ? round(($securityMetrics['patches_completed'] / ($securityMetrics['patches_completed'] + $securityMetrics['patches_pending'])) * 100) : 0; ?>%; background: var(--success);"></div>
-                    </div>
-                    <div style="font-size: 0.65rem; margin-top: 0.5rem;">Patches: <?php echo $securityMetrics['patches_completed']; ?> completed / <?php echo $securityMetrics['patches_pending']; ?> pending</div>
                 </div>
 
-                <!-- Resource Consumption -->
                 <div class="monitor-card">
                     <div class="monitor-title">💻 Resource Consumption</div>
                     <div>
@@ -866,18 +935,8 @@ $conn->close();
                             <div class="progress-fill-custom" style="width: <?php echo $serverStats['ram_usage']; ?>%; background: <?php echo $serverStats['ram_usage'] > 80 ? '#dc3545' : ($serverStats['ram_usage'] > 60 ? '#ffc107' : '#28a745'); ?>;"></div>
                         </div>
                     </div>
-                    <div style="margin-top: 0.5rem;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-                            <span>Storage Usage</span>
-                            <span><?php echo $serverStats['disk_usage']; ?>%</span>
-                        </div>
-                        <div class="progress-bar-custom">
-                            <div class="progress-fill-custom" style="width: <?php echo $serverStats['disk_usage']; ?>%; background: <?php echo $serverStats['disk_usage'] > 85 ? '#dc3545' : ($serverStats['disk_usage'] > 70 ? '#ffc107' : '#28a745'); ?>;"></div>
-                        </div>
-                    </div>
                 </div>
 
-                <!-- Threat Activity -->
                 <div class="monitor-card">
                     <div class="monitor-title">⚠️ Threat Activity (Last 24h)</div>
                     <div class="threat-item">
@@ -892,49 +951,6 @@ $conn->close();
                         <span class="threat-name">Brute Force Attacks</span>
                         <span class="threat-count"><?php echo $threatActivity['brute_force']; ?></span>
                     </div>
-                    <div class="threat-item">
-                        <span class="threat-name">DDoS Attempts</span>
-                        <span class="threat-count"><?php echo $threatActivity['ddos']; ?></span>
-                    </div>
-                    <div class="threat-item">
-                        <span class="threat-name">Unauthorized Access</span>
-                        <span class="threat-count"><?php echo $threatActivity['unauthorized_access']; ?></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Network Performance -->
-        <div class="section">
-            <div class="section-header">
-                <div class="section-title">🌐 Network Performance</div>
-            </div>
-            <div class="monitoring-grid">
-                <div class="monitor-card">
-                    <div class="monitor-title">Bandwidth Usage</div>
-                    <div class="gauge-value"><?php echo $serverStats['bandwidth_usage']; ?>%</div>
-                    <div class="progress-bar-custom">
-                        <div class="progress-fill-custom" style="width: <?php echo $serverStats['bandwidth_usage']; ?>%; background: <?php echo $serverStats['bandwidth_usage'] > 80 ? '#dc3545' : ($serverStats['bandwidth_usage'] > 60 ? '#ffc107' : '#28a745'); ?>;"></div>
-                    </div>
-                </div>
-                <div class="monitor-card">
-                    <div class="monitor-title">Latency</div>
-                    <div class="gauge-value" style="color: <?php echo $serverStats['latency'] > 100 ? 'var(--danger)' : ($serverStats['latency'] > 50 ? 'var(--warning)' : 'var(--success)'); ?>">
-                        <?php echo $serverStats['latency']; ?> ms
-                    </div>
-                    <div class="progress-bar-custom">
-                        <div class="progress-fill-custom" style="width: <?php echo min(100, ($serverStats['latency'] / 200) * 100); ?>%; background: <?php echo $serverStats['latency'] > 100 ? '#dc3545' : ($serverStats['latency'] > 50 ? '#ffc107' : '#28a745'); ?>;"></div>
-                    </div>
-                </div>
-                <div class="monitor-card">
-                    <div class="monitor-title">Packet Loss</div>
-                    <div class="gauge-value" style="color: <?php echo $serverStats['packet_loss'] > 2 ? 'var(--danger)' : ($serverStats['packet_loss'] > 1 ? 'var(--warning)' : 'var(--success)'); ?>">
-                        <?php echo $serverStats['packet_loss']; ?>%
-                    </div>
-                    <div class="progress-bar-custom">
-                        <div class="progress-fill-custom" style="width: <?php echo min(100, $serverStats['packet_loss'] * 10); ?>%; background: <?php echo $serverStats['packet_loss'] > 2 ? '#dc3545' : ($serverStats['packet_loss'] > 1 ? '#ffc107' : '#28a745'); ?>;"></div>
-                    </div>
-                    <div style="font-size: 0.65rem; margin-top: 0.5rem;">Target: &lt; 1%</div>
                 </div>
             </div>
         </div>
@@ -944,6 +960,7 @@ $conn->close();
             <div class="section-header">
                 <div class="section-title">👥 User Management</div>
                 <div>
+                    <button class="btn btn-success" onclick="openAddUserModal()" style="margin-right: 0.5rem;">➕ Add New User</button>
                     <button class="btn btn-warning btn-sm" onclick="resetAllHrPasswords()">Reset All HR Passwords</button>
                 </div>
             </div>
@@ -952,11 +969,14 @@ $conn->close();
                     <thead>
                         <tr>
                             <th>ID</th>
+                            <th>OID</th>
                             <th>Username</th>
                             <th>Full Name</th>
                             <th>Role</th>
                             <th>Email</th>
-                            <th>Created At</th>
+                            <th>Cost Center</th>
+                            <th>Section</th>
+                            <th>Created</th>
                             <th>Last Login</th>
                             <th>Actions</th>
                         </tr>
@@ -965,18 +985,21 @@ $conn->close();
                         <?php while ($user = $usersResult->fetch_assoc()): ?>
                             <tr>
                                 <td><?php echo $user['id']; ?></td>
+                                <td><?php echo htmlspecialchars($user['oid']); ?></td>
                                 <td><?php echo htmlspecialchars($user['username']); ?></td>
                                 <td><?php echo htmlspecialchars($user['full_name']); ?></td>
                                 <td>
                                     <span class="role-badge role-<?php echo $user['role']; ?>">
                                         <?php echo strtoupper($user['role']); ?>
                                     </span>
-                                    </span>
+                                </td>
                                 <td><?php echo htmlspecialchars($user['email'] ?? '-'); ?></td>
+                                <td><?php echo htmlspecialchars($user['costcenter'] ?? '-'); ?></td>
+                                <td><?php echo htmlspecialchars($user['section'] ?? '-'); ?></td>
                                 <td><?php echo date('Y-m-d', strtotime($user['created_at'])); ?></td>
                                 <td><?php echo $user['last_login'] ? date('Y-m-d H:i', strtotime($user['last_login'])) : 'Never'; ?></td>
                                 <td>
-                                    <button class="btn btn-sm" onclick="openResetModal(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['username']); ?>')">Reset Password</button>
+                                    <button class="btn btn-sm" onclick="openResetModal(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['username']); ?>')">Reset Pwd</button>
                                     <?php if ($user['id'] != $_SESSION['user_id']): ?>
                                         <button class="btn btn-danger btn-sm" onclick="deleteUser(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['username']); ?>')">Delete</button>
                                     <?php endif; ?>
@@ -997,52 +1020,12 @@ $conn->close();
                 <div>
                     <strong>PHP Version:</strong> <?php echo phpversion(); ?><br>
                     <strong>Server Software:</strong> <?php echo $_SERVER['SERVER_SOFTWARE']; ?><br>
-                    <strong>Database:</strong> MySQL / MariaDB<br>
-                    <strong>Session Save Path:</strong> <?php echo session_save_path() ?: 'Default'; ?>
-                </div>
-                <div>
-                    <strong>Upload Max Size:</strong> <?php echo ini_get('upload_max_filesize'); ?><br>
-                    <strong>Post Max Size:</strong> <?php echo ini_get('post_max_size'); ?><br>
-                    <strong>Memory Limit:</strong> <?php echo ini_get('memory_limit'); ?><br>
-                    <strong>Max Execution Time:</strong> <?php echo ini_get('max_execution_time'); ?> seconds
+                    <strong>Database:</strong> MySQL / MariaDB
                 </div>
                 <div>
                     <strong>Timezone:</strong> <?php echo date_default_timezone_get(); ?><br>
-                    <strong>Current Time:</strong> <?php echo date('Y-m-d H:i:s'); ?><br>
-                    <strong>Server Time:</strong> <?php echo date('Y-m-d H:i:s', time()); ?>
+                    <strong>Current Time:</strong> <?php echo date('Y-m-d H:i:s'); ?>
                 </div>
-            </div>
-        </div>
-
-        <!-- Quick Actions Section -->
-        <div class="section">
-            <div class="section-header">
-                <div class="section-title">⚡ Quick Actions</div>
-            </div>
-            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-                <a href="admin/data_history.php" class="btn">📜 View Audit Log</a>
-                <button class="btn btn-warning" onclick="openClearCacheModal()">🗑️ Clear System Cache</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Clear Cache Confirmation Modal -->
-    <div id="clearCacheModal" class="modal">
-        <div class="modal-content" style="max-width: 400px;">
-            <div class="modal-header">
-                <h3>🗑️ Clear System Cache</h3>
-                <button class="close-modal" onclick="closeClearCacheModal()">&times;</button>
-            </div>
-            <div style="padding: 1rem 0;">
-                <p>⚠️ <strong>Warning:</strong> This action will clear the system cache.</p>
-                <p style="font-size: 0.8rem; margin-top: 0.5rem; color: var(--warning);">
-                    This may temporarily slow down the system while caches rebuild.
-                </p>
-                <p style="font-size: 0.8rem; margin-top: 0.5rem;">Are you sure you want to continue?</p>
-            </div>
-            <div class="modal-buttons" style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem;">
-                <button class="btn" onclick="closeClearCacheModal()">Cancel</button>
-                <button class="btn btn-warning" onclick="confirmClearCache()">Yes, Clear Cache</button>
             </div>
         </div>
     </div>
@@ -1074,7 +1057,7 @@ $conn->close();
                 <div id="selectedPasswordDisplay" style="margin: 0.5rem 0; padding: 0.5rem; background: var(--dark-bg); border-radius: 5px; text-align: center; display: none;">
                     Selected: <strong id="selectedPasswordText"></strong>
                 </div>
-                <form id="resetForm" method="POST" style="margin-top: 1rem;">
+                <form id="resetForm" method="POST">
                     <input type="hidden" name="action" value="reset_password">
                     <input type="hidden" name="user_id" id="resetUserId">
                     <input type="hidden" name="new_password" id="resetPassword">
@@ -1084,21 +1067,104 @@ $conn->close();
         </div>
     </div>
 
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>➕ Add New User</h3>
+                <button class="close-modal" onclick="closeAddUserModal()">&times;</button>
+            </div>
+            <form id="addUserForm" method="POST" onsubmit="return validateAddUserForm()">
+                <input type="hidden" name="action" value="add_user">
+
+                <div class="form-group">
+                    <label>OID * (Organization ID)</label>
+                    <input type="text" name="oid" id="oid" required
+                        placeholder="e.g., 25582">
+                    <small>Unique Organization ID - Must be unique</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Username *</label>
+                    <input type="text" name="username" id="username" required
+                        placeholder="e.g., john.doe">
+                    <small>Unique login username</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Full Name *</label>
+                    <input type="text" name="full_name" id="full_name" required
+                        placeholder="e.g., John Doe">
+                </div>
+
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" name="email" id="email"
+                        placeholder="abebe@ethiopianairlines.com">
+                </div>
+
+                <div class="form-group">
+                    <label>Role *</label>
+                    <select name="role" id="role" required>
+                        <option value="">Select Role</option>
+                        <option value="hr">HR Specialist</option>
+                        <option value="qa auditor">QA Auditor</option>
+                        <option value="manager">Manager</option>
+                        <option value="director">Director</option>
+                        <option value="md">Managing Director</option>
+                        <option value="it_admin">IT Admin</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Cost Center</label>
+                    <input type="text" name="costcenter" id="costcenter"
+                        placeholder="e.g., MROMG335">
+                </div>
+
+                <div class="form-group">
+                    <label>Section/Department</label>
+                    <input type="text" name="section" id="section"
+                        placeholder="e.g., HR Department">
+                </div>
+
+                <div class="form-group">
+                    <label>Password *</label>
+                    <div class="password-input-group">
+                        <input type="password" name="password" id="password" required>
+                        <button type="button" class="btn btn-sm" onclick="generateRandomPassword()">Generate</button>
+                        <button type="button" class="btn btn-sm" onclick="setDefaultPassword()">Set Default</button>
+                    </div>
+                    <small>Minimum 6 characters. Default: password123</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Confirm Password *</label>
+                    <input type="password" name="confirm_password" id="confirm_password" required>
+                </div>
+
+                <div class="modal-buttons">
+                    <button type="button" class="btn" onclick="closeAddUserModal()" style="background: var(--border-light);">Cancel</button>
+                    <button type="submit" class="btn btn-success">Create User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         let currentUserId = null;
         let selectedPasswordValue = null;
 
+        // Reset Password Modal Functions
         function openResetModal(userId, username) {
             currentUserId = userId;
             document.getElementById('resetUserId').value = userId;
             document.getElementById('resetUsername').textContent = username;
             document.getElementById('resetModal').style.display = 'flex';
-            // Reset selection
             selectedPasswordValue = null;
             document.getElementById('resetPassword').value = '';
             document.getElementById('selectedPasswordDisplay').style.display = 'none';
             document.getElementById('confirmResetBtn').disabled = true;
-            // Remove selected class from all options
             document.querySelectorAll('.password-option').forEach(opt => {
                 opt.classList.remove('selected');
             });
@@ -1109,20 +1175,68 @@ $conn->close();
         }
 
         function selectPassword(element, password) {
-            // Remove selected class from all options
             document.querySelectorAll('.password-option').forEach(opt => {
                 opt.classList.remove('selected');
             });
-
-            // Add selected class to clicked option
             element.classList.add('selected');
-
-            // Set the selected password
             selectedPasswordValue = password;
             document.getElementById('resetPassword').value = password;
             document.getElementById('selectedPasswordText').textContent = password;
             document.getElementById('selectedPasswordDisplay').style.display = 'block';
             document.getElementById('confirmResetBtn').disabled = false;
+        }
+
+        // Add User Modal Functions
+        function openAddUserModal() {
+            document.getElementById('addUserModal').style.display = 'flex';
+            document.getElementById('addUserForm').reset();
+        }
+
+        function closeAddUserModal() {
+            document.getElementById('addUserModal').style.display = 'none';
+        }
+
+        function generateRandomPassword() {
+            const length = 10;
+            const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
+            let password = "";
+            for (let i = 0; i < length; i++) {
+                const randomIndex = Math.floor(Math.random() * charset.length);
+                password += charset[randomIndex];
+            }
+            document.getElementById('password').value = password;
+            document.getElementById('confirm_password').value = password;
+        }
+
+        function setDefaultPassword() {
+            document.getElementById('password').value = 'password123';
+            document.getElementById('confirm_password').value = 'password123';
+        }
+
+        function validateAddUserForm() {
+            const oid = document.getElementById('oid').value;
+            const username = document.getElementById('username').value;
+            const fullName = document.getElementById('full_name').value;
+            const role = document.getElementById('role').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm_password').value;
+
+            if (!oid || !username || !fullName || !role) {
+                alert('Please fill in all required fields (OID, Username, Full Name, and Role)');
+                return false;
+            }
+
+            if (password !== confirmPassword) {
+                alert('Passwords do not match!');
+                return false;
+            }
+
+            if (password.length < 6) {
+                alert('Password must be at least 6 characters long!');
+                return false;
+            }
+
+            return true;
         }
 
         function resetAllHrPasswords() {
@@ -1140,72 +1254,12 @@ $conn->close();
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.innerHTML = `
-                <input type="hidden" name="action" value="delete_user">
-                <input type="hidden" name="user_id" value="${userId}">
-            `;
+                    <input type="hidden" name="action" value="delete_user">
+                    <input type="hidden" name="user_id" value="${userId}">
+                `;
                 document.body.appendChild(form);
                 form.submit();
             }
-        }
-
-        // Clear Cache Modal Functions
-        function openClearCacheModal() {
-            document.getElementById('clearCacheModal').style.display = 'flex';
-        }
-
-        function closeClearCacheModal() {
-            document.getElementById('clearCacheModal').style.display = 'none';
-        }
-
-        function confirmClearCache() {
-            closeClearCacheModal();
-
-            // Create a div for message display
-            let messageDiv = document.getElementById('cacheMessage');
-            if (!messageDiv) {
-                messageDiv = document.createElement('div');
-                messageDiv.id = 'cacheMessage';
-                messageDiv.style.cssText = 'position: fixed; top: 80px; right: 20px; z-index: 9999; min-width: 300px;';
-                document.body.appendChild(messageDiv);
-            }
-
-            // Show loading message
-            messageDiv.innerHTML = `<div class="alert alert-info" style="animation: slideIn 0.3s ease-out; background: rgba(56, 189, 248, 0.2); border-color: var(--accent);">⏳ Clearing cache, please wait...</div>`;
-
-            fetch('clear_cache.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    }
-                })
-                .then(response => response.text())
-                .then(text => {
-                    try {
-                        // Try to parse as JSON
-                        const data = JSON.parse(text);
-                        if (data.success) {
-                            messageDiv.innerHTML = `<div class="alert alert-success" style="animation: slideIn 0.3s ease-out;">✓ ${data.message}</div>`;
-                        } else {
-                            messageDiv.innerHTML = `<div class="alert alert-error" style="animation: slideIn 0.3s ease-out;">⚠ ${data.message}${data.warnings ? '<br>' + data.warnings : ''}</div>`;
-                        }
-                        setTimeout(() => {
-                            if (messageDiv) messageDiv.innerHTML = '';
-                        }, 5000);
-                    } catch (e) {
-                        console.error('Parse error:', e);
-                        messageDiv.innerHTML = `<div class="alert alert-error" style="animation: slideIn 0.3s ease-out;">⚠ Error clearing cache. Please check server logs.</div>`;
-                        setTimeout(() => {
-                            if (messageDiv) messageDiv.innerHTML = '';
-                        }, 5000);
-                    }
-                })
-                .catch(error => {
-                    console.error('Fetch error:', error);
-                    messageDiv.innerHTML = `<div class="alert alert-error" style="animation: slideIn 0.3s ease-out;">⚠ Network error: ${error.message}</div>`;
-                    setTimeout(() => {
-                        if (messageDiv) messageDiv.innerHTML = '';
-                    }, 5000);
-                });
         }
 
         // Theme Manager
@@ -1256,13 +1310,13 @@ $conn->close();
 
         // Close modal when clicking outside
         window.onclick = function(event) {
-            const modal = document.getElementById('resetModal');
-            if (event.target === modal) {
+            const resetModal = document.getElementById('resetModal');
+            if (event.target === resetModal) {
                 closeResetModal();
             }
-            const clearCacheModal = document.getElementById('clearCacheModal');
-            if (event.target === clearCacheModal) {
-                closeClearCacheModal();
+            const addUserModal = document.getElementById('addUserModal');
+            if (event.target === addUserModal) {
+                closeAddUserModal();
             }
         }
 
@@ -1272,68 +1326,45 @@ $conn->close();
 
         // Function to open password change modal
         function openPasswordModal() {
-            // Check if modal already exists
             if (document.getElementById('passwordModalOverlay')) {
                 return;
             }
-
-            // Create modal container
             const modalOverlay = document.createElement('div');
             modalOverlay.id = 'passwordModalOverlay';
             modalOverlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            z-index: 10001;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        `;
-            // Add the onclick handler
-            modalOverlay.onclick = function() {
-                parent.closePasswordPopup();
-            };
-            // Create iframe to load the password change page
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                z-index: 10001;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
             const iframe = document.createElement('iframe');
             iframe.src = 'change_password.php';
             iframe.style.cssText = `
-            width: 100%;
-            max-width: 450px;
-            height: auto;
-            min-height: 450px;
-            border: none;
-            border-radius: 16px;
-            background: transparent;
-        `;
-
+                width: 100%;
+                max-width: 450px;
+                height: auto;
+                min-height: 450px;
+                border: none;
+                border-radius: 16px;
+                background: transparent;
+            `;
             modalOverlay.appendChild(iframe);
             document.body.appendChild(modalOverlay);
-
-            // Store reference to close function
             window.closePasswordPopup = function() {
                 if (modalOverlay && modalOverlay.parentNode) {
                     modalOverlay.remove();
                 }
                 delete window.closePasswordPopup;
             };
-
-            // Close on Escape key
-            const escapeHandler = function(e) {
-                if (e.key === 'Escape') {
-                    if (modalOverlay && modalOverlay.parentNode) {
-                        modalOverlay.remove();
-                        delete window.closePasswordPopup;
-                    }
-                    document.removeEventListener('keydown', escapeHandler);
-                }
-            };
-            document.addEventListener('keydown', escapeHandler);
         }
 
-        // Keep session alive by sending heartbeat every 5 minutes
+        // Keep session alive
         function keepSessionAlive() {
             fetch('keep_alive.php', {
                 method: 'GET',

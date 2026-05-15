@@ -986,6 +986,7 @@ unset($_SESSION['message'], $_SESSION['error']);
         <div class="navbar-container">
             <a href="master_data.php" class="navbar-brand">HR & Finance Dashboard</a>
             <div class="navbar-menu">
+
                 <a href="master_data.php" style="color: var(--accent);">Master Data</a>
                 <a href="../director/md_dashboard.php">Dashboard</a>
                 <a href="../admin/report_mro_cpr.php">Director Data Entry</a>
