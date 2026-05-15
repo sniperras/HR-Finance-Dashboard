@@ -812,7 +812,7 @@ $conn->close();
         <div class="navbar-container">
             <a href="it_admin_dashboard.php" class="navbar-brand">IT Admin Dashboard</a>
             <div class="navbar-menu">
-                <a href="it_admin_dashboard.php" style="color: var(--accent);">Dashboard</a>
+                <a href="it_admin_dashboard.php" style="color: var(--accent);">IT Dashboard</a>
                 <a href="admin/master_data.php">Master Data</a>
                 <a href="director/md_dashboard.php">Dashboard</a>
                 <div class="user-info">
