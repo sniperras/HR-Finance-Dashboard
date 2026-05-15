@@ -16,6 +16,8 @@ $currentMonthNum = date('m', strtotime($dataMonth));
 $username = $_SESSION['username'];
 $userDept = '';
 
+$theme = isset($_COOKIE['dashboard_theme']) ? $_COOKIE['dashboard_theme'] : 'dark';
+
 // Extract department from username (format: director_BMT, director_LMT, etc.)
 if (preg_match('/director_([A-Z\/\s]+)/', $username, $matches)) {
     $userDept = trim($matches[1]);
@@ -1310,29 +1312,48 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             }
 
             loadTheme() {
-                const savedTheme = localStorage.getItem(this.themeKey);
+                let savedTheme = this.getCookie(this.themeKey);
+                if (!savedTheme) {
+                    savedTheme = localStorage.getItem(this.themeKey);
+                }
                 if (savedTheme === 'light') {
                     document.body.classList.add('light-theme');
                     this.updateToggleButton(true);
-                    this.refreshCharts();
                 } else {
                     document.body.classList.remove('light-theme');
                     this.updateToggleButton(false);
-                    this.refreshCharts();
                 }
+            }
+
+            setCookie(name, value, days = 365) {
+                const expires = new Date();
+                expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+                document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+            }
+
+            getCookie(name) {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop().split(';').shift();
+                return null;
             }
 
             toggleTheme() {
                 if (document.body.classList.contains('light-theme')) {
                     document.body.classList.remove('light-theme');
                     localStorage.setItem(this.themeKey, 'dark');
+                    this.setCookie(this.themeKey, 'dark');
                     this.updateToggleButton(false);
+                    // Reload page to apply theme from PHP
+                    location.reload();
                 } else {
                     document.body.classList.add('light-theme');
                     localStorage.setItem(this.themeKey, 'light');
+                    this.setCookie(this.themeKey, 'light');
                     this.updateToggleButton(true);
+                    // Reload page to apply theme from PHP
+                    location.reload();
                 }
-                this.refreshCharts();
             }
 
             updateToggleButton(isLight) {
@@ -1340,18 +1361,6 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
                 if (toggleBtn) {
                     toggleBtn.innerHTML = isLight ? '🌙 Dark' : '☀️ Light';
                 }
-            }
-
-            refreshCharts() {
-                setTimeout(() => {
-                    for (const [id, chart] of Object.entries(chartInstances)) {
-                        if (chart && typeof chart.destroy === 'function') {
-                            chart.destroy();
-                        }
-                    }
-                    chartInstances = {};
-                    initializeCharts();
-                }, 100);
             }
 
             initToggle() {
