@@ -750,6 +750,13 @@ $conn->close();
                     <a href="qa_dashboard.php" class="active">QA Dashboard</a>
                     <a href="qa_report_entry.php">Upload Reports</a>
                 <?php endif; ?>
+
+                <?php if ($_SESSION['user_role'] == 'manager'): ?>
+                    <a href="qa_dashboard_tb.php">QA Summary Dashboard</a>
+                    <a href="qa_dashboard.php" class="active">QA Dashboard</a>
+                    <a href="../director/manager_dashboard.php">HR Dashboard</a>
+                <?php endif; ?>
+
                 <?php if ($_SESSION['user_role'] == 'director'): ?>
                     <a href="qa_dashboard_tb.php">QA Summary Dashboard</a>
                     <a href="qa_dashboard.php" class="active">QA Dashboard</a>

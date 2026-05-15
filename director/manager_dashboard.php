@@ -14,6 +14,9 @@ $username = $_SESSION['username'];
 $fullName = $_SESSION['full_name'];
 $userRole = $_SESSION['user_role'];
 
+// Get theme from cookie or default to dark
+$theme = isset($_COOKIE['dashboard_theme']) ? $_COOKIE['dashboard_theme'] : 'dark';
+
 // Get user's department and cost center from database
 $userQuery = "SELECT section, costcenter, full_name FROM users WHERE username = ?";
 $stmt = $conn->prepare($userQuery);
@@ -729,6 +732,10 @@ $conn->close();
         <div class="navbar-container">
             <a href="manager_dashboard.php" class="navbar-brand">MRO Dashboard</a>
             <div class="navbar-menu">
+                <a href="../qa/qa_dashboard_tb.php">QA Summary Dashboard</a>
+                <a href="../qa/qa_dashboard.php">QA Dashboard</a>
+                <a href="../director/manager_dashboard.php" style="color: var(--accent);">HR Dashboard</a>
+
                 <div class="user-info">
                     <button id="themeToggle" class="theme-toggle">☀️ Light</button>
                     <span class="user-name"><?php echo htmlspecialchars($userFullName); ?></span>
@@ -998,29 +1005,48 @@ $conn->close();
             }
 
             loadTheme() {
-                const savedTheme = localStorage.getItem(this.themeKey);
+                let savedTheme = this.getCookie(this.themeKey);
+                if (!savedTheme) {
+                    savedTheme = localStorage.getItem(this.themeKey);
+                }
                 if (savedTheme === 'light') {
                     document.body.classList.add('light-theme');
                     this.updateToggleButton(true);
-                    this.refreshCharts();
                 } else {
                     document.body.classList.remove('light-theme');
                     this.updateToggleButton(false);
-                    this.refreshCharts();
                 }
+            }
+
+            setCookie(name, value, days = 365) {
+                const expires = new Date();
+                expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+                document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+            }
+
+            getCookie(name) {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop().split(';').shift();
+                return null;
             }
 
             toggleTheme() {
                 if (document.body.classList.contains('light-theme')) {
                     document.body.classList.remove('light-theme');
                     localStorage.setItem(this.themeKey, 'dark');
+                    this.setCookie(this.themeKey, 'dark');
                     this.updateToggleButton(false);
+                    // Reload page to apply theme from PHP
+                    location.reload();
                 } else {
                     document.body.classList.add('light-theme');
                     localStorage.setItem(this.themeKey, 'light');
+                    this.setCookie(this.themeKey, 'light');
                     this.updateToggleButton(true);
+                    // Reload page to apply theme from PHP
+                    location.reload();
                 }
-                this.refreshCharts();
             }
 
             updateToggleButton(isLight) {
@@ -1028,18 +1054,6 @@ $conn->close();
                 if (toggleBtn) {
                     toggleBtn.innerHTML = isLight ? '🌙 Dark' : '☀️ Light';
                 }
-            }
-
-            refreshCharts() {
-                setTimeout(() => {
-                    for (const [id, chart] of Object.entries(chartInstances)) {
-                        if (chart && typeof chart.destroy === 'function') {
-                            chart.destroy();
-                        }
-                    }
-                    chartInstances = {};
-                    initializeCharts();
-                }, 100);
             }
 
             initToggle() {
