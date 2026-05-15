@@ -27,7 +27,10 @@ if (empty($userDept)) {
     exit();
 }
 
-// Define cost centers for the department
+// List of report types that should use cost_center_text from database instead of mapping
+$useDatabaseTextReports = ['Crew Meeting Minutes Submission'];
+
+// Define cost centers for the department (for non-Crew Meeting reports)
 $costCenters = [
     'BMT' => [
         'ACS' => 'Mgr. A/C Structure Maint',
@@ -151,8 +154,9 @@ if (empty($indicators)) {
 $reportData = [];      // For card display (will store AVERAGE of all percentages)
 $managerData = [];     // For detail modal
 $allPercentages = [];  // Track all percentages per indicator
+$dbTextData = [];      // Store cost_center_text for Crew Meeting reports
 
-$query = "SELECT report_type, cost_center_code, expected, completed, percentage 
+$query = "SELECT report_type, cost_center_code, cost_center_text, expected, completed, percentage 
           FROM mro_cpr_report 
           WHERE report_month = ? AND report_year = ? AND department = ? AND verification_status = 'verified'";
 $stmt = $conn->prepare($query);
@@ -163,6 +167,7 @@ $result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) {
     $reportType = $row['report_type'];
     $costCenter = $row['cost_center_code'];
+    $costCenterText = $row['cost_center_text'];
     $expected = (int)$row['expected'];
     $completed = (int)$row['completed'];
     $percentage = round((float)$row['percentage'], 1);
@@ -172,7 +177,19 @@ while ($row = $result->fetch_assoc()) {
         $managerData[$reportType] = [];
     }
 
-    $costCenterName = $costCenters[$userDept][$costCenter] ?? $costCenter;
+    // Determine display name - use database text for Crew Meeting reports, otherwise use mapping
+    $useDbText = in_array($reportType, $useDatabaseTextReports);
+    if ($useDbText && !empty($costCenterText)) {
+        $costCenterName = $costCenterText;
+        // Store the text for later use
+        if (!isset($dbTextData[$reportType])) {
+            $dbTextData[$reportType] = [];
+        }
+        $dbTextData[$reportType][$costCenter] = $costCenterText;
+    } else {
+        $costCenterName = $costCenters[$userDept][$costCenter] ?? $costCenter;
+    }
+
     $managerData[$reportType][$costCenter] = [
         'expected' => $expected,
         'completed' => $completed,
@@ -249,6 +266,7 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="icon" type="image/png" href="../assets/images/ethiopian_logo.ico">
     <style>
+        /* Keep all existing styles - same as before */
         :root {
             --dark-bg: #0F172A;
             --medium-bg: #1E293B;
@@ -278,7 +296,6 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             overflow-x: hidden;
         }
 
-        /* Fullscreen mode styles */
         body.fullscreen-mode {
             overflow: hidden;
         }
@@ -310,7 +327,6 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             width: 100%;
         }
 
-        /* Floating controls for fullscreen mode */
         .floating-controls {
             position: fixed;
             top: 0;
@@ -676,7 +692,6 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             font-size: 0.7rem;
         }
 
-        /* Modal Styles */
         .modal {
             display: none;
             position: fixed;
@@ -789,7 +804,6 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             margin-left: 0.5rem;
         }
 
-        /* Light Theme */
         body.light-theme {
             --dark-bg: #F8FAFC;
             --medium-bg: #FFFFFF;
@@ -855,7 +869,6 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
 </head>
 
 <body>
-    <!-- Floating controls for fullscreen mode -->
     <div class="floating-controls" id="floatingControls">
         <div class="dashboard-title"><?php echo htmlspecialchars($userDept); ?> Department Dashboard</div>
         <div class="overall-mini">
@@ -935,7 +948,6 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
         </div>
     </div>
 
-    <!-- Detail Modal -->
     <div id="detailModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -956,6 +968,10 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
         const userDept = '<?php echo $userDept; ?>';
         const currentMonth = '<?php echo $currentMonth; ?>';
         const averagePercentage = <?php echo $averagePercentage; ?>;
+
+        // For Crew Meeting reports, we have the actual text from database
+        const dbTextData = <?php echo json_encode($dbTextData ?? []); ?>;
+        const useDatabaseTextReports = <?php echo json_encode($useDatabaseTextReports); ?>;
 
         let chartInstances = {};
         let autoScrollInterval = null;
@@ -1005,19 +1021,13 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             });
         }
 
-        // Fullscreen functionality with smooth auto-scroll and pauses
         function toggleFullscreen() {
             const body = document.body;
             const container = document.getElementById('mainContainer');
 
             if (!body.classList.contains('fullscreen-mode')) {
-                // Enter fullscreen mode
                 body.classList.add('fullscreen-mode');
-
-                // Start auto-scrolling
                 startAutoScroll();
-
-                // Request actual browser fullscreen if available
                 if (document.documentElement.requestFullscreen) {
                     document.documentElement.requestFullscreen().catch(err => {
                         console.log(`Fullscreen error: ${err.message}`);
@@ -1030,13 +1040,8 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
 
         function exitFullscreen() {
             const body = document.body;
-
             body.classList.remove('fullscreen-mode');
-
-            // Stop auto-scrolling
             stopAutoScroll();
-
-            // Exit browser fullscreen
             if (document.exitFullscreen) {
                 document.exitFullscreen();
             }
@@ -1045,67 +1050,46 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
         function startAutoScroll() {
             const container = document.getElementById('mainContainer');
             if (!container) return;
-
-            stopAutoScroll(); // Clear any existing interval
-
+            stopAutoScroll();
             let isPaused = false;
             let scrollTimeout = null;
 
             function performScroll() {
                 if (isScrolling || isPaused) return;
-
                 isScrolling = true;
-
                 const maxScroll = container.scrollHeight - container.clientHeight;
                 const currentScroll = container.scrollTop;
-
-                // Check if we're at the bottom
                 const isAtBottom = currentScroll >= maxScroll - 10;
 
                 if (isAtBottom && maxScroll > 0) {
-                    // Pause at bottom for 2 seconds
                     isPaused = true;
                     isScrolling = false;
-
-                    // Clear any existing timeout
                     if (scrollTimeout) clearTimeout(scrollTimeout);
-
                     scrollTimeout = setTimeout(() => {
-                        // Smooth scroll to top
                         container.scrollTo({
                             top: 0,
                             behavior: 'smooth'
                         });
-
-                        // Pause at top for 2 seconds after reaching top
                         setTimeout(() => {
                             isPaused = false;
                             isScrolling = false;
                         }, 2000);
                     }, 2000);
-
                     return;
                 }
-
-                // Check if we're at the top and just finished scrolling (handled by the pause flag)
                 if (currentScroll <= 10 && isPaused) {
                     isScrolling = false;
                     return;
                 }
-
-                // Normal scroll down
                 let targetScroll = currentScroll + 2;
-
                 container.scrollTo({
                     top: targetScroll,
                     behavior: 'smooth'
                 });
-
                 setTimeout(() => {
                     isScrolling = false;
                 }, 50);
             }
-
             autoScrollInterval = setInterval(performScroll, 50);
         }
 
@@ -1116,12 +1100,9 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             }
         }
 
-        // Listen for fullscreen change events
         document.addEventListener('fullscreenchange', function() {
             if (!document.fullscreenElement) {
-                // User exited fullscreen via ESC key
                 const body = document.body;
-
                 if (body.classList.contains('fullscreen-mode')) {
                     body.classList.remove('fullscreen-mode');
                     stopAutoScroll();
@@ -1137,6 +1118,7 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             modalTitle.innerHTML = `${indicatorDisplay} - ${userDept} Department Details`;
 
             const data = managerData[indicatorKey] || {};
+            const isCrewMeeting = useDatabaseTextReports.includes(indicatorKey);
 
             // Collect ALL rows (both managers and director)
             let allRows = [];
@@ -1150,10 +1132,18 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
                     name: manager
                 };
 
+                // For Crew Meeting reports, try to use the actual database text if available
+                let displayName = manager;
+                if (isCrewMeeting && dbTextData[indicatorKey] && dbTextData[indicatorKey][code]) {
+                    displayName = dbTextData[indicatorKey][code];
+                } else if (record.name) {
+                    displayName = record.name;
+                }
+
                 if (code === 'DIR') {
                     directorData = {
                         code: code,
-                        name: manager,
+                        name: displayName,
                         expected: record.expected,
                         completed: record.completed,
                         percentage: record.percentage
@@ -1161,7 +1151,7 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
                 } else {
                     allRows.push({
                         code: code,
-                        name: manager,
+                        name: displayName,
                         expected: record.expected,
                         completed: record.completed,
                         percentage: record.percentage
@@ -1174,7 +1164,7 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
                 allRows.push(directorData);
             }
 
-            // Calculate totals for display
+            // Calculate totals
             let totalExpected = 0;
             let totalCompleted = 0;
             let totalPercentageSum = 0;
@@ -1186,11 +1176,9 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
                 totalPercentageSum += row.percentage;
             }
 
-            // Calculate the average of all completion percentages (sum / number of rows)
             const averageOfPercentages = rowCount > 0 ? (totalPercentageSum / rowCount) : 0;
-
-            // Calculate overall from actual totals (for reference)
-            const overallFromTotals = totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0;
+            const totalNotCompleted = totalExpected - totalCompleted;
+            const totalColor = getColor(averageOfPercentages);
 
             let tableHtml = `
                 <table class="detail-table">
@@ -1216,46 +1204,39 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
 
                 tableHtml += `
                     <tr class="${rowClass}">
-                        <td>${escapeHtml(row.name)}</td>
-                        <td>${row.expected}</td>
-                        <td>${row.completed}</td>
-                        <td>${notCompleted}</td>
-                        <td style="color: ${percentageColor}; font-weight: bold;">${row.percentage}%</td>
+                        <td>${escapeHtml(row.name)}</div>
+                        <td>${row.expected}</div>
+                        <td>${row.completed}</div>
+                        <td>${notCompleted}</div>
+                        <td style="color: ${percentageColor}; font-weight: bold;">${row.percentage}%</div>
                         <td>
                             <div class="progress-bar-modal">
                                 <div class="progress-fill-modal" style="width: ${row.percentage}%; background: ${percentageColor};"></div>
                             </div>
-                        </td>
+                        </div>
                     </tr>
                 `;
             }
 
-            // Add TOTAL row using AVERAGE OF PERCENTAGES (sum of all % / number of rows)
-            const totalColor = getColor(averageOfPercentages);
-            const totalNotCompleted = totalExpected - totalCompleted;
-
+            // Add TOTAL row
             tableHtml += `
                 <tr style="background: rgba(56, 189, 248, 0.2); font-weight: bold;">
-                    <td><strong>TOTAL (Avg of %)</strong></td>
-                    <td><strong>${totalExpected}</strong></td>
-                    <td><strong>${totalCompleted}</strong></td>
-                    <td><strong>${totalNotCompleted}</strong></td>
+                    <td><strong>TOTAL (Avg of %)</strong></div>
+                    <td><strong>${totalExpected}</strong></div>
+                    <td><strong>${totalCompleted}</strong></div>
+                    <td><strong>${totalNotCompleted}</strong></div>
                     <td style="color: ${totalColor}; font-weight: bold; font-size: 1.1rem;">
                         <strong>${averageOfPercentages.toFixed(1)}%</strong>
-                    </td>
+                    </div>
                     <td>
                         <div class="progress-bar-modal">
                             <div class="progress-fill-modal" style="width: ${averageOfPercentages}%; background: ${totalColor};"></div>
                         </div>
-                    </td>
+                    </div>
                 </tr>
             `;
 
-            tableHtml += `
-                    </tbody>
-                </table>
-            `;
-
+            tableHtml += `</tbody></div>`;
             modalBody.innerHTML = tableHtml;
             modal.style.display = 'flex';
         }
@@ -1301,7 +1282,6 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             }
         }
 
-        // Theme Manager
         class ThemeManager {
             constructor() {
                 this.themeKey = 'dashboard_theme';
@@ -1373,7 +1353,6 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             new ThemeManager();
             initializeCharts();
 
-            // Initialize fullscreen buttons
             const fullscreenBtn = document.getElementById('fullscreenHeaderBtn');
             const exitFullscreenBtn = document.getElementById('exitFullscreenBtn');
 
@@ -1385,22 +1364,18 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
                 exitFullscreenBtn.addEventListener('click', exitFullscreen);
             }
 
-            // Update floating overall percentage
             const floatingOverall = document.getElementById('floatingOverall');
             if (floatingOverall) {
                 floatingOverall.textContent = averagePercentage + '%';
             }
 
-            // Pause auto-scroll on user interaction
             const container = document.getElementById('mainContainer');
             if (container) {
                 let userScrollTimeout = null;
 
                 container.addEventListener('wheel', function() {
                     if (document.body.classList.contains('fullscreen-mode')) {
-                        // Temporarily pause auto-scroll on user scroll
                         stopAutoScroll();
-                        // Restart after 5 seconds of inactivity
                         if (userScrollTimeout) clearTimeout(userScrollTimeout);
                         userScrollTimeout = setTimeout(() => {
                             if (document.body.classList.contains('fullscreen-mode')) {
@@ -1424,7 +1399,6 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             }
         });
 
-        // Function to open password change modal
         function openPasswordModal() {
             if (document.getElementById('passwordModalOverlay')) {
                 return;
@@ -1481,11 +1455,12 @@ $averagePercentage = $count > 0 ? round($totalPercentage / $count, 1) : 0;
             document.addEventListener('keydown', escapeHandler);
         }
 
-        // Keep session alive by sending heartbeat every 5 minutes
         function keepSessionAlive() {
             fetch('/HRandMDDash/keep_alive.php', {
                 method: 'GET',
                 cache: 'no-cache'
+
+
             }).catch(error => console.log('Session keep-alive failed:', error));
         }
 

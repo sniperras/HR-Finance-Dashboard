@@ -19,7 +19,7 @@ if (empty($department) || empty($indicator)) {
     exit();
 }
 
-// Cost center mapping for ALL departments
+// Cost center mapping for NON-Crew Meeting reports
 $costCenterMapping = [
     'BMT' => [
         'ACS' => 'Mgr. A/C Structure Maint',
@@ -92,9 +92,12 @@ $costCenterMapping = [
     ]
 ];
 
+// List of report types that should use cost_center_text from database instead of mapping
+$useDatabaseTextReports = ['Crew Meeting Minutes Submission'];
+
 $conn = getConnection();
 
-$query = "SELECT cost_center_code, expected, completed, percentage 
+$query = "SELECT cost_center_code, cost_center_text, expected, completed, percentage 
           FROM mro_cpr_report 
           WHERE department = ? AND report_type = ? AND report_month = ? AND report_year = ?
           ORDER BY FIELD(cost_center_code, 'DIR'), cost_center_code";
@@ -105,13 +108,21 @@ $stmt->execute();
 $result = $stmt->get_result();
 
 $data = [];
+$useDatabaseText = in_array($indicator, $useDatabaseTextReports);
+
 while ($row = $result->fetch_assoc()) {
     $costCenterCode = $row['cost_center_code'];
-    // Get the display name from mapping
-    $costCenterText = isset($costCenterMapping[$department][$costCenterCode]) 
-        ? $costCenterMapping[$department][$costCenterCode] 
-        : $costCenterCode;
-    
+
+    // For Crew Meeting reports, use the actual cost_center_text from database
+    // For other reports, use the mapping
+    if ($useDatabaseText && !empty($row['cost_center_text'])) {
+        $costCenterText = $row['cost_center_text'];
+    } else {
+        $costCenterText = isset($costCenterMapping[$department][$costCenterCode])
+            ? $costCenterMapping[$department][$costCenterCode]
+            : $costCenterCode;
+    }
+
     $data[] = [
         'cost_center_code' => $costCenterCode,
         'cost_center_text' => $costCenterText,
@@ -125,4 +136,3 @@ $stmt->close();
 $conn->close();
 
 echo json_encode(['success' => true, 'data' => $data]);
-?>

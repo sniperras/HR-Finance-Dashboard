@@ -1120,6 +1120,32 @@ function hasDirector($costCentersList)
                     html += `</tbody></table>`;
                 }
             }
+            // For Crew Meeting Minutes Submission report
+            else if (currentReportType === 'Crew Meeting Minutes Submission') {
+                for (const [dept, records] of Object.entries(data)) {
+                    if (records && records.length > 0) {
+                        html += `<h4 style="color: var(--accent); margin: 1rem 0 0.5rem 0; border-bottom: 1px solid var(--border-light); padding-bottom: 0.25rem;">📁 ${escapeHtml(dept)}</h4>`;
+                        html += `<table class="preview-table" style="width:100%; margin-bottom:1rem;">`;
+                        html += `<thead><tr><th>Cost Center</th><th>Expected</th><th>Completed</th><th>Not Completed</th><th>%</th></tr></thead><tbody>`;
+
+                        for (const record of records) {
+                            const expected = record.expected || 0;
+                            const completed = record.completed || 0;
+                            const notCompleted = record.not_completed || (expected - completed);
+                            const percentage = record.percentage || (expected > 0 ? ((completed / expected) * 100).toFixed(1) : 0);
+
+                            html += `<tr>
+                    <td>${escapeHtml(record.cost_center_text || record.cost_center_code || '')}</td>
+                    <td>${expected}</td>
+                    <td>${completed}</td>
+                    <td>${notCompleted}</td>
+                    <td>${typeof percentage === 'number' ? percentage.toFixed(1) : percentage}%</td>
+                </tr>`;
+                        }
+                        html += `</tbody></table>`;
+                    }
+                }
+            }
 
             if (html === '') {
                 html = '<p>No data to preview</p>';
@@ -1218,6 +1244,9 @@ function hasDirector($costCentersList)
                         case 'Annual Vacation Utilization Status':
                             uploadScript = 'upload_annualleave_report.php';
                             break;
+                        case 'Crew Meeting Minutes Submission':
+                            uploadScript = 'upload_crew_meeting.php';
+                            break;
                         default:
                             // For other report types, we'll need to build upload scripts
                             const uploadMsg = document.getElementById('uploadMessage');
@@ -1277,6 +1306,9 @@ function hasDirector($costCentersList)
                                 break;
                             case 'Annual Vacation Utilization Status':
                                 saveScript = 'save_annualleave_upload.php';
+                                break;
+                            case 'Crew Meeting Minutes Submission':
+                                saveScript = 'save_crew_meeting.php';
                                 break;
                             default:
                                 const uploadMsg = document.getElementById('uploadMessage');

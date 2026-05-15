@@ -30,7 +30,7 @@ $allDepartments = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'PSCM', 'MRO 
 // Define main departments for MD/DIV calculation (exclude MD/DIV and Remainder)
 $mainDepartments = ['BMT', 'LMT', 'CMT', 'EMT', 'AEP', 'MSM', 'QA', 'PSCM', 'MRO HR'];
 
-// Define cost center mapping for ALL departments (for displaying manager names)
+// Define cost center mapping for ALL departments (for displaying manager names) - ONLY for non-Crew Meeting reports
 $costCenterMapping = [
     'BMT' => [
         'ACS' => 'Mgr. A/C Structure Maint',
@@ -165,7 +165,7 @@ $departmentColors = [
 ];
 
 // ==============================================
-// MODIFIED: Fetch ALL data from mro_cpr_report (ALL cost centers, not just DIR)
+// Fetch ALL data from mro_cpr_report
 // ==============================================
 $dbData = [];
 $allPercentagesByDept = []; // Store all percentages per department per indicator
@@ -174,7 +174,7 @@ $year = date('Y', strtotime($dataMonth));
 $month = date('m', strtotime($dataMonth));
 
 // Fetch ALL cost centers for ALL departments
-$query = "SELECT report_type as indicator_name, department, cost_center_code, percentage, expected, completed 
+$query = "SELECT report_type as indicator_name, department, cost_center_code, cost_center_text, percentage, expected, completed 
           FROM mro_cpr_report 
           WHERE report_month = ? AND report_year = ? AND verification_status = 'verified'";
 
@@ -190,6 +190,7 @@ while ($row = $result->fetch_assoc()) {
     $actual = $row['completed'];
     $target = $row['expected'];
     $costCenter = $row['cost_center_code'];
+    $costCenterText = $row['cost_center_text'];
 
     // Store ALL data for later use in modal
     if (!isset($dbData[$indicator])) {
@@ -202,7 +203,8 @@ while ($row = $result->fetch_assoc()) {
         'percentage' => $percentage,
         'actual' => $actual,
         'target' => $target,
-        'cost_center' => $costCenter
+        'cost_center' => $costCenter,
+        'cost_center_text' => $costCenterText
     ];
 
     // Track all percentages for this department and indicator (for calculating average)
@@ -238,7 +240,8 @@ while ($row = $masterResult->fetch_assoc()) {
             'percentage' => $percentage,
             'actual' => $row['actual_value'],
             'target' => $row['target_value'],
-            'cost_center' => 'DIR'
+            'cost_center' => 'DIR',
+            'cost_center_text' => 'Director/Total'
         ];
 
         if (!isset($allPercentagesByDept[$indicator][$dept])) {
@@ -250,7 +253,7 @@ while ($row = $masterResult->fetch_assoc()) {
 $masterStmt->close();
 
 // ==============================================
-// MODIFIED: Calculate department percentages as AVERAGE of all cost centers (MGR + DIR)
+// Calculate department percentages as AVERAGE of all cost centers (MGR + DIR)
 // ==============================================
 $metricsData = [];
 foreach ($indicators as $indicatorKey => $indicatorInfo) {
@@ -368,6 +371,7 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="icon" type="image/png" href="../assets/images/ethiopian_logo.ico">
     <style>
+        /* Keep existing styles - same as before */
         :root {
             --dark-bg: #0F172A;
             --medium-bg: #1E293B;
@@ -717,18 +721,6 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
             border: 1px solid var(--border-light);
             display: flex;
             flex-direction: column;
-        }
-
-        @media (max-width: 768px) {
-            .metric-card:hover {
-                transform: none;
-                box-shadow: none;
-            }
-
-            .dept-bar-item.clickable:hover {
-                background: none;
-                transform: none;
-            }
         }
 
         .metric-header {
@@ -1321,10 +1313,17 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                     let totalCompleted = 0;
 
                     for (const record of data.data) {
-                        if (record.cost_center_code === 'DIR') {
+                        // For Crew Meeting report, use cost_center_text as display name
+                        let displayName = record.cost_center_text || record.cost_center_code;
+
+                        if (record.cost_center_code === 'DIR' || displayName.includes('Director') || displayName.includes('Dir.')) {
                             directorData = record;
+                            directorData.display_name = displayName;
                         } else {
-                            managerRows.push(record);
+                            managerRows.push({
+                                ...record,
+                                display_name: displayName
+                            });
                         }
                         totalExpected += parseInt(record.expected) || 0;
                         totalCompleted += parseInt(record.completed) || 0;
@@ -1336,7 +1335,7 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                         const percentage = parseFloat(record.percentage) || 0;
                         const notCompleted = expected - completed;
                         const percentageColor = getScoreColor(percentage);
-                        tableHtml += `<tr><td>${record.cost_center_text || record.cost_center_code}</td><td>${expected}</td><td>${completed}</td><td>${notCompleted}</td><td style="color: ${percentageColor}; font-weight: bold;">${percentage}%</td><td><div class="progress-bar-modal"><div class="progress-fill-modal" style="width: ${percentage}%; background: ${percentageColor};"></div></div></td></tr>`;
+                        tableHtml += `<tr><td>${record.display_name}</td><td>${expected}</td><td>${completed}</td><td>${notCompleted}</td><td style="color: ${percentageColor}; font-weight: bold;">${percentage}%</td><td><div class="progress-bar-modal"><div class="progress-fill-modal" style="width: ${percentage}%; background: ${percentageColor};"></div></div></td></tr>`;
                     }
 
                     if (directorData) {
@@ -1345,7 +1344,7 @@ $averageOverall = $countOverall > 0 ? round($totalOverall / $countOverall, 1) : 
                         const dirPercentage = parseFloat(directorData.percentage) || 0;
                         const dirNotCompleted = dirExpected - dirCompleted;
                         const dirColor = getScoreColor(dirPercentage);
-                        tableHtml += `<tr class="director-row"><td><strong>${directorData.cost_center_text || 'Director/Total'}</strong></td><td><strong>${dirExpected}</strong></td><td><strong>${dirCompleted}</strong></td><td><strong>${dirNotCompleted}</strong></td><td style="color: ${dirColor}; font-weight: bold;"><strong>${dirPercentage}%</strong></td><td><div class="progress-bar-modal"><div class="progress-fill-modal" style="width: ${dirPercentage}%; background: ${dirColor};"></div></div></td></tr>`;
+                        tableHtml += `<tr class="director-row"><td><strong>${directorData.display_name || 'Director/Total'}</strong></td><td><strong>${dirExpected}</strong></td><td><strong>${dirCompleted}</strong></td><td><strong>${dirNotCompleted}</strong></td><td style="color: ${dirColor}; font-weight: bold;"><strong>${dirPercentage}%</strong></td><td><div class="progress-bar-modal"><div class="progress-fill-modal" style="width: ${dirPercentage}%; background: ${dirColor};"></div></div></td></tr>`;
                     }
 
                     // Calculate average of all percentages
